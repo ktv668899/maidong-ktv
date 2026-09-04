@@ -42,10 +42,31 @@ class SongListAdapter(
     private val nextPageFocusId: Int,
     private val stateFor: (Song) -> SongRowState,
     private val callbacks: SongListCallbacks,
+    private val initialRowHeightPx: Int = 0,
+    private val rowsPerPage: Int = 0,
 ) : BaseAdapter() {
     private val density = context.resources.displayMetrics.density
     private val columns = if (mode in SINGLE_COLUMN_MODES) 1 else 2
     private val cardIds = HashMap<String, Int>()
+
+    /** 当前行高(px)。0 = 保持内容自然高度(滚动列表用)。 */
+    var rowHeightPx: Int = initialRowHeightPx
+        private set
+
+    /**
+     * 让行高铺满可用高度: 把列表可视高度按每页行数均分(分页列表专用)。
+     * 超出 min/max 范围时收敛, 避免过小/过大。滚动列表(rowsPerPage<=0)忽略。
+     */
+    fun fitRowHeight(availableHeightPx: Int) {
+        if (rowsPerPage <= 0 || availableHeightPx <= 0) return
+        val minPx = dp(52)
+        val maxPx = dp(160)
+        val fitted = (availableHeightPx / rowsPerPage).coerceIn(minPx, maxPx)
+        if (fitted != rowHeightPx) {
+            rowHeightPx = fitted
+            notifyDataSetChanged()
+        }
+    }
 
     private fun cardId(index: Int): Int = cardIds.getOrPut(songKey(songs[index])) { View.generateViewId() }
 
@@ -64,27 +85,34 @@ class SongListAdapter(
     }
 
     override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-        if (columns == 1) {
-            return createSingleRow(songs[position], position).apply {
+        val view = if (columns == 1) {
+            createSingleRow(songs[position], position).apply {
                 if (position == count - 1) nextFocusDownId = previousPageFocusId
             }
-        }
-        return LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            val cells = mutableListOf<View>()
-            repeat(2) { column ->
-                val index = position * 2 + column
-                val cell = songs.getOrNull(index)?.let {
-                    createCatalogCell(it, index, column, position == count - 1)
-                } ?: View(context)
-                cells += cell
-                addView(
-                    cell,
-                    LinearLayout.LayoutParams(0, dp(60), 1f),
-                )
+        } else {
+            LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                repeat(2) { column ->
+                    val index = position * 2 + column
+                    val cell = songs.getOrNull(index)?.let {
+                        createCatalogCell(it, index, column, position == count - 1)
+                    } ?: View(context)
+                    addView(
+                        cell,
+                        LinearLayout.LayoutParams(0, -1, 1f),
+                    )
+                }
             }
         }
+        // 分页列表: 让整行背景铺满均分行高; 滚动列表保持自然高度。
+        if (rowHeightPx > 0) {
+            view.layoutParams = android.widget.AbsListView.LayoutParams(
+                android.widget.AbsListView.LayoutParams.MATCH_PARENT,
+                rowHeightPx,
+            )
+        }
+        return view
     }
 
     private fun createSingleRow(song: Song, index: Int): View = when (mode) {

@@ -9091,6 +9091,13 @@ class MainActivity : AppCompatActivity() {
         }
         val pageOffset = if (mode == "rank") browsePage * browsePageSize() else 0
         val existing = modernSongAdapter?.takeIf { it.matches(mode, pageOffset) && list.adapter === it }
+        // 分页网格/排行列表: 行高自适应铺满屏幕(2列目录每页5行, 排行单列每页6行);
+        // 可滚动的队列/下载/已唱列表保持自然行高(rowsPerPage=0)。
+        val rowsPerPage = when (mode) {
+            "catalog" -> 5
+            "rank" -> 6
+            else -> 0
+        }
         val listAdapter = existing ?: SongListAdapter(
             this,
             visibleSongs,
@@ -9109,11 +9116,17 @@ class MainActivity : AppCompatActivity() {
                 },
                 onPauseResume = { song -> toggleDownloadPause(song) },
             ),
+            initialRowHeightPx = 0,
+            rowsPerPage = rowsPerPage,
         ).also {
             modernSongAdapter = it
             list.adapter = it
         }
         if (existing != null) listAdapter.notifyDataSetChanged()
+        // 布局完成后按实际可视高度拉满各行, 消除投影/高分屏底部空白。
+        if (rowsPerPage > 0) {
+            list.post { if (list.adapter === listAdapter) listAdapter.fitRowHeight(list.height) }
+        }
 
         val targetPosition = focusedMarker?.let(listAdapter::adapterPositionFor)
             ?: oldSelectedPosition.takeIf { it >= 0 }
