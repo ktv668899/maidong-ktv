@@ -300,6 +300,7 @@ class MainActivity : AppCompatActivity() {
     private val browseDisplayRequests = HashMap<BrowseCacheKey, Int>()
     private var searchScope = "song"
     private var activeSettingsEntries: List<SettingsEntry> = emptyList()
+    private var activeSettingsAdapter: SettingsListAdapter? = null
     private var activeSearchQuery = ""
     private var searchLanguage = "全部"
     private var searchContextId = ""
@@ -459,6 +460,10 @@ class MainActivity : AppCompatActivity() {
         startupSong?.let { restoredSong ->
             play(restoredSong)
             updateBottomBar(restoredSong, true)
+        } ?: run {
+            // 启动时没有恢复的播放与已点歌曲: 曲库就绪后自动随机播放本地已下载歌曲
+            // (与"点歌列表播放完毕自动随机本地歌曲"同一逻辑), 避免开机后空白等待。
+            startupRandomPending = true
         }
         // Keep initialization on the loading state until the external catalog is ready.
         SongApiClient.init(this)  // 主线程初始化 JS Bridge
@@ -507,6 +512,13 @@ class MainActivity : AppCompatActivity() {
                         showHomePage()
                         if (usedOldDatabase && bootstrapError != null) toast("曲库更新失败，已使用本地曲库")
                         if (catalogRefreshPending) refreshCurrentCatalogPage()
+                        // 启动自动随机播放: 仅当启动时无恢复播放/空队列且允许顺序播放时触发一次。
+                        if (startupRandomPending) {
+                            startupRandomPending = false
+                            if (autoNext && orderQueue!!.isEmpty() && currentSong == null) {
+                                main.postDelayed({ playRandomLocalSong(startup = true) }, 600L)
+                            }
+                        }
                     }
                 } else {
                     val reason = bootstrapError?.message.orEmpty().ifBlank { "未找到可用曲库" }
@@ -5140,10 +5152,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * 已点队列自然播放完毕后，从本机所有有效歌曲中随机续播。
+     * 从本机所有有效歌曲中随机续播(启动自动播放 / 点歌列表播放完毕均走此逻辑)。
      * 随机歌曲不写入已点列表；用户此时点歌会立即取消本次随机请求并优先播放已点歌曲。
      */
-    private fun playRandomLocalSong() {
+    private fun playRandomLocalSong(startup: Boolean = false) {
         val previousSongId = currentSong?.let(::stableId) ?: lastRandomLocalSongId
         val requestSerial = ++randomLocalRequestSerial
         playbackPreparing = true
@@ -5152,7 +5164,7 @@ class MainActivity : AppCompatActivity() {
         currentSong = null
         clearLyrics()
         updateBottomBar(null, false)
-        status?.text = "已点播放完成，正在随机本地歌曲..."
+        status?.text = if (startup) "正在随机播放本地歌曲..." else "已点播放完成，正在随机本地歌曲..."
         persistRuntimeState()
 
         io.execute {
@@ -6242,6 +6254,8 @@ class MainActivity : AppCompatActivity() {
     private var fullScreenPreviousVolume = 70
     private var randomLocalRequestSerial = 0L
     private var lastRandomLocalSongId: String? = null
+    /** 启动时无恢复播放/空队列: 曲库就绪后自动随机播放本地已下载歌曲(仅触发一次)。 */
+    private var startupRandomPending = false
     private var advancingPlayback = false
     private var lastAutoAdvanceAtMs = 0L
     private var fullScreenChromeVisible = false
@@ -8135,7 +8149,12 @@ class MainActivity : AppCompatActivity() {
                 },
             )
             1 -> listOf(
-                SettingsEntry(R.drawable.ott_ic_data_upgrade, "曲库", "数据库 ${library.muse.songCount()} 首  本地已下载 ${countDownloadedFiles()} 首", "更新") {
+                SettingsEntry(
+                    R.drawable.ott_ic_data_upgrade,
+                    "曲库",
+                    "统计中…",
+                    "更新",
+                ) {
                     io.execute { library.muse.close(); library.muse.open(); main.post { showSettingsSection(1, false) } }
                 },
                 SettingsEntry(R.drawable.ott_ic_data_setting, "U盘加歌", "扫描U盘内按规定命名的歌曲文件，并添加到曲库中", "立即加歌") { toast("未检测到U盘") },
@@ -8164,9 +8183,25 @@ class MainActivity : AppCompatActivity() {
         songList!!.dividerHeight = dp(12)
         songList!!.setBackgroundColor(Color.TRANSPARENT)
         val settingsAdapter = SettingsListAdapter(this, entries, R.id.btn_back)
+        activeSettingsAdapter = settingsAdapter
         songList!!.adapter = settingsAdapter
         btnBack?.nextFocusDownId = settingsAdapter.firstActionId
         if (requestInitialFocus) settingsAdapter.requestInitialFocus(songList!!)
+        // 数据设置: 曲库/下载数统计较耗时(逐文件校验), 移到 IO 线程, 避免进入界面卡顿。
+        if (section == 1) refreshLibraryStatsAsync(settingsAdapter)
+    }
+
+    /** IO 线程统计曲库歌曲数与本地已下载数, 完成后原位回填"曲库"条副标题。 */
+    private fun refreshLibraryStatsAsync(adapter: SettingsListAdapter) {
+        io.execute {
+            val count = runCatching { library.muse.songCount() }.getOrDefault(0)
+            val downloaded = runCatching { countDownloadedFiles() }.getOrDefault(0)
+            main.post {
+                if (activeSettingsAdapter === adapter) {
+                    adapter.updateSubtitle("曲库", "数据库 $count 首  本地已下载 $downloaded 首")
+                }
+            }
+        }
     }
 
     private fun isNetworkConnected(): Boolean {

@@ -15,7 +15,7 @@ import android.widget.Switch
 data class SettingsEntry(
     val icon: Int,
     val title: String,
-    val subtitle: String = "",
+    var subtitle: String = "",
     val actionText: String = "设置",
     val checked: Boolean? = null,
     val action: () -> Unit,
@@ -110,6 +110,16 @@ class SettingsListAdapter(
 
     fun requestInitialFocus(list: ListView, onTargetReady: (View) -> Unit = {}) {
         requestFocusAt(list, 0, onTargetReady)
+    }
+
+    /** 原位更新某条目的副标题(如异步统计完成后回填), 不重建列表、不丢焦点。 */
+    fun updateSubtitle(title: String, newSubtitle: String) {
+        val index = entries.indexOfFirst { it.title == title }
+        if (index < 0) return
+        val entry = entries[index]
+        if (entry.subtitle == newSubtitle) return
+        entry.subtitle = newSubtitle
+        notifyDataSetChanged()
     }
 
     fun positionForMarker(marker: String): Int? {
