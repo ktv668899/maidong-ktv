@@ -57,6 +57,11 @@ class KtvJsBridge(context: Context) {
     private var loadedFromCache = false
     private var assetRetryAttempted = false
 
+    /** 最近一次点歌实际命中的歌曲源 host(由 JS reportSongResult 更新, 供远程日志)。 */
+    @Volatile
+    var lastSongSourceHost: String = ""
+        private set
+
     /** 必须最终在主线程创建 WebView；可从任意线程调用。 */
     fun init(callback: (Boolean) -> Unit) {
         mainHandler.post {
@@ -212,7 +217,7 @@ class KtvJsBridge(context: Context) {
         runCatching {
             file.isFile && file.length() in 1_001..500_000 &&
                 file.readText(Charsets.UTF_8).let {
-                    it.contains("KtvApi") && it.contains("KTV_BRIDGE_API: 7")
+                    it.contains("KtvApi") && it.contains("KTV_BRIDGE_API: 8")
                 }
         }.getOrDefault(false)
 
@@ -238,7 +243,7 @@ class KtvJsBridge(context: Context) {
                     val script = String(bytes, StandardCharsets.UTF_8)
                     require(
                         script.length > 1000 && script.contains("KtvApi") &&
-                            script.contains("KTV_BRIDGE_API: 7"),
+                            script.contains("KTV_BRIDGE_API: 8"),
                     ) { "Invalid or incompatible JS file" }
                     tempFile.writeText(script, Charsets.UTF_8)
                     if (!tempFile.renameTo(cacheFile)) {
@@ -295,6 +300,21 @@ class KtvJsBridge(context: Context) {
         @JavascriptInterface
         fun httpPost(url: String, body: String, headersJson: String, timeoutMs: Int): String =
             request("POST", url, body, headersJson, timeoutMs)
+
+        // 任务3: JS 点歌结果上报(成功/失败 + 实际命中的歌曲源 host)。
+        // 由 Kotlin 调用方(SongOkDownloadManager)补充标题后写入远程日志,
+        // 同时成功即表示窗口/网络恢复 → 复位 e.ac19 窗口守卫提示状态。
+        @JavascriptInterface
+        fun reportSongResult(status: String, host: String, musicno: String, detail: String) {
+            val ok = status == "ok"
+            if (host.isNotBlank()) lastSongSourceHost = host
+            if (ok) Eac19WindowGuard.noteUrlOk()
+            // 具体含标题的日志由 SongOkDownloadManager 在拿到 URL 后统一写,
+            // 这里只留简短来源记录, 避免重复刷屏。
+            if (!ok) {
+                MiliLog.error("点歌失败 编号=$musicno 请求源=$host 详情=${detail.take(160)}")
+            }
+        }
 
         private fun request(method: String, url: String, body: String?, headersJson: String, timeoutMs: Int): String {
             // 歌曲源(如 w.w345.my)的 do.php 风控只放行"干净"请求(原版仅 Host+Accept;

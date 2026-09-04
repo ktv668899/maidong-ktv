@@ -135,8 +135,8 @@ object SongOkDownloadManager {
         }
         val musicNo = song.filename?.removeSuffix(".ts")?.removeSuffix(".ls") ?: song.id
         return SongApiClient.getSongDownloadUrl(musicNo).orEmpty().also { url ->
-            // 请求源 = 配置的歌曲源(与 JS ktv_api.js CONFIG.HOSTS 同步)。
-            val srcHost = "w.w345.my"
+            // 请求源 = 本次点歌实际命中的源(JS 上报); 取不到时留空。
+            val srcHost = SongApiClient.lastSongSourceHost()
             if (url.isNotEmpty()) {
                 song.downloadUrl = url
                 val cdnHost = runCatching { java.net.URI(url).host }.getOrNull() ?: "unknown"

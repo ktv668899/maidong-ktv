@@ -12,7 +12,7 @@
 (function(global) {
   'use strict';
 
-  // KTV_BRIDGE_API: 7 (Android 缓存校验标记，请勿删除)
+  // KTV_BRIDGE_API: 8 (Android 缓存校验标记，请勿删除)
 
   // ─── 配置 ──────────────────────────────────────────
   const CONFIG = {
@@ -21,8 +21,16 @@
     SDK_KEY: '19042303a8374f67ae3fe1e25c97936f',
     VN:      '4.100.5.11121504',
     VER:     '4',
-    // 歌曲源: 仅 w.w345.my(e.ac19.cn 同后台的另一入口, 无 api.php 登记端点)。
-    HOSTS:   ['http://w.w345.my'],
+    // 歌曲源(均为同一后台的多个入口; 运行时按可用性自动排序, 解析失败的源沉底)。
+    HOSTS:   [
+      'http://w.w345.my',
+      'http://desktok.top',
+      'http://mm.kk456.top',
+      'http://w.w345.my:66',
+      'http://z.w345.my',
+      'http://b.sktv.top',
+      'http://w345.my',
+    ],
     HOST:    'http://w.w345.my',
     MWS:     'https://mws.cherryonline.cn',
     RSA_PUBKEY: 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAucL0oFErd7REM6TSNa3EZdN1YaOs4J1eCybLPyoQ9ru3q1HU67agC9FzhrCG/RvAQUya5iPmQ8Caed05vqcCVcyJChmkSOGQ7DVShe2rGuTMNlpoRV6UzfcraaVS++7m2K/+kSZJ8OAhhhVuqPruMjsFYpdtstAwvyZT28b+eENwzpp9UHqsooZc7FZ0H8kTbs6XMkw4nIWo+4HoPAhNLEY+xdHvwY6drF/3WDTvsaoMrs73TVQCEEHzZNIz2H/is9VLMnIyOfnfcJi9br78Fj2xHzxu3sAySBOTVLmUMxqYh/g1ox5OXGcW93HJkQLkBi42tFAEkWYlYyl93+jbbQIDAQAB'
@@ -142,6 +150,15 @@
     return false;
   }
 
+  // 任务3: 点歌结果上报(成功/失败 + 实际命中的源) → Android 侧写入远程日志。
+  function reportSongResult(ok, host, musicno, detail) {
+    try {
+      if (global.android && typeof global.android.reportSongResult === 'function') {
+        global.android.reportSongResult(ok ? 'ok' : 'fail', host, String(musicno), String(detail || ''));
+      }
+    } catch(e) { /* 日志失败不影响点歌 */ }
+  }
+
   async function httpGet(url, timeout) {
     timeout = timeout || 8000;
     // 原 APK 的 native GET 抓包只带 Accept: */*，不伪造来源 IP。
@@ -185,6 +202,9 @@
     this.mac = options.mac || randomHex(16);
     this.sn = options.sn || randomHex(16);
     this.tokens = {};
+    // 歌曲源自动排序: 维护一份"当前优先级"列表(运行时可变)。
+    // 某源解析失败时把它挪到队尾, 下次点歌优先尝试更可靠的源。
+    this.sourceOrder = (options.hosts && options.hosts.length ? options.hosts : CONFIG.HOSTS).slice();
     // 与 test_ktv_unified.py 一致：首次设备加最多 3 次换设备重试。
     this.maxDeviceRetries = Number.isFinite(Number(options.maxDeviceRetries))
       ? Math.max(0, Number(options.maxDeviceRetries) | 0) : 3;
@@ -195,6 +215,26 @@
 
   KtvApi.prototype = {
     _log: function(msg) { if (this.debug) console.log('[KtvApi]', msg); },
+
+    /** 将失败的源移到优先级队尾(自动排序)。host 不在列表时忽略。 */
+    demoteSource: function(host) {
+      var idx = this.sourceOrder.indexOf(host);
+      if (idx < 0) return;
+      this.sourceOrder.splice(idx, 1);
+      this.sourceOrder.push(host);
+      this._log('Source demoted to end (解析失败): ' + host);
+      this._log('Source order now: ' + this.sourceOrder.join(' > '));
+    },
+
+    /** 成功解析的源提到队首(最近成功优先; 曾失败的源恢复后自然回到前面)。 */
+    promoteSource: function(host) {
+      var idx = this.sourceOrder.indexOf(host);
+      if (idx <= 0) return;
+      this.sourceOrder.splice(idx, 1);
+      this.sourceOrder.unshift(host);
+      this._log('Source promoted to front (解析成功): ' + host);
+      this._log('Source order now: ' + this.sourceOrder.join(' > '));
+    },
 
     regenerateDevice: function() {
       this.mac = randomHex(16);
@@ -299,69 +339,89 @@
     },
 
     // 3. Get Song Download URL
-    // 当前仅使用 w.w345.my(与 e.ac19.cn 同后台的另一入口, 只对 ls=1 返回真源)。
-    // 结构保留 host/device 循环, 便于日后恢复多节点/备用源。
+    // 多源自动排序: 按 this.sourceOrder(当前优先级)依次尝试; 某源解析失败
+    // (token 失败 / do.php 非 200 / 广告错号 / 无有效 URL)时立即 demote 到队尾,
+    // 下次点歌自动优先使用更可靠的源。全部源失败返回 null。
     getSongUrl: async function(musicno, resolution, h265, _preferredLs) {
       resolution = resolution || '720';
       h265 = !!h265;
-      var preferredLs = String(_preferredLs == null ? '1' : _preferredLs);
       var self = this;
+      var lastDetail = '';
+      var lastAttemptHost = '';
       for (var deviceRound = 0; deviceRound <= self.maxDeviceRetries; deviceRound++) {
         if (deviceRound > 0) self.regenerateDevice();
-        for (var hostIndex = 0; hostIndex < CONFIG.HOSTS.length; hostIndex++) {
-          var host = CONFIG.HOSTS[hostIndex];
-          self._log((hostIndex === 0 ? 'Primary' : 'Fallback') +
-            ' host, device round ' + (deviceRound + 1) + ': ' + host);
+        // 每一轮使用当时的优先级快照; demote 动态修改 sourceOrder。
+        var order = self.sourceOrder.slice();
+        for (var hostIndex = 0; hostIndex < order.length; hostIndex++) {
+          var host = order[hostIndex];
+          lastAttemptHost = host;
+          self._log('Try source (' + (hostIndex + 1) + '/' + order.length + '): ' + host);
 
           var token = await self.getToken(host, false);
-          if (!token) { self._log('token-fail: ' + host); continue; }
+          if (!token) {
+            lastDetail = 'token-fail';
+            self._log('token-fail: ' + host + ' → demote');
+            self.demoteSource(host);
+            continue;
+          }
 
-          // w.w345.my 与 e.ac19.cn 同后台, 只试 ls=1(其余 ls 值会被其风控直接拒绝,
-          // 反复试会放大请求量)。若未来恢复多节点/备用源, 需按节点保留 ls 轮询。
+          // 各源同后台, 只试 ls=1(其余 ls 值会被其风控直接拒绝, 反复试会放大请求量)。
           var lsValues = ['1'];
+          var hostOk = false;
+          var hostDetail = '';
 
-          for (var lsi = 0; lsi < lsValues.length; lsi++) {
+          for (var lsi = 0; lsi < lsValues.length && !hostOk; lsi++) {
             var ls = lsValues[lsi];
             try {
               var data = await self._fetchSongUrl(host, musicno, token, ls, resolution, h265);
-              // 抓包证实: i.php 下发的 token 恒定不变(端到端同一值, 不随 time/请求变化),
-              // do.php 返回 403"检测到异常行为"是风控限流, 与 token 过期无关。
-              // 原版遇 403 不重取 token, 而是同 token 间隔几秒重试数次后停手(等风控窗口
-              // 过去再成功)。因此这里: 403/失败/广告命中时同 token 短退避重试一次,
-              // 不再清 token 重取 i.php(那会多打一倍请求, 反而放大限流)。
-              // 任务4: do.php code=200 但返回广告/错号资源(如 wb66 719.ts)也算失败,
-              // 退避重试一次, 给服务端机会返回与 musicno 一致的真源。
+              // token 恒定不变; do.php 403"检测到异常行为"是风控限流, 与 token 过期无关。
+              // 403/失败/广告命中时同 token 短退避重试一次, 不再清 token 重取 i.php。
+              // 广告/错号资源(如 wb66 719.ts)也算失败, 退避重试一次等真源。
               var needRetry = data.code !== 200;
               if (!needRetry && data.code === 200 && isDemoUrl(data.data || '', musicno)) {
                 self._log('广告/错号资源 (ls=' + ls + '): ' + String(data.data).slice(0, 90));
                 needRetry = true;
               }
               if (needRetry) {
-                self._log('do.php code=' + data.code + ' http=' + (data.httpStatus || 0) +
-                  ' for ' + musicno + ' ls=' + ls + '; retry once with same token');
+                hostDetail = 'do.php code=' + data.code + ' http=' + (data.httpStatus || 0);
+                self._log(hostDetail + ' for ' + musicno + ' ls=' + ls + '; retry once with same token');
                 await sleep(3000);
                 data = await self._fetchSongUrl(host, musicno, token, ls, resolution, h265);
               }
 
               if (data.code === 200) {
                 var songUrl = data.data || '';
-                // 任务4: 广告/错误资源屏蔽——返回的文件编号与请求不一致即视为广告
-                // (例: 请求 7018878 却返回 719.ts / wb66 demo 等), 一律丢弃。
+                // 任务4: 返回的文件编号与请求不一致即视为广告/错误资源, 一律丢弃。
                 if (songUrl && !isDemoUrl(songUrl, musicno) && /^https?:\/\//i.test(songUrl)) {
                   self._log('URL OK: ' + musicno + ' ls=' + ls + ' via ' + host);
+                  self.promoteSource(host);
+                  hostOk = true;
+                  // 任务3: 点歌成功上报命中的源(Android 侧写入远程日志)。
+                  reportSongResult(true, host, musicno, 'ok');
                   return songUrl;
                 }
-                if (isDemoUrl(songUrl, musicno))
-                  self._log('仍为广告/错号资源 (ls=' + ls + '): ' + String(songUrl).slice(0, 90));
-                // 不是 demo 但也无效 (空/格式不对) → 继续试下一个 ls
+                if (isDemoUrl(songUrl, musicno)) {
+                  hostDetail = '仍为广告/错号资源 (ls=' + ls + ')';
+                  self._log(hostDetail + ': ' + String(songUrl).slice(0, 90));
+                }
               }
             } catch(e) {
+              hostDetail = e.message;
               self._log('Failed ls=' + ls + ': ' + host + ', ' + e.message);
             }
           }
-          self._log('All ls values exhausted for ' + host);
+
+          // 该源所有 ls 都未取到有效 URL → 判定解析失败, 排到最后。
+          if (!hostOk) {
+            lastDetail = hostDetail || 'no-url';
+            self._log('Source failed (' + (hostDetail || 'no-url') + ') → demote: ' + host);
+            self.demoteSource(host);
+          }
         }
       }
+      self._log('All sources exhausted for ' + musicno + ' (' + lastDetail + ')');
+      // 任务3: 全部源失败 → 上报最后尝试的源与原因。
+      reportSongResult(false, lastAttemptHost, musicno, lastDetail || 'all-sources-failed');
       return null;
     },
 
@@ -375,7 +435,7 @@
   // ─── 导出 ──────────────────────────────────────────
   global.KtvApi = KtvApi;
   global.KtvApiConfig = CONFIG;
-  global.KtvBridgeApiVersion = 7;
+  global.KtvBridgeApiVersion = 8;
 
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = {KtvApi: KtvApi, CONFIG: CONFIG};

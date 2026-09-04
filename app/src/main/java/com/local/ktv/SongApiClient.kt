@@ -108,4 +108,8 @@ object SongApiClient {
 
     @JvmStatic
     fun clearTokenCache() {}
+
+    /** 最近一次点歌实际命中的歌曲源 host(由 JS 上报, 用于远程日志)。 */
+    @JvmStatic
+    fun lastSongSourceHost(): String = bridge?.lastSongSourceHost.orEmpty()
 }
