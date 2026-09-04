@@ -1806,7 +1806,7 @@ class MainActivity : AppCompatActivity() {
                 // 关于
                 addSettingsTitle(content, "关于")
                 addSettingsItem(content, "应用名称", "麦动", null)
-                addSettingsItem(content, "版本号", "1.0.0", null)
+                addSettingsItem(content, "版本号", BuildConfig.VERSION_NAME, null)
                 addSettingsItem(
                     content,
                     "曲库",
@@ -3380,7 +3380,7 @@ class MainActivity : AppCompatActivity() {
             try {
                 val sb = StringBuilder()
                 sb.append("BOOT pkg=").append(packageName)
-                sb.append(" ver=").append(BuildConfig.VERSION_NAME).append('(').append(BuildConfig.VERSION_CODE).append(')')
+                sb.append(" ver=").append(BuildConfig.VERSION_NAME)
                 sb.append(" device=").append(Build.BRAND).append(' ').append(Build.MODEL)
                 sb.append(" android=").append(Build.VERSION.RELEASE).append("(api").append(Build.VERSION.SDK_INT).append(')')
                 sb.append(" abi=").append(Build.SUPPORTED_ABIS?.joinToString(","))
