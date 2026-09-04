@@ -56,3 +56,41 @@
 - Stable focus during list refreshes, paging, tab changes, and song ordering.
 - Focus changes color only and preserves each control's original dimensions, corners, and layout.
 - A consistent circular Maidong logo across the home screen, player, and application information.
+
+## Project Notice
+
+> **UI/feature framework credit**: [https://gitee.com/yangyachao-X/maidong-ktv](https://gitee.com/yangyachao-X/maidong-ktv)
+>
+> This repository reworks the upstream "Maidong KTV" UI and feature framework, and the core/data layer was
+> rewritten with **DSH (DeepSeek Harness)**: library sync, song-source integration, device auth,
+> risk-control handling, remote logging, and ad blocking are all new implementations.
+
+Highlights of the reworked data layer:
+
+- **Library**: synced exclusively from the official Muse service
+  (`mconn.cherryonline.cn` `mls-api/v1/sqlite/sync`); Gitee hosts code only, no database files.
+- **Song source**: `w.w345.my` (`i.php` token → `do.php` playback URL) with fixed device identity and
+  reproduced signing; ad/mismatched resources (e.g. `wb66.cn/.../719.ts`) are blocked and retried.
+- **Remote logging**: optional RFC 3164 syslog over TCP+TLS (`zb.kasugano.cn:514`).
+- **JS hot-update**: `app/src/main/assets/mobile/ktv_api.js`, requires the `KTV_BRIDGE_API: 7` marker.
+
+## Building
+
+Requirements: JDK 17, Android SDK (`compileSdk 35`, `minSdk 21`, `targetSdk 25`),
+Gradle wrapper 8.13 (bundled).
+
+```bash
+cd maidong-ktv
+export JAVA_HOME=/path/to/jdk-17
+export ANDROID_HOME=/path/to/android-sdk
+export ANDROID_SDK_ROOT=$ANDROID_HOME
+./gradlew assembleRelease
+```
+
+The release signing config in `app/build.gradle` expects `../../ktv_keystore.jks` (one level above the
+repo root) with alias `ktv` / password `123456`; adjust paths or use `signingConfigs.debug` for a
+quick unsigned build. Output: `app/build/outputs/apk/release/app-release.apk`
+(dual ABI: `armeabi-v7a` + `arm64-v8a`). Install with `adb install -r <apk>`.
+
+For non-commercial learning purposes only. Respect upstream copyright and song licensing.
+
