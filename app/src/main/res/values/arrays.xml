@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="app_filter_not_show">
+        <item>com.hhc.muse.device</item>
+        <item>com.hhc.muse.manager</item>
+        <item>com.hhc.muse.launcher</item>
+        <item>com.hhc.muse.watch</item>
+        <item>com.google.android.inputmethod.latin</item>
+        <item>io.titannetwork.service</item>
+    </string-array>
+    <string-array name="not_uninstall_app">
+        <item>com.alphainventor.filemanager</item>
+        <item>com.android.chrome</item>
+    </string-array>
+    <string-array name="system_pre_app">
+        <item>com.alphainventor.filemanager</item>
+        <item>com.android.chrome</item>
+    </string-array>
+</resources>

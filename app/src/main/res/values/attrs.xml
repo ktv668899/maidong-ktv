@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 精简的自定义属性声明:仅包含布局中通过 app: 命名空间使用的自定义属性。
+     已排除由 androidx.constraintlayout / androidx.appcompat 定义的标准属性
+     (layout_constraint*、layout_goneMargin*、srcCompat、navigationContentDescription)。 -->
+<resources>
+
+    <!-- ===== 枚举类型属性 ===== -->
+    <attr name="circular_direction" format="enum">
+        <enum name="clockwise" value="0" />
+        <enum name="counterclockwise" value="1" />
+        <enum name="anticlockwise" value="1" />
+    </attr>
+    <attr name="gradientType" format="enum">
+        <enum name="linear" value="0" />
+        <enum name="radial" value="1" />
+        <enum name="sweep" value="2" />
+    </attr>
+    <attr name="input_orientation" format="enum">
+        <enum name="horizontal" value="0" />
+        <enum name="vertical" value="1" />
+    </attr>
+    <attr name="kb_orientation" format="enum">
+        <enum name="portrait" value="0" />
+        <enum name="landscape" value="1" />
+        <enum name="ott" value="2" />
+    </attr>
+    <attr name="keyboard_type" format="enum">
+        <enum name="abc" value="0" />
+        <enum name="abc_number" value="1" />
+        <enum name="number_only" value="2" />
+        <enum name="symbol" value="3" />
+        <enum name="symbol_number" value="4" />
+    </attr>
+    <attr name="progressCap" format="enum">
+        <enum name="butt" value="0" />
+        <enum name="round" value="1" />
+        <enum name="square" value="2" />
+    </attr>
+    <attr name="screen" format="enum">
+        <enum name="landscape" value="0" />
+        <enum name="portrait" value="1" />
+    </attr>
+    <attr name="seekBarRotation" format="enum">
+        <enum name="CW0" value="0" />
+        <enum name="CW90" value="1" />
+        <enum name="CW180" value="2" />
+        <enum name="CW270" value="3" />
+    </attr>
+    <attr name="skinColorType" format="enum">
+        <enum name="color1" value="0" />
+        <enum name="color2" value="1" />
+        <enum name="color3" value="2" />
+    </attr>
+
+    <!-- ===== 布尔类型属性 ===== -->
+    <attr name="autoPlay" format="boolean" />
+    <attr name="borderTop" format="boolean" />
+    <attr name="doubleLangNewLine" format="boolean" />
+    <attr name="drawDot" format="boolean" />
+    <attr name="fillBackground" format="boolean" />
+    <attr name="itemWrapContent" format="boolean" />
+    <attr name="keepAlpha" format="boolean" />
+    <attr name="keepTextColor" format="boolean" />
+    <attr name="showBorder" format="boolean" />
+    <attr name="showPercent" format="boolean" />
+    <attr name="showSelectedBg" format="boolean" />
+    <attr name="supportDoubleLang" format="boolean" />
+    <attr name="supportHorizontalScroll" format="boolean" />
+    <attr name="textBold" format="boolean" />
+    <attr name="textInCenter" format="boolean" />
+    <attr name="textItalic" format="boolean" />
+    <attr name="vertical" format="boolean" />
+
+    <!-- ===== 颜色类型属性 ===== -->
+    <attr name="gradientEndColor" format="color" />
+    <attr name="keyTextColor" format="color" />
+    <attr name="progressBackgroundColor" format="color" />
+    <attr name="progressColor" format="color" />
+    <attr name="progress_reached_color" format="color" />
+    <attr name="progress_text_color" format="color" />
+    <attr name="progress_unreached_color" format="color" />
+    <attr name="shadowColor" format="color" />
+    <attr name="textColor" format="color" />
+    <attr name="textColorFocused" format="color" />
+    <attr name="textColorSelected" format="color" />
+    <attr name="textEnd" format="color" />
+    <attr name="textEndColor" format="color" />
+    <attr name="textStart" format="color" />
+    <attr name="textStartColor" format="color" />
+
+    <!-- ===== 尺寸类型属性 ===== -->
+    <attr name="dividerPadding" format="dimension" />
+    <attr name="imageHeight" format="dimension" />
+    <attr name="imageWidth" format="dimension" />
+    <attr name="itemMarginStart" format="dimension" />
+    <attr name="itemWidth" format="dimension" />
+    <attr name="keyHeight" format="dimension" />
+    <attr name="keyMargin" format="dimension" />
+    <attr name="keyTextSize" format="dimension" />
+    <attr name="keyWidth" format="dimension" />
+    <attr name="paddingBottomNoButtons" format="dimension" />
+    <attr name="paddingTopNoTitle" format="dimension" />
+    <attr name="progressBackgroundStrokeWidth" format="dimension" />
+    <attr name="progressStrokeWidth" format="dimension" />
+    <attr name="progress_reached_bar_height" format="dimension" />
+    <attr name="progress_text_size" format="dimension" />
+    <attr name="progress_unreached_bar_height" format="dimension" />
+    <attr name="riv_corner_radius" format="dimension" />
+    <attr name="riv_corner_radius_top_right" format="dimension" />
+    <attr name="textSize" format="dimension" />
+    <attr name="textSizeSelected" format="dimension" />
+
+    <!-- ===== 整数类型属性 ===== -->
+    <attr name="changeCount" format="integer" />
+    <attr name="column" format="integer" />
+    <attr name="defaultNumber" format="integer" />
+    <attr name="maxNumber" format="integer" />
+    <attr name="minNumber" format="integer" />
+    <attr name="progress_current" format="integer" />
+    <attr name="progress_max" format="integer" />
+    <attr name="row" format="integer" />
+
+    <!-- ===== 浮点类型属性 ===== -->
+    <attr name="shadowDx" format="float" />
+    <attr name="shadowDy" format="float" />
+    <attr name="shadowRadius" format="float" />
+
+    <!-- ===== 引用类型属性 ===== -->
+    <attr name="bg" format="reference|color" />
+    <attr name="btnChecked" format="reference" />
+    <attr name="btnUnchecked" format="reference" />
+    <attr name="divider" format="reference" />
+    <attr name="empty_tip" format="reference|string" />
+    <attr name="image" format="reference" />
+    <attr name="invalidIcon" format="reference" />
+    <attr name="itemBg" format="reference|color" />
+    <attr name="keyBg" format="reference|color" />
+    <attr name="normalIcon" format="reference" />
+
+    <!-- ===== 字符串类型属性 ===== -->
+    <attr name="buttonText" format="string" />
+    <attr name="source" format="string" />
+    <attr name="text" format="string" />
+
+    <!-- ===== skin.support 皮肤框架主题属性(通过 ?attrName 引用) ===== -->
+    <attr name="skinAlertDialogBackground" format="reference|color" />
+    <attr name="skinAlertDialogControlHighlightColor" format="color" />
+    <attr name="skinAlertDialogListDivider" format="reference" />
+    <attr name="skinAlertDialogListItemTextColor" format="color" />
+    <attr name="skinAlertDialogMessageTextColor" format="color" />
+    <attr name="skinAlertDialogNegativeButtonTextColor" format="color" />
+    <attr name="skinAlertDialogNeutralButtonTextColor" format="color" />
+    <attr name="skinAlertDialogPositiveButtonTextColor" format="color" />
+    <attr name="skinAlertDialogTitleTextColor" format="color" />
+    <attr name="skinListChoiceIndicatorMultiple" format="reference" />
+    <attr name="skinListChoiceIndicatorSingle" format="reference" />
+
+</resources>

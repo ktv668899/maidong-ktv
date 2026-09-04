@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:left="7dp" android:top="7dp" android:right="7dp" android:bottom="7dp">
+        <bitmap android:gravity="fill" android:src="@drawable/ic_launcher_art" />
+    </item>
+</layer-list>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 设置项 - 选中态 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:angle="90"
+        android:startColor="#FF27CCA4"
+        android:endColor="#FF1A8C70"
+        android:type="linear" />
+    <corners android:radius="6dp" />
+</shape>

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  主背景: 深紫色渐变 + 透明叠加
+  对应原版首页的深紫色波浪光背景
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="135"
+                android:startColor="#FF2A0E55"
+                android:centerColor="#FF1A0A3D"
+                android:endColor="#FF08031A"
+                android:type="linear" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="45"
+                android:startColor="#003D1B7A"
+                android:centerColor="#552A1B7A"
+                android:endColor="#00000000"
+                android:type="radial"
+                android:gradientRadius="800dp" />
+        </shape>
+    </item>
+</layer-list>

@@ -1,0 +1,22 @@
+.gradle/
+.idea/
+local.properties
+**/build/
+app/release/
+*.apk
+/*.png
+/*.xml
+/*.log
+/*.txt
+.codex-*
+captures/
+**/captures/
+*.xml.bak
+# 曲库不再入库/发布到 Gitee(官方 Muse 同步), 整目录忽略
+database_publish/
+gradle.properties
+
+
+# Temp files
+.tmp_muse.db
+tools/__pycache__/

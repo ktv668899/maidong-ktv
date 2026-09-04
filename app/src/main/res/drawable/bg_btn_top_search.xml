@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 顶部搜索按钮: 玻璃态深紫 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#36FFFFFF" />
+    <corners android:radius="16dp" />
+    <stroke android:width="1dp" android:color="#18FFFFFF" />
+</shape>

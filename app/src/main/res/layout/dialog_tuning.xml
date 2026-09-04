@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="470dp"
+    android:layout_height="340dp"
+    android:background="@drawable/bg_tuning_dialog"
+    android:orientation="vertical"
+    android:paddingStart="28dp"
+    android:paddingTop="20dp"
+    android:paddingEnd="28dp"
+    android:paddingBottom="22dp">
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="44dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:text="调音"
+            android:textColor="#FFFFFFFF"
+            android:textSize="24sp" />
+
+        <TextView
+            android:id="@+id/btn_tuning_close"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_gravity="end|center_vertical"
+            android:gravity="center"
+            android:text="×"
+            android:textColor="#99FFFFFF"
+            android:textSize="22sp" />
+    </FrameLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="116dp"
+        android:layout_marginTop="12dp"
+        android:orientation="horizontal">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:layout_marginEnd="12dp"
+            android:background="@drawable/bg_tuning_counter"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="升降调" android:textColor="#BFFFFFFF" android:textSize="17sp" />
+
+            <LinearLayout android:layout_width="match_parent" android:layout_height="54dp"
+                android:gravity="center" android:orientation="horizontal">
+                <TextView android:id="@+id/btn_tone_down" android:layout_width="48dp" android:layout_height="48dp"
+                    android:gravity="center" android:text="−" android:textColor="#BFFFFFFF" android:textSize="34sp" />
+                <TextView android:id="@+id/text_tone_counter" android:layout_width="56dp" android:layout_height="48dp"
+                    android:gravity="center" android:text="0" android:textColor="#BFFFFFFF" android:textSize="20sp" />
+                <TextView android:id="@+id/btn_tone_up" android:layout_width="48dp" android:layout_height="48dp"
+                    android:gravity="center" android:text="+" android:textColor="#BFFFFFFF" android:textSize="30sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/bg_tuning_counter"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="麦克风" android:textColor="#FFFFFFFF" android:textSize="17sp" />
+
+            <LinearLayout android:layout_width="match_parent" android:layout_height="54dp"
+                android:gravity="center" android:orientation="horizontal">
+                <TextView android:id="@+id/btn_mic_down" android:layout_width="48dp" android:layout_height="48dp"
+                    android:gravity="center" android:text="−" android:textColor="#FFFFFFFF" android:textSize="34sp" />
+                <TextView android:id="@+id/text_mic_counter" android:layout_width="56dp" android:layout_height="48dp"
+                    android:gravity="center" android:text="50" android:textColor="#FFFFFFFF" android:textSize="20sp" />
+                <TextView android:id="@+id/btn_mic_up" android:layout_width="48dp" android:layout_height="48dp"
+                    android:gravity="center" android:text="+" android:textColor="#FFFFFFFF" android:textSize="30sp" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:weightSum="4">
+
+        <TextView android:id="@+id/btn_preset_pop" android:layout_width="0dp" android:layout_height="92dp"
+            android:layout_weight="1" android:gravity="center" android:text="♬\n流行" android:textColor="#FFFFFFFF" android:textSize="16sp" />
+        <TextView android:id="@+id/btn_preset_lyric" android:layout_width="0dp" android:layout_height="92dp"
+            android:layout_weight="1" android:gravity="center" android:text="▥\n抒情" android:textColor="#FFFFFFFF" android:textSize="16sp" />
+        <TextView android:id="@+id/btn_preset_rock" android:layout_width="0dp" android:layout_height="92dp"
+            android:layout_weight="1" android:gravity="center" android:text="♨\n摇滚" android:textColor="#FFFFFFFF" android:textSize="16sp" />
+        <TextView android:id="@+id/btn_preset_singer" android:layout_width="0dp" android:layout_height="92dp"
+            android:layout_weight="1" android:gravity="center" android:text="♪\n唱将" android:textColor="#FFFFFFFF" android:textSize="16sp" />
+    </LinearLayout>
+</LinearLayout>

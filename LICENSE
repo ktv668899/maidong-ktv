@@ -1,0 +1,49 @@
+麦动 App (Maidong App) 软件许可及非商用协议
+
+版权所有 (c) 2026 麦动开发者 (杨家三郎)
+
+本软件（包括但不限于源代码、编译后的APK二进制文件、界面设计、音频处理算法等）免费对公众开放，并允许个人进行非营利性学习、研究和使用。
+
+一旦您使用、复制、修改或分发本软件，即表示您完全同意并接受以下条款：
+
+1. 禁止营利性使用
+本软件严禁任何形式的营利性/商业性使用。营利性使用包括但不限于：
+- 直接售卖本软件或其修改版、衍生版。
+- 将本软件（APK或源码）作为收费系统、定制ROM、电视盒子硬件的内置、预装或捆绑软件进行销售或出租。
+- 在本软件中植入任何形式的广告、第三方统计/推广SDK以获取收益。
+- 围绕本软件提供收费的安装、技术支持、激活或会员增值服务。
+- 利用本软件的代码或其编译产物，进行任何商业性演出、K歌房（KTV）商业运营或收费体验活动。
+
+2. 源码修改与分发
+如果您对本源码进行了修改、二次开发并进行分发：
+- 您必须完整保留此《许可及非商用协议》，且您的衍生版本必须继续以完全免费、开源、禁止商用的形式发布。
+- 您必须在衍生版本的显著位置（如关于页面、README）注明原作者信息及原项目地址。
+
+3. 免责声明
+本软件按“现状”提供，不带有任何明示或暗示的担保（包括但不限于对音质、低延迟、设备兼容性的担保）。在任何情况下，作者均不对因使用本软件而产生的任何直接、间接、偶然的损害承担责任。
+
+---
+
+Maidong App Software License and Non-Commercial Agreement
+
+Copyright (c) 2026 Maidong Developer Team (YnagJiaSanLang)
+
+This software (including but not limited to source code, compiled APK binaries, UI design, and audio processing algorithms) is provided free of charge to the public and is allowed for personal non-profit learning, research, and usage.
+
+By using, copying, modifying, or distributing this software, you agree to the following terms:
+
+1. Prohibition of Commercial/For-Profit Use
+Any commercial or for-profit use of this software is strictly prohibited. Commercial use includes, but is not limited to:
+- Directly selling this software or its modified/derived versions.
+- Pre-installing, bundling, or embedding this software (APK or source code) as part of paid operating systems, custom ROMs, or TV box hardware for sale or rent.
+- Embedding any form of advertising or third-party ad/tracking SDKs to generate revenue.
+- Providing paid installation, technical support, activation, or premium membership services based on this software.
+- Using this software or its compiled binaries for commercial performances, commercial KTV operations, or paid experience events.
+
+2. Modification and Distribution
+If you modify, re-develop, and distribute this source code:
+- You must keep this agreement intact, and your derived versions must also be distributed for free and strictly for non-commercial use.
+- You must clearly credit the original author and include a link to the original project.
+
+3. Disclaimer
+This software is provided "as is", without warranty of any kind. In no event shall the authors be liable for any claim, damages, or other liability arising from the use of this software.

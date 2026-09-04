@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  设置弹窗(对应"设置.jpg")
+  包含左侧菜单 + 右侧内容区
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="800dp"
+    android:layout_height="540dp"
+    android:background="@drawable/bg_dialog_panel"
+    android:orientation="vertical">
+
+    <!-- 标题栏 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="20dp"
+        android:paddingEnd="12dp"
+        android:background="@drawable/bg_top_navigation">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="⚙  系统设置"
+            android:textColor="#FF27CCA4"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/btn_settings_close"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:background="@drawable/bg_btn_dialog_close"
+            android:gravity="center"
+            android:text="×"
+            android:textColor="#FFCCCCCC"
+            android:textSize="20sp" />
+    </LinearLayout>
+
+    <!-- 主体: 左侧菜单 + 右侧内容 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal"
+        android:padding="10dp">
+
+        <!-- 左侧菜单 -->
+        <ListView
+            android:id="@+id/settings_menu"
+            android:layout_width="160dp"
+            android:layout_height="match_parent"
+            android:background="@drawable/bg_song_list"
+            android:divider="#22FFFFFF"
+            android:dividerHeight="1dp"
+            android:listSelector="@drawable/bg_btn_toggle_on" />
+
+        <!-- 右侧内容(动态填充) -->
+        <ScrollView
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginStart="10dp"
+            android:layout_weight="1">
+
+            <LinearLayout
+                android:id="@+id/settings_content"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_song_list"
+                android:orientation="vertical"
+                android:padding="14dp" />
+        </ScrollView>
+    </LinearLayout>
+</LinearLayout>

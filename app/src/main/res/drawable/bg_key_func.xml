@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 键盘功能键(退格/清除/空格) -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#55227BCC" />
+    <corners android:radius="6dp" />
+    <stroke android:width="1dp" android:color="#33B070FF" />
+</shape>

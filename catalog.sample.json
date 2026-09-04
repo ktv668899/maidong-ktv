@@ -1,0 +1,9 @@
+﻿[
+  {
+    "id": "demo-001",
+    "title": "示例歌曲",
+    "singer": "合法曲库",
+    "category": "示例",
+    "url": "http://192.168.3.100:8080/songs/demo.mp4"
+  }
+]

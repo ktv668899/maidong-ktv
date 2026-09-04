@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 首页"排行榜"卡片: 紫蓝渐变(对应设计图皇冠图标的紫蓝卡) -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="45"
+                android:startColor="#FF6A2EC2"
+                android:centerColor="#FF4A1B9C"
+                android:endColor="#FF2A0E55"
+                android:type="linear" />
+            <corners android:radius="10dp" />
+        </shape>
+    </item>
+    <item android:left="0dp" android:gravity="right|bottom">
+        <shape android:shape="rectangle">
+            <size android:width="120dp" android:height="120dp" />
+            <gradient
+                android:angle="135"
+                android:startColor="#33FFFFFF"
+                android:centerColor="#11FFFFFF"
+                android:endColor="#00000000"
+                android:type="linear" />
+            <corners android:radius="10dp" />
+        </shape>
+    </item>
+</layer-list>

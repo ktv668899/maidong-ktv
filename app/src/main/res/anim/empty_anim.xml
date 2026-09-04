@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 空动画:alpha 1.0→1.0,持续 0ms,用于 DialogNoAnimation 让 Dialog 无进出场动画 -->
+<alpha xmlns:android="http://schemas.android.com/apk/res/android"
+    android:fromAlpha="1.0"
+    android:toAlpha="1.0"
+    android:duration="0" />

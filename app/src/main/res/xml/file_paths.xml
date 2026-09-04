@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <external-path name="external" path="." />
+    <root-path name="storage" path="/storage" />
+    <cache-path name="update_cache" path="updates/" />
+    <external-cache-path name="external_update_cache" path="updates/" />
+</paths>

@@ -1,0 +1,1545 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="a_cache">a-cache</string>
+    <string name="abc_action_bar_home_description">Navigate home</string>
+    <string name="abc_action_bar_up_description">Navigate up</string>
+    <string name="abc_action_menu_overflow_description">More options</string>
+    <string name="abc_action_mode_done">Done</string>
+    <string name="abc_activity_chooser_view_see_all">See all</string>
+    <string name="abc_activitychooserview_choose_application">Choose an app</string>
+    <string name="abc_capital_off">OFF</string>
+    <string name="abc_capital_on">ON</string>
+    <string name="abc_font_family_body_1_material">sans-serif</string>
+    <string name="abc_font_family_body_2_material">sans-serif-medium</string>
+    <string name="abc_font_family_button_material">sans-serif-medium</string>
+    <string name="abc_font_family_caption_material">sans-serif</string>
+    <string name="abc_font_family_display_1_material">sans-serif</string>
+    <string name="abc_font_family_display_2_material">sans-serif</string>
+    <string name="abc_font_family_display_3_material">sans-serif</string>
+    <string name="abc_font_family_display_4_material">sans-serif-light</string>
+    <string name="abc_font_family_headline_material">sans-serif</string>
+    <string name="abc_font_family_menu_material">sans-serif</string>
+    <string name="abc_font_family_subhead_material">sans-serif</string>
+    <string name="abc_font_family_title_material">sans-serif-medium</string>
+    <string name="abc_menu_alt_shortcut_label">Alt+</string>
+    <string name="abc_menu_ctrl_shortcut_label">Ctrl+</string>
+    <string name="abc_menu_delete_shortcut_label">delete</string>
+    <string name="abc_menu_enter_shortcut_label">enter</string>
+    <string name="abc_menu_function_shortcut_label">Function+</string>
+    <string name="abc_menu_meta_shortcut_label">Meta+</string>
+    <string name="abc_menu_shift_shortcut_label">Shift+</string>
+    <string name="abc_menu_space_shortcut_label">space</string>
+    <string name="abc_menu_sym_shortcut_label">Sym+</string>
+    <string name="abc_prepend_shortcut_label">Menu+</string>
+    <string name="abc_search_hint">Search…</string>
+    <string name="abc_searchview_description_clear">Clear query</string>
+    <string name="abc_searchview_description_query">Search query</string>
+    <string name="abc_searchview_description_search">Search</string>
+    <string name="abc_searchview_description_submit">Submit query</string>
+    <string name="abc_searchview_description_voice">Voice search</string>
+    <string name="abc_shareactionprovider_share_with">Share with</string>
+    <string name="abc_shareactionprovider_share_with_application">Share with %s</string>
+    <string name="abc_toolbar_collapse_description">Collapse</string>
+    <string name="activate_serial_no_button">立即认证</string>
+    <string name="activate_serial_no_input">请输入序列号认证</string>
+    <string name="activate_serial_no_san">请使用微信扫描二维码，先关注公众号，再序列号认证</string>
+    <string name="activate_serial_no_tip_empty">请输入序列号</string>
+    <string name="activate_serial_no_tip_success">认证成功</string>
+    <string name="activate_serial_no_tip_wrong">认证失败，请输入正确的序列号</string>
+    <string name="activate_serial_no_type">选择以下方式进行序列号认证</string>
+    <string name="activate_serial_no_type_one">方法一：</string>
+    <string name="activate_serial_no_type_two">方法二：</string>
+    <string name="age_test_error_msg">日志</string>
+    <string name="age_test_file_info">文件下载：%1$d 次， 成功：%2$d 次， 失败：%3$d 次</string>
+    <string name="age_test_ip">设备IP：%1$s</string>
+    <string name="age_test_mac">设备MAC：%1$s</string>
+    <string name="age_test_mad_vn">点歌软件版本：v%1$s</string>
+    <string name="age_test_rom_vn">固件版本：%1$s</string>
+    <string name="age_test_server_info">服务器：%1$s</string>
+    <string name="age_test_start_time">开始时间：%1$s</string>
+    <string name="age_test_touch_info" formatted="false">点击坐标：(%.2f, %.2f)</string>
+    <string name="age_test_video_info">视频播放：%1$d 次， 成功：%2$d 次， 失败：%3$d 次</string>
+    <string name="agree">同意并继续</string>
+    <string name="ai_action_next_song">已为您切换</string>
+    <string name="ai_action_pause">已为您停止</string>
+    <string name="ai_action_play">已为您继续</string>
+    <string name="ai_action_replay">已回放当前歌曲</string>
+    <string name="ai_action_switch_sound">切换成功</string>
+    <string name="ai_action_top_song">已为您置顶歌曲</string>
+    <string name="ai_action_volume_down">音量降低</string>
+    <string name="ai_action_volume_up">音量增加</string>
+    <string name="ai_add_song_success">已为您添加歌曲</string>
+    <string name="ai_connect_network_tip">当前网络异常，连接网络可以使用更多的语音功能哦~</string>
+    <string name="ai_mi_unknown_hint">小爱没有听懂</string>
+    <string name="ai_network_error">网络异常，请检查网络设置</string>
+    <string name="ai_open_fav_hint">正在获取收藏的歌曲......</string>
+    <string name="ai_open_ordered_hint">正在获取已点歌曲......</string>
+    <string name="ai_open_recent_hint">正在获取常唱歌曲......</string>
+    <string name="ai_open_sang_hint">正在获取已唱歌曲......</string>
+    <string name="ai_order_song_guide">"你可以说【第几首】选择歌曲
+【上一页】【下一页】翻页
+【关闭页面】退出"</string>
+    <string name="ai_order_song_info_singer">%1$s 的歌</string>
+    <string name="ai_order_song_info_singer_song">%1$s的《%2$s》</string>
+    <string name="ai_order_song_info_song">《%1$s》</string>
+    <string name="ai_order_song_search_hint">正在搜索歌曲中......</string>
+    <string name="ai_order_song_searching">正在搜索：%1$s</string>
+    <string name="ai_ott_mi_guide">"Hi，我是小爱同学，您的语音助手。
+
+您可以对话筒说【小爱同学】唤起我，然后对我说对应的语音命令。
+
+连接网络后才能使用小爱同学~"</string>
+    <string name="ai_song_downloading">歌曲正在下载中</string>
+    <string name="ai_song_not_found">未能找到歌曲</string>
+    <string name="ai_song_search">正在搜索歌曲</string>
+    <string name="ai_song_select">请选择歌曲</string>
+    <string name="ai_start_service">语音功能已启动，您可以开始点歌了</string>
+    <string name="ai_stop_service">语音功能已关闭</string>
+    <string name="ai_top_last_song">已为您置顶《%1$s》</string>
+    <string name="ai_top_last_song_empty_list">未找到任何已点歌曲</string>
+    <string name="ai_top_song_guide">"你可以说【第几首】来置顶歌曲
+【上一页】【下一页】翻页
+【关闭页面】退出"</string>
+    <string name="ai_type_change">选择语音助手类型</string>
+    <string name="ai_type_change_hint">您可以选择想要使用的语音助手类型，修改之后APP将会自动重启：</string>
+    <string name="ai_type_change_success">语音助手修改成功，应用即将自动重启！</string>
+    <string name="ai_type_ifly">免唤醒语音助手</string>
+    <string name="ai_type_mi">小爱同学</string>
+    <string name="ai_unknown_hint">我没听清，再说一遍吧</string>
+    <string name="ai_wakeup_hint_1">到</string>
+    <string name="ai_wakeup_hint_2">我来啦</string>
+    <string name="ai_wakeup_hint_3">我在</string>
+    <string name="ai_wakeup_hint_4">在呢</string>
+    <string name="all">全部</string>
+    <string name="app_crash_hint">应用发生错误，我们会尽快处理</string>
+    <string name="app_name">麦动</string>
+    <string name="app_not_in_system_dir_force_exit">应用未安装在系统目录下，为了您的安全，APP禁止使用。</string>
+    <string name="appstore">应用商店</string>
+    <string name="appstore_empty">暂时没有任何应用</string>
+    <string name="appstore_install_confirm">%1$s 暂未安装，是否立即下载安装？</string>
+    <string name="appstore_install_downloading">下载中</string>
+    <string name="appstore_install_upgrading">升级中</string>
+    <string name="appstore_install_waiting">等待中</string>
+    <string name="appstore_installing">安装中…</string>
+    <string name="appstore_not_uninstallable">%1$s 不可卸载</string>
+    <string name="appstore_open_hint">%1$s安装成功，是否立即打开？</string>
+    <string name="appstore_uninstall_fail">卸载失败，请重试！</string>
+    <string name="appstore_uninstall_hint">是否要卸载%1$s？</string>
+    <string name="appstore_uninstall_success">卸载成功！</string>
+    <string name="appstore_uninstalling">卸载中</string>
+    <string name="atmosphere_auto_light">智能灯光</string>
+    <string name="atmosphere_light">气氛</string>
+    <string name="atmosphere_light_beautiful">唯美</string>
+    <string name="atmosphere_light_bright">明亮</string>
+    <string name="atmosphere_light_dim">朦胧</string>
+    <string name="atmosphere_light_disable">关闭</string>
+    <string name="atmosphere_light_lyrical">抒情</string>
+    <string name="atmosphere_light_rock">摇滚</string>
+    <string name="atmosphere_light_sad">伤感</string>
+    <string name="atmosphere_light_setting">灯光设置</string>
+    <string name="atmosphere_light_slow_rock">慢摇</string>
+    <string name="atmosphere_light_soft">柔和</string>
+    <string name="atmosphere_light_type_4">4路灯光</string>
+    <string name="atmosphere_light_type_6">6路灯光</string>
+    <string name="atmosphere_light_type_8">8路灯光</string>
+    <string name="atmosphere_light_type_change">灯光类型已修改为：%1$s</string>
+    <string name="audio_sync">音画同步</string>
+    <string name="audio_sync_audio_ahead">声音提前 %1$s 秒</string>
+    <string name="audio_sync_audio_delay">声音延后 %1$s 秒</string>
+    <string name="audio_sync_set_title">音画同步</string>
+    <string name="audio_sync_tip">重唱或切歌后生效</string>
+    <string name="auth_expired_hint">测试版本授权已过期，请联系厂商更新对应软件版本！</string>
+    <string name="auto_remove_song_full_notice">存储空间不足，已自动删除较少演唱的歌曲《%1$s》，建议您插上U盘或移动硬盘，用来保存更多歌曲。</string>
+    <string name="auto_remove_songs_full_notice">存储空间不足，已自动删除《%1$s》等 %2$d 首较少演唱的歌曲，建议您插上U盘或移动硬盘，用来保存更多歌曲。</string>
+    <string name="auto_remove_songs_notice">存储空间不足，已自动删除《%1$s》等 %2$d 首歌曲</string>
+    <string name="bind_place_jump_over">跳过</string>
+    <string name="bind_place_jump_over_tip">跳过本次绑定，您可以在【设置】页面中继续绑定设备</string>
+    <string name="bind_place_tip">微信扫码绑定设备</string>
+    <string name="bit_rate">bit_rate</string>
+    <string name="button_ai_help">语音助手</string>
+    <string name="button_input_custom">ABC</string>
+    <string name="button_input_custom_with_zhuyin">ㄓㄨㄧㄣ</string>
+    <string name="button_input_handwrite">手写</string>
+    <string name="button_input_system">系统</string>
+    <string name="button_input_zhuyin">注音</string>
+    <string name="button_mi">小爱同学</string>
+    <string name="button_page_next">下一页</string>
+    <string name="button_page_pre">上一页</string>
+    <string name="button_quick_rotation">屏幕旋转</string>
+    <string name="button_settings">设置</string>
+    <string name="cache_size_not_enough_tip">警告! 内部存储空间不足，可能会导致播放异常，请及时删除不需要的歌曲或清理多余的文件和APP!</string>
+    <string name="call_room_service">呼叫</string>
+    <string name="call_service_error">呼叫服务失败</string>
+    <string name="call_service_hint">呼叫服务生</string>
+    <string name="call_wine_service">拿%1$d个%2$s</string>
+    <string name="cancel">关闭</string>
+    <string name="cancel_room_service">取消呼叫</string>
+    <string name="cancel_service_hint">正在呼叫服务，确定取消？</string>
+    <string name="change_screen_orientation">设置屏幕方向，即将重启…</string>
+    <string name="check_upgrade_fail">检查更新失败，请重试</string>
+    <string name="check_upgrade_latest">已是最新版本</string>
+    <string name="close_play_while_download">关闭边下边播</string>
+    <string name="code_ai_unfresh">服务器已超过%s未联网，建议联网获取最新的曲库信息</string>
+    <string name="code_app_can_not_delete">无法删除该应用</string>
+    <string name="code_app_release_exists_can_not_delete">存在升级包包含此安装包，无法删除</string>
+    <string name="code_authorized_expired">服务器授权已过期</string>
+    <string name="code_auto_disk_search_notice">检测到新的存储盘，即将为您自动扫描该存储盘</string>
+    <string name="code_auto_disk_search_update_song_path">正在扫描%1$s下的歌曲，扫描进度(%2$s/%3$s)，请您耐心等候，不要关机</string>
+    <string name="code_auto_remove_but_freeless">自动删歌后，存储空间仍不足%1$s，歌曲无法存储</string>
+    <string name="code_auto_remove_disk_short">自动删歌后，磁盘空间仍不足%1$s，请清理部分多余文件后重试</string>
+    <string name="code_auto_remove_song_notice">存储空间不足，已自动删除歌曲《%1$s》</string>
+    <string name="code_auto_search_and_init_db_finish">初始化结束，成功为您导入%1$s首歌曲</string>
+    <string name="code_auto_search_and_init_db_progress">正在初始化数据库，导入歌曲进度(%1$s/%2$s)，请您耐心等待，不要关机</string>
+    <string name="code_auto_search_and_init_db_start">正在扫描硬盘并初始化数据库</string>
+    <string name="code_auto_search_db_progress" formatted="false">正在扫描歌曲文件，扫描进度(%s/%s)，请您耐心等待，不要关机</string>
+    <string name="code_auz_coming_expired">服务器授权即将到期</string>
+    <string name="code_box_can_not_remove">无法删除最近两天内在线的机顶盒</string>
+    <string name="code_box_close">当前包厢尚未开台, 请联系服务员</string>
+    <string name="code_box_expire_qrcode">二维码已过期</string>
+    <string name="code_box_ip_using">该IP已被使用，请使用其他IP</string>
+    <string name="code_box_media_exceed">点歌数量已超上限</string>
+    <string name="code_box_not_bind">未绑定设备，请扫码绑定</string>
+    <string name="code_box_not_online">点唱机未连接网络，暂不支持小程序点歌</string>
+    <string name="code_box_wrong_qrcode">二维码格式错误</string>
+    <string name="code_check_udisk_song">正在校验U盘加歌数据，进度%1$s/%2$s</string>
+    <string name="code_connect_nas_server_fail">未连接到服务器：%1$s</string>
+    <string name="code_create_disk">文件夹创建失败，请确认硬盘是否松动</string>
+    <string name="code_data_check">正在校验数据库数据</string>
+    <string name="code_db_backup">正在进行曲库备份</string>
+    <string name="code_db_backup_fail">数据库备份失败，请稍后重试</string>
+    <string name="code_db_backup_fail_for_not_outter_disk">数据库备份失败，未检测到外部存储</string>
+    <string name="code_db_backup_fail_for_space_short">数据库备份失败，外部存储空间不足%1$s，请尝试手动清理后重试</string>
+    <string name="code_db_copy">正在复制曲库文件</string>
+    <string name="code_db_data_broken">您查询的数据可能发生损坏，建议通过升级数据库修复该问题</string>
+    <string name="code_db_init">正在初始化曲库(%1$s)</string>
+    <string name="code_db_is_latest">曲库已是最新版本</string>
+    <string name="code_db_set_index">正在创建索引</string>
+    <string name="code_db_sync">正在同步曲库(%1$s/%2$s)</string>
+    <string name="code_db_sync_cancel">曲库同步已取消，本次共更新%1$s首歌曲</string>
+    <string name="code_db_sync_canceling">正在取消更新......</string>
+    <string name="code_db_sync_exist">已存在曲库同步任务，请取消之前的任务后重试</string>
+    <string name="code_db_sync_hot_score">正在同步热度值，如需暂停，请在公众号中操作</string>
+    <string name="code_db_sync_ok">曲库更新成功，本次共更新%1$s首歌曲</string>
+    <string name="code_db_unzip_error">数据库文件解压失败，请尝试重启设备后重试</string>
+    <string name="code_db_upgrade">正在升级曲库</string>
+    <string name="code_db_upgrade_ok">升级曲库成功</string>
+    <string name="code_disk_check">正在扫描歌曲文件</string>
+    <string name="code_disk_disable">存储 %1$s 下载异常，本次运行将暂时禁用该硬盘</string>
+    <string name="code_disk_not_found">未获得路径：%1$s的挂载信息，请尝试拔插存储设备或重启app</string>
+    <string name="code_disk_permission_denied">文件存储出错，请根据界面提示进行修复！</string>
+    <string name="code_disk_search_fail">扫描失败，请检硬盘是否松动并重试</string>
+    <string name="code_disk_search_ok">扫描结束，成功导入%1$s首歌曲</string>
+    <string name="code_disk_short">磁盘空间不足%1$s，请清理部分多余文件后重试</string>
+    <string name="code_disk_too_small">未检测到存储器或存储器容量小于%1$s，请检查您的硬盘，U盘或TF卡是否损坏</string>
+    <string name="code_disk_too_small_exit">未检测到存储器或存储器容量小于%1$s，请检查您的硬盘，U盘或TF卡是否损坏，APP即将在 {{}} 秒后退出…</string>
+    <string name="code_download_cancel">下载已取消</string>
+    <string name="code_download_db_error">数据库文件下载失败，请尝试重启设备后重试</string>
+    <string name="code_download_db_file">正在下载数据库文件(%1$s)</string>
+    <string name="code_download_db_for_net_broken">网络异常，请检查网络连接是否正常，系统稍后将自动为您重新下载数据库文件</string>
+    <string name="code_download_error">下载错误，您可尝试重启设备后重试，若问题仍未解决，请联系客服</string>
+    <string name="code_download_pause">下载已暂停</string>
+    <string name="code_error_password">密码错误</string>
+    <string name="code_error_sys">系统异常，请稍后再试</string>
+    <string name="code_error_sys_mps">系统异常</string>
+    <string name="code_file_is_downloading">文件正在下载</string>
+    <string name="code_file_not_found">文件不存在</string>
+    <string name="code_file_read_error">文件读取错误，您可尝试重启设备后重试，若问题仍未解决，请联系客服</string>
+    <string name="code_file_read_error_mps">文件读取错误</string>
+    <string name="code_file_remove_error">删除文件失败，请稍后重试</string>
+    <string name="code_get_cluster">获取本机集群信息，发生数据库异常，请尝试重启服务</string>
+    <string name="code_get_disk">获取硬盘目录异常</string>
+    <string name="code_get_download_url_err_args">获取下载链接失败，参数错误</string>
+    <string name="code_get_download_url_err_auth">获取下载链接失败，请检查网络</string>
+    <string name="code_get_download_url_err_network">获取下载链接失败，请检查网络</string>
+    <string name="code_get_download_url_err_other">获取下载链接失败，请重试</string>
+    <string name="code_get_download_url_err_server">获取下载链接失败，云端错误</string>
+    <string name="code_get_url">获取下载链接失败，请稍后重试</string>
+    <string name="code_input_output_error">文件写入错误，可能为磁盘坏道引起，建议更换一块存储重新尝试</string>
+    <string name="code_invalid_db">数据库错误，您可尝试重启设备后重试，若问题仍未解决，请联系客服</string>
+    <string name="code_invalid_db_mps">数据库错误</string>
+    <string name="code_invalid_http">网络请求错误，请检查网络连接后重试</string>
+    <string name="code_invalid_http_mps">网络请求错误</string>
+    <string name="code_invalid_http_ret">HTTP请求返回错误，请稍后重试</string>
+    <string name="code_invalid_http_ret_mps">HTTP请求返回错误</string>
+    <string name="code_invalid_json">数据格式错误</string>
+    <string name="code_invalid_json_mps">数据格式错误</string>
+    <string name="code_invalid_param">请求参数错误</string>
+    <string name="code_invalid_postbody">请求参数错误</string>
+    <string name="code_local_server_release_exists_newer">存在一样或更新的vc版本升级包, 无法创建</string>
+    <string name="code_main_disk_not_set">未设置歌曲下载的硬盘</string>
+    <string name="code_mp_msg_review_fail">请勿输入违法违规内容</string>
+    <string name="code_multi_cluster">局域网内存在多个场所集群，无法正常提供服务，请确保局域网中的服务器处于同一场所</string>
+    <string name="code_music_coming_expired">曲库下载授权即将到期</string>
+    <string name="code_music_expired">曲库下载授权已到期</string>
+    <string name="code_mv_resource_unavailable">MV资源不可用！</string>
+    <string name="code_net_broken">网络异常，请检查网络连接后重试</string>
+    <string name="code_not_open">功能暂未开放</string>
+    <string name="code_obj_exists">对象已存在</string>
+    <string name="code_obj_unfound">对象不存在</string>
+    <string name="code_ott_actived_count_exceed">无法激活，请联系购买经销商！</string>
+    <string name="code_ott_channel_invalid">当前设备【%1$s】型号【%2$s】无法使用此渠道的应用！</string>
+    <string name="code_ott_flow_exceed">设备流量已用完，请扫码续费！</string>
+    <string name="code_ott_has_actived">设备已激活！</string>
+    <string name="code_ott_havent_login">无法激活设备，设备必须先至少联网过一次才能激活！</string>
+    <string name="code_ott_license_expire">设备授权已过期，请扫码续费！</string>
+    <string name="code_ott_model_not_support">当前设备【%1$s】型号【%2$s】不支持安装此渠道的应用！</string>
+    <string name="code_ott_not_actived">设备流量已用完，请扫码激活！</string>
+    <string name="code_ott_not_bind_serial_no">设备未验证序列号</string>
+    <string name="code_outof_box_max">已登录设备超过授权机顶盒最大数量</string>
+    <string name="code_place_binding">设备在其他场所绑定中</string>
+    <string name="code_place_mls_not_bind">场所服务器未绑定</string>
+    <string name="code_place_mls_not_online">场所服务器不在线</string>
+    <string name="code_place_no_auth">非场所管理员, 无权限访问</string>
+    <string name="code_playlist_song_exceed">歌单歌曲超过上限</string>
+    <string name="code_qrcode_expire">二维码已过期，请刷新</string>
+    <string name="code_qrcode_not_scan">二维码未扫描，请扫描二维码</string>
+    <string name="code_qrcode_singer_no_delete">歌手不能删除</string>
+    <string name="code_qrcode_singer_no_update">歌手不能更新</string>
+    <string name="code_qrcode_singer_used">歌手有关联歌曲</string>
+    <string name="code_qrcode_song_no_delete">歌曲不能删除</string>
+    <string name="code_qrcode_song_no_update">歌曲不能更新</string>
+    <string name="code_qrcode_used">二维码已被使用,请刷新</string>
+    <string name="code_recode_not_found">未找到该记录，建议执行设置-数据同步，以更新本地数据</string>
+    <string name="code_request_limit">请求过于频繁，请稍后再试</string>
+    <string name="code_restore_udisk_song">正在恢复U盘加歌数据%1$s/%2$s</string>
+    <string name="code_restore_udisk_song_success">成功恢复%1$s首歌曲数据</string>
+    <string name="code_retry_search_cluster">集群服务暂未启动，如长时间未启动，请检查网络是否异常</string>
+    <string name="code_room_op_by_erp">请使用利通收银开关台</string>
+    <string name="code_root_short">内部存储空间不足%1$s，请清理部分多余文件后重试</string>
+    <string name="code_search_cluster">正在搜寻局域网内集群服务</string>
+    <string name="code_set_main_disk_fail">保存主存储设置失败，请稍后重试</string>
+    <string name="code_skin_download_fail">皮肤包下载失败，请检查网络</string>
+    <string name="code_skin_switch_fail">切换皮肤失败，请重试</string>
+    <string name="code_sms_ver_code_invalid">验证码错误</string>
+    <string name="code_song_off_shelf">下载失败，歌曲《%1$s》已下架</string>
+    <string name="code_sync_portal_data">正在请求云端数据，请确保网络连接</string>
+    <string name="code_syncing_atc">正在同步数据</string>
+    <string name="code_syncing_data">正在同步数据</string>
+    <string name="code_system_busy">系统正忙，请稍后再试</string>
+    <string name="code_timeout">请求超时，请稍后重试</string>
+    <string name="code_todo">TODO</string>
+    <string name="code_udisk_add_song">正在复制U盘歌曲，当前进度%1$s/%2$s，歌曲 %3$s</string>
+    <string name="code_udisk_add_song_space_short">硬盘空间不足，已为您暂停加歌，成功加歌%1$s首</string>
+    <string name="code_udisk_add_song_success">加歌成功，已为您加歌%1$s首</string>
+    <string name="code_udisk_add_song_success_have_skip">加歌成功，发现重复歌曲%1$s首，已为您新加歌曲%2$s首</string>
+    <string name="code_udisk_add_song_success_have_skip_and_not_new">加歌成功，发现重复歌曲%1$s首，未发现新歌</string>
+    <string name="code_udisk_add_song_success_not_song">扫描结束，未发现U盘加歌歌曲</string>
+    <string name="code_udisk_disable_progress" formatted="false">正在隐藏U盘加歌数据，进度%s/%s</string>
+    <string name="code_udisk_search">正在扫描U盘歌曲，已扫描%1$s首歌曲</string>
+    <string name="code_udisk_search_skip">正在扫描U盘歌曲，已扫描%1$s首歌曲，自动为您过滤%2$s首重复歌曲</string>
+    <string name="code_udisk_start_search">正在扫描U盘歌曲</string>
+    <string name="code_udp_unstart">集群通信服务未启动，请稍后重试</string>
+    <string name="code_unauthorized">服务器未获取到授权信息</string>
+    <string name="code_unauthorized_mps">未授权</string>
+    <string name="code_unknow_file_type">未知的文件类型，无法下载</string>
+    <string name="code_unzip">正在解压文件(%1$s)</string>
+    <string name="code_update_song_path">正在扫描%1$s下的歌曲，扫描进度(%2$s/%3$s)</string>
+    <string name="code_user_import_playlist_time_out">正在努力导入歌单中，请稍后刷新收藏歌单列表查看导入的歌单</string>
+    <string name="code_user_video_not_found">未找到视频文件，请重新上传</string>
+    <string name="confirm">确认</string>
+    <string name="confirm_exit_app">确认退出系统？</string>
+    <string name="confirm_exit_now">立即退出</string>
+    <string name="confirm_get_ether_mac_error">无法获取到有线网卡MAC！</string>
+    <string name="confirm_reboot_now">立即重启</string>
+    <string name="confirm_upgrade">立即更新</string>
+    <string name="connect">连接</string>
+    <string name="correct_hint_adjust">要校准触摸屏，请按住白色十字中心，直到它消失.</string>
+    <string name="correct_hint_adjust_finish">校准完成.</string>
+    <string name="correct_hint_adjust_none_local">本地无校准数据，要校准触摸屏，请按住白色十字中心，直到它消失.</string>
+    <string name="correct_hint_break">未进行校准，使用原有数据.</string>
+    <string name="correct_hint_break_none_local">未进行校准，触摸屏可能无法正常工作.</string>
+    <string name="ctrl_button_advance_sound">高级音效</string>
+    <string name="ctrl_button_atmosphere">气氛</string>
+    <string name="ctrl_button_back">返回点歌</string>
+    <string name="ctrl_button_mi">小爱</string>
+    <string name="ctrl_button_music_accomp">伴唱</string>
+    <string name="ctrl_button_music_origin">原唱</string>
+    <string name="ctrl_button_orderlist">已点</string>
+    <string name="ctrl_button_pause">暂停</string>
+    <string name="ctrl_button_phantom">幻影</string>
+    <string name="ctrl_button_play">播放</string>
+    <string name="ctrl_button_replay">重唱</string>
+    <string name="ctrl_button_score">评分</string>
+    <string name="ctrl_button_sound">调音</string>
+    <string name="ctrl_button_switch_song">切歌</string>
+    <string name="ctrl_button_tone">调音</string>
+    <string name="ctrl_sing_guide">导唱</string>
+    <string name="current_db_version">当前版本：</string>
+    <string name="db_broken_need_to_repair">检测到数据损坏，即将重新下载数据库进行修复</string>
+    <string name="define_roundedimageview" />
+    <string name="delete">删除</string>
+    <string name="device_disabled_open_network">检查网络</string>
+    <string name="device_disabled_portrait">系统不支持竖屏，请重启设备后继续使用</string>
+    <string name="device_disabled_tip">当前设备已被禁用，若有疑问请联系经销商处理，点击确认退出APP或检查网络连接</string>
+    <string name="device_mount_tip">检测到存储设备接入</string>
+    <string name="device_scene_0">KTV</string>
+    <string name="device_scene_1">酒吧</string>
+    <string name="device_scene_2">餐吧</string>
+    <string name="device_scene_3">家庭</string>
+    <string name="device_scene_4">沐足</string>
+    <string name="device_scene_5">多功能厅</string>
+    <string name="device_scene_6">娱乐室</string>
+    <string name="device_scene_tip">选择使用场景，我们将更好为您服务</string>
+    <string name="device_unmount_tip">检测到存储设备移除</string>
+    <string name="dialog_button_setting_network">设置网络</string>
+    <string name="dialog_title_tip">会员激活成功</string>
+    <string name="disagree">不同意</string>
+    <string name="disco_mode_forbid_change_skin_tip">派对模式下无法使用皮肤功能</string>
+    <string name="disco_mode_leave_tip">退出派对模式？</string>
+    <string name="disco_mode_tip">关闭派对模式，可继续欢唱</string>
+    <string name="do_not_exit_app_tip">请勿退出APP</string>
+    <string name="download_continue">继续下载</string>
+    <string name="download_fail_confirm">下载失败，%1$s</string>
+    <string name="download_fail_confirm_prefix">下载失败</string>
+    <string name="download_fail_confirm_retry">下载失败，请重试</string>
+    <string name="download_fail_detail">下载失败</string>
+    <string name="download_fail_detail_retry">下载失败，重试</string>
+    <string name="download_fail_retry">重试</string>
+    <string name="download_song_from_cloud">正在从云端下载歌曲：%1$s</string>
+    <string name="empty_playlist">未找到分类</string>
+    <string name="empty_singer">未找到歌手</string>
+    <string name="empty_song">未找到歌曲</string>
+    <string name="empty_string" />
+    <string name="experience_charge_now">立刻充值</string>
+    <string name="experience_download_day_limit">· 每日可免费下载歌曲 %1$d首</string>
+    <string name="experience_download_day_remain">（剩余%1$d首）</string>
+    <string name="experience_download_speed">· 歌曲下载速度限速 %1$dKB/s</string>
+    <string name="experience_info">体验卡权限：</string>
+    <string name="experience_to">%1$s到期</string>
+    <string name="file_not_found">未找到文件，请检查U盘是否正常接入</string>
+    <string name="filter">筛选</string>
+    <string name="flip_page_total_count"> / %1$d</string>
+    <string name="force_exit_endfix_tip">，APP即将在 %1$d 秒后退出…</string>
+    <string name="fps">fps</string>
+    <string name="fragmentation_stack_help">"*: Not in backStack
+☀: Visible"</string>
+    <string name="fragmentation_stack_view">Stack</string>
+    <string name="full_screen_menu_tip">"按菜单键
+切换全屏"</string>
+    <string name="hint_vn">v%1$s</string>
+    <string name="home_menu_tab_ai_help">语音</string>
+    <string name="home_menu_tab_ai_help_mi">小爱</string>
+    <string name="home_menu_tab_app_store">应用</string>
+    <string name="home_menu_tab_disco">派对</string>
+    <string name="home_menu_tab_home_page">主页</string>
+    <string name="home_menu_tab_language">语言</string>
+    <string name="home_menu_tab_market">超市</string>
+    <string name="home_menu_tab_order_song">点歌</string>
+    <string name="home_menu_tab_recommend">推荐</string>
+    <string name="home_menu_tab_setting">设置</string>
+    <string name="ifly_action_guide">命令词</string>
+    <string name="ifly_action_hint_accomp">伴唱</string>
+    <string name="ifly_action_hint_close_page">关闭页面</string>
+    <string name="ifly_action_hint_enter_full_screen">打开全屏</string>
+    <string name="ifly_action_hint_exit_full_screen">退出全屏</string>
+    <string name="ifly_action_hint_max_volume">音量已最大</string>
+    <string name="ifly_action_hint_mic_down">麦克风音量降低</string>
+    <string name="ifly_action_hint_mic_up">麦克风音量增加</string>
+    <string name="ifly_action_hint_next">下一首</string>
+    <string name="ifly_action_hint_next_page">下一页</string>
+    <string name="ifly_action_hint_open_fav">打开收藏列表</string>
+    <string name="ifly_action_hint_open_local">打开本地歌曲列表</string>
+    <string name="ifly_action_hint_open_ordered">打开已点列表</string>
+    <string name="ifly_action_hint_open_recent">打开常唱列表</string>
+    <string name="ifly_action_hint_open_sang">打开已唱列表</string>
+    <string name="ifly_action_hint_origin">原唱</string>
+    <string name="ifly_action_hint_pause">暂停</string>
+    <string name="ifly_action_hint_play">播放</string>
+    <string name="ifly_action_hint_prev">上一首</string>
+    <string name="ifly_action_hint_prev_page">上一页</string>
+    <string name="ifly_action_hint_quiet">静音</string>
+    <string name="ifly_action_hint_recovery">打开声音</string>
+    <string name="ifly_action_hint_replay">重唱</string>
+    <string name="ifly_action_hint_select_item">选择序号</string>
+    <string name="ifly_action_hint_set_volume">设置音量：</string>
+    <string name="ifly_action_hint_top">置顶歌曲</string>
+    <string name="ifly_action_hint_volume_down">音量降低</string>
+    <string name="ifly_action_hint_volume_up">音量增加</string>
+    <string name="ifly_action_order_song_1">来一首</string>
+    <string name="ifly_action_order_song_2">我要唱</string>
+    <string name="ifly_action_order_song_3">点首</string>
+    <string name="ifly_add_song_success">已添加歌曲</string>
+    <string name="ifly_add_song_success_hint">已添加歌曲：%1$s</string>
+    <string name="ifly_ai_thinking">我在听……</string>
+    <string name="ifly_ai_unknown_hint">我没有听懂</string>
+    <string name="ifly_ai_unknown_retry_hint">我没听清，再说一遍吧</string>
+    <string name="ifly_empty_fav">当前没有收藏歌曲~</string>
+    <string name="ifly_empty_ordered_list">已点歌曲列表为空~</string>
+    <string name="ifly_empty_recent">没有找到任何常唱歌曲~</string>
+    <string name="ifly_empty_sang_list">已唱歌曲列表为空~</string>
+    <string name="ifly_guide_ctrl">播放控制</string>
+    <string name="ifly_guide_ctrl_content_1">"1. 暂停播放
+    “暂停、停止播放、暂停播放”
+
+2. 继续播放
+    “播放、继续播放、恢复播放”
+
+"</string>
+    <string name="ifly_guide_ctrl_content_2">"3. 切下一首歌
+    “下一首、切歌、下一曲、下首、下曲”
+
+    无网络情况：“下一首”
+
+4. 重唱
+    “重播、重唱、再唱一次”
+
+    无网络情况：“再唱一次”"</string>
+    <string name="ifly_guide_offline">无网络</string>
+    <string name="ifly_guide_online">有网络</string>
+    <string name="ifly_guide_order">点歌</string>
+    <string name="ifly_guide_order_content_1">"只有连接了网络才能使用点歌功能哦~
+
+"</string>
+    <string name="ifly_guide_order_content_2">"1. 按歌手 + 歌名点歌：
+   【点个/点首/来一首/我要唱/我想唱/帮我点】+【歌手名】的【歌曲名】
+   例如：“我想唱周华健的朋友”
+
+"</string>
+    <string name="ifly_guide_order_content_3">"2. 按歌手点歌：
+   【点个/点首/来一首/我要唱/我想唱/帮我点】+【歌手名】的歌
+   例如：“点首周华健的歌”
+
+"</string>
+    <string name="ifly_guide_order_content_4">"3. 按歌名点歌：
+   【点个/点首/来一首/我要唱/我想唱/帮我点】+【歌名】
+   例如：“来一首朋友”
+
+"</string>
+    <string name="ifly_guide_order_content_5">"您可以通过这些命令选择想唱的歌曲：
+
+    选择歌曲：您可以说【第几首】选择歌曲，例如：“第一首 / 第五首”
+    翻页：您可以说 “上一页”、“下一页”
+    退出：您可以说 “关闭页面”"</string>
+    <string name="ifly_guide_screen">窗口控制</string>
+    <string name="ifly_guide_screen_content_1">"1. 全屏播放视频
+    “打开全屏、进入全屏”
+
+2. 退出全屏播放
+    “退出全屏、关闭全屏、结束全屏”"</string>
+    <string name="ifly_guide_sound_close">静音</string>
+    <string name="ifly_guide_sound_close_content_1">"如果要关闭声音，您可以这么说：
+“关闭声音、静音、关掉声音、声音关闭、取消声音、安静”
+
+无网络情况：“关闭声音”
+
+"</string>
+    <string name="ifly_guide_sound_down">降低音量</string>
+    <string name="ifly_guide_sound_down_content_1">"您可以通过这些命令来调高音量：
+
+“声音小一点、音量小一点、音乐小一点、音量调小点、声音调小点
+小声一点、音量小点、音乐小点、小声点、小点声、音量调小一点
+声音调小一点、音量小一些、音量再小一些、音乐小一些、音乐再小一些
+音乐再小一点”
+
+无网络情况：“声音小一点、音量小一点、音乐小一点”"</string>
+    <string name="ifly_guide_sound_max">音量最大</string>
+    <string name="ifly_guide_sound_max_content_1">"您可以通过这些命令把音量开到最大：
+
+“声音最大、音量最大”
+
+"</string>
+    <string name="ifly_guide_sound_max_content_2">只有连接了网络才能使用这个功能。</string>
+    <string name="ifly_guide_sound_open">打开声音</string>
+    <string name="ifly_guide_sound_open_content_1">"如果要恢复声音，您可以这么说：
+“打开声音、声音恢复、恢复声音、正常声音、声音正常、取消静音、退出静音、关闭静音”
+
+无网络情况：“打开声音”
+
+"</string>
+    <string name="ifly_guide_sound_set">设置任意音量</string>
+    <string name="ifly_guide_sound_set_content_1">"设置音量为任意数值，您可以这么说：
+【设置音量 / 音量调到】+【0~100的数字】
+
+例如：“设置音量三十五”、“音量调到四十”
+
+"</string>
+    <string name="ifly_guide_sound_set_content_2">只有连接了网络才能使用这个功能。</string>
+    <string name="ifly_guide_sound_up">增加音量</string>
+    <string name="ifly_guide_sound_up_content_1">"您可以通过这些命令来增加音量：
+
+“声音大一点、音量大一点、音乐大一点、音量调大点、声音调大点
+音量调大一点、声音调大一点、大声一点、大声点、大点声、音量大一些
+音乐大一些、音乐再大一些、音量再大一些、音乐再大一点”
+
+无网络情况：“声音大一点、音量大一点、音乐大一点”"</string>
+    <string name="ifly_guide_sum">功能说明</string>
+    <string name="ifly_guide_sum_content">"Hi，我是您的语音助手，您可以直接对麦克风说出想要的命令，我会执行对应操作。
+
+建议连接网络后再使用语音功能。
+
+无网络情况会影响识别准确率，并且只能使用一部分命令。"</string>
+    <string name="ifly_guide_track">原伴唱</string>
+    <string name="ifly_guide_track_content_1">"1. 视频切到原唱
+    “原唱”
+
+2. 视频切到伴唱
+    “伴唱”"</string>
+    <string name="ifly_help_content">"Hi，我是您的语音助手，您可以直接对麦克风说出想要的命令。
+
+您可以这么和我说：
+
+1. 点个/点首/来一首【某个歌手】的【歌名】
+   （例如：点首“周杰伦”的“七里香”）
+2. 点个/点首【歌名】
+   （例如：点首 “七里香”）
+3. 下一首
+4. 播放 / 暂停
+5. 声音大一点 / 声音小一点
+6. 设为音量【0—100的数值】
+   （例如：设置音量50）
+7. 原唱 / 伴唱
+8. 重唱
+9. 静音 / 关闭声音
+10. 打开声音 / 恢复声音
+11. 打开全屏
+12. 退出全屏"</string>
+    <string name="ifly_main">目录</string>
+    <string name="ifly_network_error">网络异常，请检查网络设置</string>
+    <string name="ifly_server_error">云端服务异常：%s</string>
+    <string name="ifly_song_downloading">正在下载歌曲</string>
+    <string name="ifly_song_downloading_hint">正在下载歌曲：%1$s</string>
+    <string name="ifly_song_not_found">未能找到歌曲</string>
+    <string name="ifly_song_not_found_hint">"未能找到歌曲：%1$s
+
+推荐使用 “[歌手名] + [歌曲名]” 的说法点歌哦~
+
+比如说：“%2$s周华健的《朋友》”"</string>
+    <string name="ifly_top_song_success_hint">已置顶歌曲：《%1$s》</string>
+    <string name="info_effector">效果器：%1$s 型号: %2$s</string>
+    <string name="info_lt">利通：%1$s</string>
+    <string name="info_mi_token">小爱Token：%1$s</string>
+    <string name="info_network">网络：%1$s    %2$s</string>
+    <string name="info_recorder">录音接口：%1$s</string>
+    <string name="info_rom">Rom版本：%1$s</string>
+    <string name="info_room_close">关台</string>
+    <string name="info_room_open">已开台</string>
+    <string name="info_server">服务器：%1$s</string>
+    <string name="info_storage">存储：%1$d/%2$dM   </string>
+    <string name="init_tip_check_skin_upgrade">正在检查资源更新 …</string>
+    <string name="init_tip_complete">初始化完成，正在打开主页 …</string>
+    <string name="init_tip_connect_websocket">建立长连接</string>
+    <string name="init_tip_connecting_mls">正在连接本地服务器 …</string>
+    <string name="init_tip_doing_check_disable">正在检查设备状态</string>
+    <string name="init_tip_doing_login">登录中 …</string>
+    <string name="init_tip_doing_ntp">正在校准系统时间 …</string>
+    <string name="init_tip_find_mls">正在搜索本地服务器 …</string>
+    <string name="init_tip_get_play_ctrl_config">正在获取环境配置 …</string>
+    <string name="init_tip_get_sys_config">正在获取系统配置 …</string>
+    <string name="init_tip_init_skin">正在检查资源 …</string>
+    <string name="init_tip_init_system">系统初始化中 …</string>
+    <string name="init_tip_load_default_songs">加载数据…</string>
+    <string name="init_tip_ott_find_mls">初始化中 …</string>
+    <string name="invalid_channel_mode_exit_in">APP即将在 %1$d 秒后退出…</string>
+    <string name="launch_note" />
+    <string name="library_roundedimageview_author">Vince Mi</string>
+    <string name="library_roundedimageview_authorWebsite">https://github.com/vinc3m1</string>
+    <string name="library_roundedimageview_isOpenSource">true</string>
+    <string name="library_roundedimageview_libraryDescription">A fast ImageView (and Drawable) that supports rounded corners (and ovals or circles) based on the original example from Romain Guy.</string>
+    <string name="library_roundedimageview_libraryName">RoundedImageView</string>
+    <string name="library_roundedimageview_libraryVersion">1.3.0</string>
+    <string name="library_roundedimageview_libraryWebsite">https://github.com/vinc3m1/RoundedImageView</string>
+    <string name="library_roundedimageview_licenseId">apache_2_0</string>
+    <string name="library_roundedimageview_repositoryLink">https://github.com/vinc3m1/RoundedImageView.git</string>
+    <string name="license_activate_by_hand">设备尚未激活，若您是消费者，请激活设备，畅享点歌</string>
+    <string name="license_activate_by_hand_button_cancel">暂不激活</string>
+    <string name="license_activate_by_hand_button_confirm">激活</string>
+    <string name="license_activate_by_hand_error_retry">网络异常，请重试</string>
+    <string name="license_activate_by_hand_fail">激活失败</string>
+    <string name="license_activate_by_hand_success">激活成功</string>
+    <string name="license_dl_activate_hint">请先扫码免费开通会员！</string>
+    <string name="license_dl_remain_empty_hint">下载次数已用完，请及时续费！</string>
+    <string name="license_dl_vip_expired_hint">当前会员已过期，请及时续费！</string>
+    <string name="license_expired_connect_agent">您的会员已过期，请洽谈代理商</string>
+    <string name="license_near_expired">您的会员权益即将到期，剩余 %1$d天，请提前续费</string>
+    <string name="license_near_expired_connect_agent">"您的会员权益即将到期，剩余 %1$d天
+请提前洽谈代理商"</string>
+    <string name="license_not_activated">正在加载...</string>
+    <string name="license_remain_download_count">剩余下载数：%1$d首</string>
+    <string name="license_unlimited_download_hint">畅享歌曲下载特权</string>
+    <string name="license_vip_expired">VIP · 续费</string>
+    <string name="license_vip_expired_charge_hint">请您尽快扫码续费</string>
+    <string name="license_vip_expired_date">%1$s到期</string>
+    <string name="license_vip_expired_hint">当前会员已经过期</string>
+    <string name="license_vip_free_download">免费下载</string>
+    <string name="license_vip_near_expired_hint">(会员即将到期)</string>
+    <string name="license_vip_none_free_download">下载次数已用完</string>
+    <string name="license_vip_remain_day">天</string>
+    <string name="license_vip_valid">麦动</string>
+    <string name="license_vip_valid_date">会员有效期：</string>
+    <string name="license_wx_activate_hint">微信扫码免费开通会员</string>
+    <string name="license_wx_charge_hint">微信扫码续费</string>
+    <string name="load_cost">load-cost</string>
+    <string name="loading">加载中…</string>
+    <string name="local_movie">本地影片</string>
+    <string name="lrc_label">暂无歌词</string>
+    <string name="marquee_default_close_state">欢迎光临，关台状态不能点歌哦~</string>
+    <string name="marquee_default_open_state">欢迎光临</string>
+    <string name="marquee_default_open_state_empty_order">欢迎光临，您当前还没有点歌哦~</string>
+    <string name="marquee_song_current">当前：%1$s - %2$s</string>
+    <string name="marquee_song_download_buffering">缓冲中</string>
+    <string name="marquee_song_download_empty">当前没有下载</string>
+    <string name="marquee_song_download_info">下载中：%1$s (%2$s)</string>
+    <string name="marquee_song_info">当前：%1$s - %2$s\u0009\u0009下首：%3$s - %4$s</string>
+    <string name="marquee_song_info_without_next">当前：%1$s - %2$s\u0009\u0009下首：未点歌</string>
+    <string name="marquee_song_next">下首：%1$s - %2$s</string>
+    <string name="marquee_song_next_empty">下首：未点歌</string>
+    <string name="marquee_song_not_ordered">当前：未点歌</string>
+    <string name="mi_action_add_song">已添加歌曲：%s</string>
+    <string name="mi_action_add_song_default">添加歌曲成功</string>
+    <string name="mi_action_hint_accompany">伴唱</string>
+    <string name="mi_action_hint_call_service">已为您呼叫服务生</string>
+    <string name="mi_action_hint_call_wine">已通知服务生拿%1$d个%2$s</string>
+    <string name="mi_action_hint_close_ac">关闭空调</string>
+    <string name="mi_action_hint_close_page">关闭页面</string>
+    <string name="mi_action_hint_enter_full_screen">打开全屏</string>
+    <string name="mi_action_hint_exit_full_screen">退出全屏</string>
+    <string name="mi_action_hint_help">帮助</string>
+    <string name="mi_action_hint_help_content">"您可以这么和我说：
+1. 下一首/切歌
+2. 点一首【某位歌手】的【歌名】
+ （例如：点一首“周华健”的“朋友”）
+3. 播放/暂停
+4. 静音/声音还原
+5. 重唱/原唱/伴唱
+6. 声音大一点/声音小一点
+7. 麦克风音量大一点/麦克风音量小一点
+8. 音调升高/音调降低
+9. 切换灯光/灯光柔和/灯光明亮等"</string>
+    <string name="mi_action_hint_joke">说笑话中</string>
+    <string name="mi_action_hint_light_change">灯光效果改变</string>
+    <string name="mi_action_hint_light_close">关闭灯光</string>
+    <string name="mi_action_hint_light_default">默认灯光</string>
+    <string name="mi_action_hint_mic_decr">麦克风音量降低</string>
+    <string name="mi_action_hint_mic_incr">麦克风音量增加</string>
+    <string name="mi_action_hint_music_decr">音量降低</string>
+    <string name="mi_action_hint_music_incr">音量增加</string>
+    <string name="mi_action_hint_next">下一首</string>
+    <string name="mi_action_hint_next_page">下一页</string>
+    <string name="mi_action_hint_open_ac">打开空调</string>
+    <string name="mi_action_hint_origin">原唱</string>
+    <string name="mi_action_hint_pause">暂停</string>
+    <string name="mi_action_hint_play">播放</string>
+    <string name="mi_action_hint_prev">上一首</string>
+    <string name="mi_action_hint_prev_page">上一页</string>
+    <string name="mi_action_hint_quiet">静音</string>
+    <string name="mi_action_hint_recovery">恢复声音</string>
+    <string name="mi_action_hint_replay">重唱</string>
+    <string name="mi_action_hint_select_item">选择序号</string>
+    <string name="mi_action_hint_set_volume">设置音量为%s</string>
+    <string name="mi_action_hint_tone_down">音调降低</string>
+    <string name="mi_action_hint_tone_up">音调升高</string>
+    <string name="mi_action_hint_top">置顶歌曲</string>
+    <string name="mi_action_tip_order">"你可以说：“点一首周杰伦的七里香”
+                     “点一首七里香”"</string>
+    <string name="mi_ai_error">云端服务异常，请检查网络设置: %s</string>
+    <string name="mi_ai_unknown">我没听清，再说一遍吧</string>
+    <string name="mi_guide_ac_ctrl">控制空调</string>
+    <string name="mi_guide_ac_ctrl_detail">"1. 打开空调
+
+2. 关闭空调"</string>
+    <string name="mi_guide_ctrl_hint">您可以这么和我说：</string>
+    <string name="mi_guide_order_song">点歌</string>
+    <string name="mi_guide_order_song_detail">"1. 点一首【某位歌手】的【歌名】
+ （例如：点一首 “周华健” 的 “朋友”）
+
+2. 点一首【歌名】
+ （例如：点一首 “朋友”）"</string>
+    <string name="mi_guide_play_ctrl">播放控制</string>
+    <string name="mi_guide_play_ctrl_detail">"1. 下一首 / 切歌
+
+2. 播放 / 暂停
+
+3. 重唱
+
+4. 原唱 / 切原唱
+ （当前歌曲将自动切换为原唱）
+
+5. 伴唱 / 切伴唱
+ （当前歌曲将自动切换为伴唱）"</string>
+    <string name="mi_guide_service_ctrl">呼叫服务</string>
+    <string name="mi_guide_service_ctrl_detail">"1. 呼叫服务生
+
+2. 帮我拿【数量】【杯子/酒杯/红酒杯/高脚杯等】
+ （例如：帮我拿三个酒杯）"</string>
+    <string name="mi_guide_volume_ctrl">音量调节</string>
+    <string name="mi_guide_volume_ctrl_detail">"1. 声音大一点 / 大点声 / 音量加
+
+2. 声音小一点 / 小点声/ 音量减
+
+3. 静音
+
+4. 恢复声音 / 声音正常
+
+5. 麦克风音量大一点
+
+6. 麦克风音量小一点"</string>
+    <string name="mi_guide_wake_up">唤醒小爱</string>
+    <string name="mi_guide_wake_up_detail">"Hi，我是小爱同学，您的语音助手。
+
+您可以对话筒说【小爱同学】唤起我，也可以通过按下话筒的【AI】按键唤起我。"</string>
+    <string name="mi_network_error">网络异常，请检查当前网络设置</string>
+    <string name="mi_thinking">我在听……</string>
+    <string name="mobile_box_name">包厢：%1$s</string>
+    <string name="mobile_order_good">微信点单</string>
+    <string name="mobile_order_good_tip">微信扫码，手机点单</string>
+    <string name="mobile_order_song">微信点歌</string>
+    <string name="mobile_order_song_tip">微信扫码，手机点歌</string>
+    <string name="mobile_scan_share_recording">微信扫码，分享作品</string>
+    <string name="mobile_upload_song">手机传歌</string>
+    <string name="mobile_upload_song_tip">微信扫码，手机传歌</string>
+    <string name="monitor_server_not_connect">未连接到服务器</string>
+    <string name="movie_actor">主演</string>
+    <string name="movie_director">导演</string>
+    <string name="movie_style">类型</string>
+    <string name="movie_summary">简介</string>
+    <string name="network_connect_hint">网络连接异常，请检查网络设置</string>
+    <string name="network_ethernet">有线</string>
+    <string name="network_go_connect">网络设置</string>
+    <string name="network_none">无网络</string>
+    <string name="network_unknown">未知</string>
+    <string name="network_wifi">WiFi</string>
+    <string name="new_db_update_cancel">下次吧</string>
+    <string name="new_db_update_confirm">立即升级</string>
+    <string name="new_db_version">最新版本：</string>
+    <string name="new_db_version_tip">发现新版本数据库，升级后可以点播更多最新歌曲，可能花费较长时间，是否升级？</string>
+    <string name="new_db_version_title">新版本数据库</string>
+    <string name="no_network_open_setting" />
+    <string name="open_setting_storage">去清理</string>
+    <string name="orderlist_download">下载</string>
+    <string name="orderlist_download_pause_all">全部暂停</string>
+    <string name="orderlist_download_start_all">全部开始</string>
+    <string name="orderlist_ordered">已点</string>
+    <string name="orderlist_over_limit">先唱完已点播的歌曲吧～</string>
+    <string name="orderlist_sang">已唱</string>
+    <string name="orderlist_song_playing">正在播放</string>
+    <string name="orderlist_uploading">处理中…</string>
+    <string name="ott_search_abc_hint">输入首字母搜索</string>
+    <string name="ott_search_keyword_hint">输入关键字搜索</string>
+    <string name="page_app_store">应用</string>
+    <string name="page_disco">派对</string>
+    <string name="page_favorite">收藏</string>
+    <string name="page_gcw">广场舞</string>
+    <string name="page_global">各国歌曲</string>
+    <string name="page_launch">启动</string>
+    <string name="page_main">主页</string>
+    <string name="page_movie">电影</string>
+    <string name="page_movie_detail">电影详情</string>
+    <string name="page_network">无线网络</string>
+    <string name="page_network_ethernet">有线网络</string>
+    <string name="page_playlist">分类</string>
+    <string name="page_rank">排行榜</string>
+    <string name="page_recent">常唱</string>
+    <string name="page_recommend">猜你想唱</string>
+    <string name="page_screen">屏幕调节</string>
+    <string name="page_search">快搜</string>
+    <string name="page_settings">设置</string>
+    <string name="page_settings_about">关于</string>
+    <string name="page_settings_about_this">关于本机</string>
+    <string name="page_settings_common">通用设置</string>
+    <string name="page_settings_database">数据设置</string>
+    <string name="page_settings_device">外设设置</string>
+    <string name="page_settings_display">显示设置</string>
+    <string name="page_settings_download">下载设置</string>
+    <string name="page_settings_network">网络设置</string>
+    <string name="page_settings_player">播放设置</string>
+    <string name="page_settings_set">设置</string>
+    <string name="page_settings_ui">界面设置</string>
+    <string name="page_singer">歌星</string>
+    <string name="page_skin_change">皮肤中心</string>
+    <string name="page_song">歌名</string>
+    <string name="page_song_child">儿歌</string>
+    <string name="page_song_disco">Disco</string>
+    <string name="page_song_drama">戏曲</string>
+    <string name="page_song_hd">高清</string>
+    <string name="page_song_hot">热歌</string>
+    <string name="page_song_local">本地</string>
+    <string name="page_song_new">新歌</string>
+    <string name="page_song_old_song">经典老歌</string>
+    <string name="page_song_red">光辉历程</string>
+    <string name="page_song_style">曲风</string>
+    <string name="page_song_tiktok">抖音排行榜</string>
+    <string name="page_udisk_play">U盘播放</string>
+    <string name="page_video_broadcast">大厅转播</string>
+    <string name="pay_sing_expire_soon_tip">您的欢唱时间快到了哦！请扫码充值</string>
+    <string name="paysing_recharge">"充值即享
+全年欢唱"</string>
+    <string name="permission_exit_app">退出应用</string>
+    <string name="permission_go_set">前往设置</string>
+    <string name="permission_manual_set_hint">因为您选择了【不再提醒授权】，所以需要手动开启APP必要权限：</string>
+    <string name="permission_manual_set_step">"1. 进入应用设置页面，然后点击【权限】；
+2. 开启【存储空间】、【麦克风】权限；
+3. 返回桌面，重新打开点歌软件。"</string>
+    <string name="permission_not_granted">未授予必要的权限</string>
+    <string name="play_ctrl_key_tip">按确认键可以打开控制台</string>
+    <string name="play_while_download_disabled_tip">已添加到下载列表，当前未开启边下边播，您可以在设置中启用</string>
+    <string name="player_download_error">下载失败，请重试或切歌，您也可以暂时关闭边下边播</string>
+    <string name="player_download_license_error">下载失败，下载次数已用完，请充值续费或切歌</string>
+    <string name="player_download_license_expired">下载失败，会员已过期，请充值续费或切歌</string>
+    <string name="player_download_network_error">下载失败，网络异常，请检查网络连接或切歌，您也可以暂时关闭边下边播</string>
+    <string name="player_download_not_activate">下载失败，设备未激活，请激活设备或切歌</string>
+    <string name="player_download_storage_short_error">下载失败，存储空间不足，请清理文件、接U盘后重试或切歌</string>
+    <string name="player_error_auto_play_next_song">播放异常，即将自动切歌</string>
+    <string name="player_pause_disabled_when_play_while_download">边下边播中的歌曲不可暂停</string>
+    <string name="player_type_hisi">定制播放器</string>
+    <string name="player_type_ijkplayer">私有播放器</string>
+    <string name="player_type_mediaplayer">系统播放器</string>
+    <string name="player_type_thunder">通用播放器</string>
+    <string name="pwd_empty">密码不能为空！</string>
+    <string name="pwd_error_hint">密码错误！还剩下%1$d次机会</string>
+    <string name="pwd_forbidden">您已多次输入密码错误，无法继续尝试！</string>
+    <string name="pwd_hint">密码</string>
+    <string name="pwd_input_hint">请输入密码</string>
+    <string name="quick_search_hint">输入歌名、歌星名点歌</string>
+    <string name="random">打乱</string>
+    <string name="recharge_activate">微信扫码领取</string>
+    <string name="recharge_license_add_count">+%1$d首</string>
+    <string name="recharge_license_add_count_infinite">无限</string>
+    <string name="recharge_license_add_month">+%1$d个月</string>
+    <string name="recharge_license_agreement">会员服务协议</string>
+    <string name="recharge_license_count">剩余下载数：%1$d</string>
+    <string name="recharge_license_expired">下载流量用完，请充值</string>
+    <string name="recharge_license_expires_soon">（即将过期）</string>
+    <string name="recharge_license_expried_prefix">会员权益：%1$s</string>
+    <string name="recharge_license_gift_code">礼品码兑换</string>
+    <string name="recharge_license_gift_code_exchange_error">礼品码兑换失败，请检查礼品码是否正确</string>
+    <string name="recharge_license_gift_code_input_hint">请输入礼品码</string>
+    <string name="recharge_license_tip">会员下载特权：已激活</string>
+    <string name="recharge_license_to">会员有效期：%1$s</string>
+    <string name="recharge_license_to_date">%1$s 到期</string>
+    <string name="recharge_license_vip">下载特权</string>
+    <string name="recharge_license_vip_count">剩余下载次数： %1$d</string>
+    <string name="recharge_license_vip_count_expired">剩余下载次数：已用完，请充值</string>
+    <string name="recharge_license_vip_count_per_month">歌曲下载特权： %1$d 首/月</string>
+    <string name="recharge_license_vip_month">会员有效期至： %1$s</string>
+    <string name="recharge_license_vip_month_expired">会员有效期至：已过期，请充值</string>
+    <string name="recharge_license_vip_total_download">已下载次数： %1$d</string>
+    <string name="recharge_option_month">%1$d个月</string>
+    <string name="recharge_pay_refresh_code">支付遇到问题请点击二维码刷新</string>
+    <string name="recharge_success_license_to">会员有效期至：</string>
+    <string name="recharge_timer">限时</string>
+    <string name="recharge_tip_close_dialog">遥控器按返回或点击空白区域关闭弹窗</string>
+    <string name="recharge_wechat_ali_scan_to_pay">微信/支付宝扫码</string>
+    <string name="record_get_share_qrcode_fail">"获取分享二维码失败
+请检查网络连接"</string>
+    <string name="record_share_record">"微信扫码
+立即分享作品"</string>
+    <string name="restart_switch_to_lan">APP即将重启以切换到LAN模式</string>
+    <string name="restart_switch_to_nas">APP即将重启以切换到NAS模式</string>
+    <string name="restart_switch_to_single">APP即将重启以切换到单机模式</string>
+    <string name="room_service_cup">要酒杯</string>
+    <string name="room_service_dice">要筛盅</string>
+    <string name="room_service_mic">话筒异常</string>
+    <string name="room_service_pay_bill">结账</string>
+    <string name="room_service_reminder">催单</string>
+    <string name="room_service_status_calling">呼叫中</string>
+    <string name="room_service_status_init">服务</string>
+    <string name="room_service_waiter">呼叫服务生</string>
+    <string name="room_state_not_open">当前包厢未开台，请先开台！</string>
+    <string name="scan_to_activate">扫码激活</string>
+    <string name="score_champion_mark">最强擂主</string>
+    <string name="score_combo_count">x%1$d</string>
+    <string name="score_combo_good">GOOD</string>
+    <string name="score_combo_great">GREAT</string>
+    <string name="score_combo_perfect">PERFECT</string>
+    <string name="score_empty_user_info">"无法获取用户信息
+立即扫码领取成绩"</string>
+    <string name="score_level_s">S</string>
+    <string name="score_share_shortcut">您也可以在已唱列表分享该作品</string>
+    <string name="score_skip">跳过</string>
+    <string name="score_song_name">演唱歌曲：</string>
+    <string name="score_user_champion_hint">恭喜你成为本首歌的</string>
+    <string name="score_user_defeat_end">的人</string>
+    <string name="score_user_defeat_title">击败全国</string>
+    <string name="score_user_score">演唱得分：</string>
+    <string name="score_user_total_score">%1$d分</string>
+    <string name="score_wx_share_scan">"微信扫码
+分享作品"</string>
+    <string name="search">搜索</string>
+    <string name="search_hint">请输入搜索内容</string>
+    <string name="search_menu_title">Search</string>
+    <string name="seek_cost">seek_cost</string>
+    <string name="seek_load_cost">seek_load_cost</string>
+    <string name="select_all">全选</string>
+    <string name="setting_about_open">查看</string>
+    <string name="setting_about_us">关于我们</string>
+    <string name="setting_about_us_content">和音元视智能语音点播系统</string>
+    <string name="setting_about_us_detail">详情</string>
+    <string name="setting_ai_ctrl_not_initialised">语音功能尚未初始化，请稍后再试</string>
+    <string name="setting_ai_ctrl_switch">语音功能</string>
+    <string name="setting_ai_ctrl_volume">语音引擎音量</string>
+    <string name="setting_ai_light">AI 灯光</string>
+    <string name="setting_ai_light_cc_ip">中控IP：%1$s</string>
+    <string name="setting_ai_light_cc_mac">中控MAC：%1$s</string>
+    <string name="setting_ai_light_not_init">未连接中控！</string>
+    <string name="setting_ai_light_rebind">重新连接</string>
+    <string name="setting_ai_light_rebind_fail">"中控重连失败，错误信息：
+"</string>
+    <string name="setting_ai_light_rebind_success">中控重连成功！</string>
+    <string name="setting_ai_light_status">AI灯光初始化：%1$b</string>
+    <string name="setting_ai_type_change">设置语音类型</string>
+    <string name="setting_ai_type_change_hint">修改</string>
+    <string name="setting_audio_accomp">伴唱</string>
+    <string name="setting_audio_config">声音设置</string>
+    <string name="setting_audio_config_tip">设置语音功能和点歌默认音量</string>
+    <string name="setting_audio_eq">高级音效</string>
+    <string name="setting_audio_follow_pre_origin_accomp">跟随上首原伴唱</string>
+    <string name="setting_audio_follow_pre_volume">跟随上首音量</string>
+    <string name="setting_audio_order_song_fix_origin_accomp">固定点播原伴唱</string>
+    <string name="setting_audio_order_song_fix_volume">固定点播音量</string>
+    <string name="setting_audio_order_song_follow_pre_origin_accomp">跟随上首点播原伴唱</string>
+    <string name="setting_audio_order_song_follow_pre_volume">跟随上首点播歌曲音量</string>
+    <string name="setting_audio_order_song_origin_accomp">点播歌曲原伴唱</string>
+    <string name="setting_audio_order_song_switch_origin_accomp_type">切到点播歌曲时原伴唱：</string>
+    <string name="setting_audio_order_song_switch_volume_type">切到点播歌曲时音量：</string>
+    <string name="setting_audio_order_song_volume">点播歌曲音量</string>
+    <string name="setting_audio_origin">原唱</string>
+    <string name="setting_audio_origin_accomp">原伴唱</string>
+    <string name="setting_audio_volume">音量</string>
+    <string name="setting_auth_storage">硬盘读写权限</string>
+    <string name="setting_auth_storage_confirm">开启读写权限</string>
+    <string name="setting_auth_storage_empty">未选择任何硬盘</string>
+    <string name="setting_auth_storage_fail">开启读写权限失败！%1$s</string>
+    <string name="setting_auth_storage_hint">开启硬盘读写权限成功后，应用会自动重启。</string>
+    <string name="setting_auth_storage_list_empty">未检测到硬盘</string>
+    <string name="setting_auth_storage_loading">开启读写权限中……</string>
+    <string name="setting_auth_storage_repair">去修复</string>
+    <string name="setting_auth_storage_success">开启读写权限成功，应用即将自动重启！</string>
+    <string name="setting_banner_config">轮播图配置</string>
+    <string name="setting_banner_select_none">至少要选择一张轮播图</string>
+    <string name="setting_boot_logo">开机静态图</string>
+    <string name="setting_bootstrap">运行向导</string>
+    <string name="setting_bootstrap_open">打开</string>
+    <string name="setting_button_check_upgrade">麦动</string>
+    <string name="setting_button_local_file">扫描本地文件</string>
+    <string name="setting_button_remove_db">还原</string>
+    <string name="setting_button_save">保存</string>
+    <string name="setting_button_song_remove_confirm">设置</string>
+    <string name="setting_button_sync_data">同步</string>
+    <string name="setting_button_touch_correct">开始校准</string>
+    <string name="setting_change_language">设置语言</string>
+    <string name="setting_check_storage">查看存储</string>
+    <string name="setting_check_upgrade">K歌系统</string>
+    <string name="setting_clear_app_data">清理应用数据</string>
+    <string name="setting_clear_app_data_button">清理</string>
+    <string name="setting_clear_app_data_restart_tip">清理后，应用会自动重启，确认清理吗？</string>
+    <string name="setting_clear_app_data_tip">包括缓存，本地存储的皮肤包等数据</string>
+    <string name="setting_clear_downoad_list">开机清空下载列表</string>
+    <string name="setting_clear_recent">清空常唱</string>
+    <string name="setting_clear_recent_button">清空</string>
+    <string name="setting_clear_recent_confirm">您确认要清空常唱页面下的歌曲记录吗？</string>
+    <string name="setting_clear_recent_fail">清空常唱失败，请重试，%1$s</string>
+    <string name="setting_clear_recent_success">已为您清空常唱页面下的歌曲记录。</string>
+    <string name="setting_clear_recent_tip">清空常唱</string>
+    <string name="setting_close_screen">熄屏</string>
+    <string name="setting_database">数据设置</string>
+    <string name="setting_database_page_button">前往设置</string>
+    <string name="setting_database_page_tip">数据库、歌曲下载、歌曲文件相关设置</string>
+    <string name="setting_database_song_count">"本地：%1$s
+总数：%2$s"</string>
+    <string name="setting_database_sync">曲库</string>
+    <string name="setting_database_sync_button">更新</string>
+    <string name="setting_database_sync_hint">"全屏播放时曲库会在后台自动更新
+您也可以点击【更新】按钮手动更新"</string>
+    <string name="setting_database_version">版本：%1$s</string>
+    <string name="setting_device_info">设备信息</string>
+    <string name="setting_dhcp_default">保存后将自动获取</string>
+    <string name="setting_display_rotation">触摸屏旋转</string>
+    <string name="setting_display_rotation_error">获取触摸屏旋转设置失败！</string>
+    <string name="setting_display_rotation_reboot">重启设备后设置才会生效，是否重启？</string>
+    <string name="setting_display_rotation_rotation_0">横屏</string>
+    <string name="setting_display_rotation_rotation_180">横屏翻转180°</string>
+    <string name="setting_display_rotation_rotation_270">竖屏翻转180°</string>
+    <string name="setting_display_rotation_rotation_90">竖屏</string>
+    <string name="setting_display_rotation_same">未修改任何参数！</string>
+    <string name="setting_display_rotation_set_fail">设置触摸屏旋转参数失败！</string>
+    <string name="setting_double_language_hint">双语</string>
+    <string name="setting_double_screen">双屏异显</string>
+    <string name="setting_double_screen_disable_tip">遥控触发开关双屏异显，即将重启</string>
+    <string name="setting_double_screen_tip">关闭双屏异显后，两个屏幕显示相同内容</string>
+    <string name="setting_download">下载设置</string>
+    <string name="setting_download_disk">下载目录</string>
+    <string name="setting_download_disk_button">设置</string>
+    <string name="setting_download_disk_tip">设置下载歌曲文件的存储设备</string>
+    <string name="setting_download_page_button">前往设置</string>
+    <string name="setting_download_page_tip">下载存储设备和自动删歌等设置</string>
+    <string name="setting_download_storage_device_fail">"设置 %1$s 为下载歌曲存储设备失败！
+%2$s"</string>
+    <string name="setting_download_storage_device_success">设置 %1$s 为下载歌曲存储设备成功！</string>
+    <string name="setting_eq_set_custom">自定义音效</string>
+    <string name="setting_eq_set_custom_fail">自定义音效设置失败，请稍后再试！</string>
+    <string name="setting_eq_set_custom_success">自定义音效设置成功</string>
+    <string name="setting_eq_set_default_fail">恢复默认音效失败！</string>
+    <string name="setting_eq_set_default_success">已恢复为默认音效</string>
+    <string name="setting_eq_set_fail">修改音效失败，请稍后再试！</string>
+    <string name="setting_eq_set_progress">切换音效中：%1$s</string>
+    <string name="setting_eq_set_start">切换音效中</string>
+    <string name="setting_eq_set_success">修改音效成功</string>
+    <string name="setting_eq_type_blue">蓝调</string>
+    <string name="setting_eq_type_classic">古典</string>
+    <string name="setting_eq_type_country">乡村</string>
+    <string name="setting_eq_type_electric">电子乐</string>
+    <string name="setting_eq_type_human">人声</string>
+    <string name="setting_eq_type_jazz">爵士</string>
+    <string name="setting_eq_type_rock">摇滚</string>
+    <string name="setting_eq_type_standard">标准</string>
+    <string name="setting_ethernet">有线网络</string>
+    <string name="setting_ethernet_not_available">请检查网线是否插好</string>
+    <string name="setting_ethernet_save_success">已生效</string>
+    <string name="setting_float_button">悬浮按钮</string>
+    <string name="setting_float_button_hint">隐藏/显示系统悬浮按钮</string>
+    <string name="setting_force_scan_disk_after_remove_db">监测到数据已还原，请重新扫描本地文件，以正常使用</string>
+    <string name="setting_fullscreen">自动全屏</string>
+    <string name="setting_fullscreen_option_0">30秒</string>
+    <string name="setting_fullscreen_option_1">45秒</string>
+    <string name="setting_fullscreen_option_2">1分钟</string>
+    <string name="setting_fullscreen_option_3">2分钟</string>
+    <string name="setting_fullscreen_option_4">关闭（不推荐）</string>
+    <string name="setting_fullscreen_set">设置间隔</string>
+    <string name="setting_fullscreen_tip">设置多久未操作后自动进入全屏</string>
+    <string name="setting_hdmi_volume">HDMI声音</string>
+    <string name="setting_imax">巨幕设置</string>
+    <string name="setting_imax_server_ip">巨幕服务器IP</string>
+    <string name="setting_imax_set_invalid">巨幕IP无效！</string>
+    <string name="setting_imax_set_same_server">巨幕IP未修改</string>
+    <string name="setting_imax_set_success">巨幕IP设置成功</string>
+    <string name="setting_info">设备信息</string>
+    <string name="setting_info_mac">MAC：%1$s</string>
+    <string name="setting_info_model">设备：%1$s</string>
+    <string name="setting_info_sn">SN：%1$s</string>
+    <string name="setting_info_version">版本：%1$s</string>
+    <string name="setting_internal_storage_label">本机存储</string>
+    <string name="setting_ip_edit_empty">输入不能为空</string>
+    <string name="setting_ip_edit_invalid">请输入正确的格式</string>
+    <string name="setting_label_dhcp">自动获取</string>
+    <string name="setting_label_dns1">DNS服务器1</string>
+    <string name="setting_label_dns2">DNS服务器2</string>
+    <string name="setting_label_gateway">默认网关</string>
+    <string name="setting_label_ip">IP地址</string>
+    <string name="setting_label_mask">子网掩码</string>
+    <string name="setting_label_static">静态设置</string>
+    <string name="setting_label_wifi_pwd">密码</string>
+    <string name="setting_language">语言</string>
+    <string name="setting_language_hint">"修改后语言后，应用将会自动重启。
+请选择要使用的语言："</string>
+    <string name="setting_language_restart">语言已修改，应用即将自动重启</string>
+    <string name="setting_language_title">请选择语言</string>
+    <string name="setting_local_file">本地文件</string>
+    <string name="setting_local_file_confirm">如果您是首次扫描该设备可能会花费较长时间，约%1$s，过程中将暂停播放，确认现在扫描吗？</string>
+    <string name="setting_local_file_select_none">请选择要扫描的硬盘！</string>
+    <string name="setting_local_file_tip">硬盘有歌，搜索不出来？扫描硬盘，更新本地数据库</string>
+    <string name="setting_made_base">基础指令</string>
+    <string name="setting_made_door_light">门牌灯</string>
+    <string name="setting_made_light">灯光</string>
+    <string name="setting_made_sound">音效</string>
+    <string name="setting_made_test">中控测试</string>
+    <string name="setting_made_test_cmd">"当前指令：%1$s
+码值：%2$s
+中控显示值：%3$s"</string>
+    <string name="setting_marquee_setting">走马灯</string>
+    <string name="setting_marquee_setting_hint">点击此处输入走马灯内容</string>
+    <string name="setting_marquee_setting_tip">设置视频窗口固定走马灯内容</string>
+    <string name="setting_max_volume">歌曲最大音量</string>
+    <string name="setting_need_pwd">设置密码(542317)</string>
+    <string name="setting_need_pwd_tip">开启设置密码后，进入设置时需要输入密码：542317</string>
+    <string name="setting_network_test">网络检测</string>
+    <string name="setting_network_test_ai">语音助手检测</string>
+    <string name="setting_network_test_button">检测</string>
+    <string name="setting_network_test_cdn">CDN检测</string>
+    <string name="setting_network_test_dns">DNS解析检测</string>
+    <string name="setting_network_test_fail">重新诊断</string>
+    <string name="setting_network_test_ip">本地IP地址检测</string>
+    <string name="setting_network_test_item_fail">异常</string>
+    <string name="setting_network_test_item_ok">正常</string>
+    <string name="setting_network_test_item_testing">检测中</string>
+    <string name="setting_network_test_item_waiting">未检测</string>
+    <string name="setting_network_test_network">网络连接检测</string>
+    <string name="setting_network_test_repository">云曲库检测</string>
+    <string name="setting_network_test_server">云平台检测</string>
+    <string name="setting_network_test_start">开始诊断</string>
+    <string name="setting_network_test_testing">正在诊断</string>
+    <string name="setting_network_test_tip2_fail_repository_url">获取曲库下载链接失败，请配置网络，改为静态设置</string>
+    <string name="setting_network_test_tip2_fail_server">连接云服务失败，请配置网络，改为静态设置</string>
+    <string name="setting_network_test_tip_fail_ai">语音助手连接失败，在线语音识别暂时不可用，我们会尽快处理</string>
+    <string name="setting_network_test_tip_fail_network">网络连接不可用，请检查网络连接情况</string>
+    <string name="setting_network_test_tip_fail_repository_url">获取曲库下载链接失败，请配置网络，将DNS改为114.114.114.114或8.8.8.8</string>
+    <string name="setting_network_test_tip_fail_server">连接云服务失败，请配置网络，将DNS改为114.114.114.114或8.8.8.8</string>
+    <string name="setting_network_test_tip_ok">网络连接正常，祝您使用愉快</string>
+    <string name="setting_network_test_websocket">长连接检测</string>
+    <string name="setting_order_song_default_volume">点播默认音量</string>
+    <string name="setting_play_while_download">边下边播</string>
+    <string name="setting_player_background">在后台播放</string>
+    <string name="setting_player_tip">播放器、视频窗口相关设置</string>
+    <string name="setting_player_type">播放器切换</string>
+    <string name="setting_player_type_tip">切换播放器类型，选择合适的播放器</string>
+    <string name="setting_power_need_pwd">关机和重启密码(542317)</string>
+    <string name="setting_power_off">关机</string>
+    <string name="setting_power_off_hint">确定要关机？</string>
+    <string name="setting_qrcode">点歌二维码</string>
+    <string name="setting_qrcode_tip">是否在播放窗口上显示手机点歌二维码</string>
+    <string name="setting_quick_rotation">屏幕旋转策略</string>
+    <string name="setting_quick_rotation_0_270">横屏&lt;—>竖屏翻转180°</string>
+    <string name="setting_quick_rotation_0_90">横屏&lt;—>竖屏</string>
+    <string name="setting_quick_rotation_180_270">横屏翻转180°&lt;—>竖屏翻转180°</string>
+    <string name="setting_quick_rotation_180_90">横屏翻转180°&lt;—>竖屏</string>
+    <string name="setting_quick_rotation_restart">重启应用才能生效，是否重启？</string>
+    <string name="setting_quick_rotation_tip">屏幕旋转将按照配置的两个方向进行</string>
+    <string name="setting_reboot">重启</string>
+    <string name="setting_remove_db">数据还原</string>
+    <string name="setting_remove_db_confirm">删除本地数据库后，APP会重启并还原，确认现在还原吗？</string>
+    <string name="setting_remove_db_fail">删除数据库失败，请重试，%1$s</string>
+    <string name="setting_remove_db_loading">正在删除数据库…</string>
+    <string name="setting_remove_db_success">删除数据库成功，将在%1$d秒后重启…</string>
+    <string name="setting_remove_db_tip">删除本地数据库，APP会重新初始化，不会删除歌曲文件。</string>
+    <string name="setting_restart_now">立即重启</string>
+    <string name="setting_room_close">确认关台吗？</string>
+    <string name="setting_room_close_success">关台成功</string>
+    <string name="setting_room_open">请输入开台分钟数，默认无期限</string>
+    <string name="setting_room_open_success">重置成功</string>
+    <string name="setting_room_open_too_long">超过24小时，请重新输入</string>
+    <string name="setting_room_status_ctrl">重置为开台状态</string>
+    <string name="setting_room_status_reset">重置</string>
+    <string name="setting_sata_info">硬盘存储空间</string>
+    <string name="setting_scan_local_file_start">开始扫描磁盘</string>
+    <string name="setting_scan_local_file_start_fail">扫描磁盘失败，请重试</string>
+    <string name="setting_score">歌曲评分</string>
+    <string name="setting_score_mode">歌曲评分模式</string>
+    <string name="setting_score_mode_change_success">修改评分模式成功！</string>
+    <string name="setting_score_mode_disable">关闭评分</string>
+    <string name="setting_score_mode_fun">娱乐模式</string>
+    <string name="setting_score_mode_pro">专业模式</string>
+    <string name="setting_score_on_vga">设置评分条显示在触摸屏上</string>
+    <string name="setting_score_on_vga_tip">关闭时，评分条将显示在电视屏上</string>
+    <string name="setting_score_tip">评分为体验功能，需要联网使用</string>
+    <string name="setting_screen_adjust">电视屏幕调节</string>
+    <string name="setting_screen_adjust_move">位置</string>
+    <string name="setting_screen_adjust_reset">还原</string>
+    <string name="setting_screen_adjust_scale">缩放</string>
+    <string name="setting_screen_adjust_set">设置</string>
+    <string name="setting_screen_adjust_tip">调节大屏显示位置、大小</string>
+    <string name="setting_screen_double_screen_need">未检测到大屏连接</string>
+    <string name="setting_skin">皮肤中心</string>
+    <string name="setting_skin_page_button">前往设置</string>
+    <string name="setting_song_comment">歌曲片头字幕</string>
+    <string name="setting_song_remove_auto">自动删歌</string>
+    <string name="setting_song_remove_auto_size_end">GB</string>
+    <string name="setting_song_remove_auto_size_head">预留空间：</string>
+    <string name="setting_song_remove_auto_size_range">设置范围： %1$s  -  %2$s</string>
+    <string name="setting_song_remove_auto_size_too_large">预留空间设置过大，可能导致歌曲文件无法存储</string>
+    <string name="setting_song_remove_auto_size_too_small">预留空间设置过小，可能导致无法正常播放</string>
+    <string name="setting_song_remove_auto_space">预留存储空间</string>
+    <string name="setting_song_remove_auto_space_desc">设置预留的存储空间大小</string>
+    <string name="setting_song_remove_auto_space_empty_error">预留空间大小不能为空！</string>
+    <string name="setting_song_remove_auto_space_format_error">请输入正确的格式</string>
+    <string name="setting_song_remove_auto_space_hint">当点歌机可用存储空间不足时，请打开自动删歌按钮，我们将自动删除部份本地冷门歌曲，腾出空间。</string>
+    <string name="setting_song_remove_auto_space_same">修改后的值不能和当前大小一样！</string>
+    <string name="setting_song_remove_auto_tip">当剩余存储空间低于“预留存储空间”时，自动删除冷门的歌曲</string>
+    <string name="setting_song_remove_enable_auto">开启自动删歌</string>
+    <string name="setting_song_remove_enable_auto_fail">开启【自动删歌】功能失败</string>
+    <string name="setting_song_remove_enable_auto_success">已开启【自动删歌】功能</string>
+    <string name="setting_song_remove_low_disk_hint">"下载失败，存储空间不足，请尝试如下操作：
+1. 在点歌机上接入U盘或移动硬盘。
+2. 开启【自动删歌】功能。"</string>
+    <string name="setting_song_remove_low_disk_with_auto_remove_enabled_hint">"下载失败，自动删歌后存储空间仍然不足，请尝试如下操作：
+1. 在点歌机上接入U盘或移动硬盘。
+2. 删除不需要的文件或歌曲。
+3. 确认【数据设置】-【预留存储空间】是否设置过大"</string>
+    <string name="setting_song_remove_update_fail">修改失败，请重试，%1$s</string>
+    <string name="setting_song_remove_update_success">修改成功</string>
+    <string name="setting_store_manage">门店管理</string>
+    <string name="setting_success_reboot_tip">修改成功，重启设备后生效，是否立即重启？</string>
+    <string name="setting_success_restart_tip">修改成功，重启应用后生效，是否立即重启？</string>
+    <string name="setting_sync_data">更新</string>
+    <string name="setting_sync_data_confirm">同步云端数据库可能会花费较长时间，过程中将暂停播放，确认现在同步吗？</string>
+    <string name="setting_sync_data_start">开始更新曲库</string>
+    <string name="setting_sync_data_start_fail">更新曲库失败，请重试</string>
+    <string name="setting_sync_data_tip">找不到最新歌曲？同步云端数据库</string>
+    <string name="setting_system_reset">恢复出厂设置</string>
+    <string name="setting_system_setting">系统设置</string>
+    <string name="setting_tab_market_switch">超市入口开关</string>
+    <string name="setting_touch_correct">触摸屏校准</string>
+    <string name="setting_tv_display_mode">TV输出模式</string>
+    <string name="setting_tv_display_mode_set">设置</string>
+    <string name="setting_tv_display_mode_set_loading">正在切换输出模式</string>
+    <string name="setting_tv_display_mode_tip">设置TV输出模式、分辨率、刷新频率</string>
+    <string name="setting_udisk_add_song">U盘加歌</string>
+    <string name="setting_udisk_add_song_button">立即加歌</string>
+    <string name="setting_udisk_add_song_confirm">开始扫描</string>
+    <string name="setting_udisk_add_song_devices_not_found">未找到U盘或U盘尚未准备好，请接入U盘或稍后重试</string>
+    <string name="setting_udisk_add_song_disclaimer">免责声明</string>
+    <string name="setting_udisk_add_song_format">格式说明</string>
+    <string name="setting_udisk_add_song_notice">注意：请确保U盘中文件命名为 歌星_歌名_语种_原唱音轨_伴唱音轨_分类.后缀</string>
+    <string name="setting_udisk_add_song_processing">正在进行U盘加歌</string>
+    <string name="setting_udisk_add_song_select">选择设备</string>
+    <string name="setting_udisk_add_song_select_none">请选择要的扫描的设备！</string>
+    <string name="setting_udisk_add_song_start">开始扫描U盘</string>
+    <string name="setting_udisk_add_song_start_fail">U盘加歌失败，请重试</string>
+    <string name="setting_udisk_add_song_tip">扫描U盘内按规定命名的歌曲文件，并添加到曲库中</string>
+    <string name="setting_udisk_config">显示U盘加歌歌曲</string>
+    <string name="setting_udisk_config_disable">是否隐藏U盘加歌歌曲？</string>
+    <string name="setting_udisk_config_enable">是否显示U盘加歌歌曲？</string>
+    <string name="setting_udisk_config_loading">处理中，请稍后</string>
+    <string name="setting_udisk_config_success">处理完成</string>
+    <string name="setting_udisk_config_tip">关闭后，U盘加歌歌曲将隐藏</string>
+    <string name="setting_upgrade_db">重置数据库</string>
+    <string name="setting_upgrade_db_button">重置</string>
+    <string name="setting_upgrade_db_confirm">升级过程中会下载最新的数据库并重新扫描存储设备，可能花费较长时间，确认现在升级本地数据库吗？</string>
+    <string name="setting_upgrade_db_fail">升级数据库失败，请重试，%1$s</string>
+    <string name="setting_upgrade_db_loading">正在升级数据库…</string>
+    <string name="setting_upgrade_db_success">升级数据库成功！</string>
+    <string name="setting_upgrade_db_tip">修复数据异常，下载最新数据库并备份</string>
+    <string name="setting_video_scale">视频比例</string>
+    <string name="setting_video_scale_option_0">16 : 9</string>
+    <string name="setting_video_scale_option_1">4 : 3</string>
+    <string name="setting_video_scale_option_2">全屏</string>
+    <string name="setting_video_scale_set">设置</string>
+    <string name="setting_video_scale_tip">设置触摸屏上视频窗口全屏时的画面比例</string>
+    <string name="setting_volume_balance">音量平衡</string>
+    <string name="setting_volume_balance_tip">根据歌曲音量大小自动调节音量，保持实际音量大小稳定</string>
+    <string name="setting_wifi_changed">******</string>
+    <string name="setting_wifi_close">关闭</string>
+    <string name="setting_wifi_closing">关闭WiFi中</string>
+    <string name="setting_wifi_connect">连接</string>
+    <string name="setting_wifi_connect_error">连接失败，请确认输入密码是否正常</string>
+    <string name="setting_wifi_connected">已连接</string>
+    <string name="setting_wifi_connecting">连接中</string>
+    <string name="setting_wifi_delete_success">删除成功</string>
+    <string name="setting_wifi_disable">要查看可用网络，请打开WLAN。</string>
+    <string name="setting_wifi_disable_ethernet_in_use">无线网络不可用，请拔掉网线后再试。</string>
+    <string name="setting_wifi_invalid">身份验证出现问题</string>
+    <string name="setting_wifi_level">信号强度：%1$s</string>
+    <string name="setting_wifi_list_empty">附近未搜索到任何WiFi</string>
+    <string name="setting_wifi_not_change">（未更改）</string>
+    <string name="setting_wifi_open">开启</string>
+    <string name="setting_wifi_opening">打开WiFi中</string>
+    <string name="setting_wifi_page_button">设置</string>
+    <string name="setting_wifi_pwd_empty">WiFi密码不能为空</string>
+    <string name="setting_wifi_pwd_hint">请输入WiFi密码</string>
+    <string name="setting_wifi_refresh">刷新</string>
+    <string name="setting_wifi_refreshing">获取WiFi列表中</string>
+    <string name="setting_wifi_saved">已保存</string>
+    <string name="settings_switch">开关</string>
+    <string name="share_recording">分享</string>
+    <string name="shipped_ffmpeg_version">n2.4.2</string>
+    <string name="show_info">Info</string>
+    <string name="signature_invalid">您正在使用盗版软件，为了您的安全，APP禁止使用</string>
+    <string name="signature_invalid_force_exit">您正在使用盗版软件，为了您的安全，APP即将在 %1$d 秒后退出…</string>
+    <string name="similar_remark_0">%1$s 来啦？</string>
+    <string name="similar_remark_1">%1$s 亲临现场啦！</string>
+    <string name="similar_remark_location">你就是 %1$s</string>
+    <string name="similar_title_0">唱得太棒了</string>
+    <string name="similar_title_1">完美！</string>
+    <string name="similar_title_2">唱得太好了</string>
+    <string name="similar_title_3">如此动听</string>
+    <string name="similar_voice">声音相似度</string>
+    <string name="singer_area_all">全部</string>
+    <string name="singer_area_china">中国</string>
+    <string name="singer_area_foreign">外国</string>
+    <string name="singer_area_hk_tw">港台</string>
+    <string name="singer_area_japan">日本</string>
+    <string name="singer_area_korea">韩国</string>
+    <string name="singer_area_mainland">大陆</string>
+    <string name="singer_area_malaysia">马来</string>
+    <string name="singer_area_myanmar">缅甸</string>
+    <string name="singer_area_thailand">泰国</string>
+    <string name="singer_area_vietnam">越南</string>
+    <string name="singer_area_west">欧美</string>
+    <string name="singer_name_unknown">佚名</string>
+    <string name="singer_type_all" />
+    <string name="singer_type_female">女</string>
+    <string name="singer_type_male">男</string>
+    <string name="singer_type_team">组合</string>
+    <string name="size_unknown">未知</string>
+    <string name="skin_change_error">切换皮肤失败，请重试</string>
+    <string name="skin_change_hint">使用该皮肤需要重启应用才能生效，是否立即重启？</string>
+    <string name="skin_change_now">立即使用</string>
+    <string name="skin_current_using">使用中</string>
+    <string name="skin_empty">暂无皮肤包可切换</string>
+    <string name="skin_loading">正在切换皮肤…</string>
+    <string name="skin_ott_blue_purple">蓝紫风情</string>
+    <string name="skin_ott_circle">电音舞台</string>
+    <string name="skin_ott_cvte_default">迷幻之光</string>
+    <string name="skin_ott_default">默认风格</string>
+    <string name="skin_ott_gallery">流金岁月</string>
+    <string name="skin_ott_tradition">经典黑</string>
+    <string name="skin_preview_tip">点击图片预览</string>
+    <string name="skin_update_restart_app_hint">皮肤包已更新，即将重启应用</string>
+    <string name="song_action_delete">删除</string>
+    <string name="song_action_delete_file">删除文件</string>
+    <string name="song_action_fav">收藏</string>
+    <string name="song_action_fav_cancel">已收藏</string>
+    <string name="song_action_fav_cancel_success">取消收藏成功</string>
+    <string name="song_action_fav_success">收藏成功</string>
+    <string name="song_action_record">录音</string>
+    <string name="song_action_top">置顶</string>
+    <string name="song_area_all">全网</string>
+    <string name="song_area_local">本地</string>
+    <string name="song_click">常唱</string>
+    <string name="song_click_all">全部</string>
+    <string name="song_click_count">%1$d次</string>
+    <string name="song_click_recent">近期</string>
+    <string name="song_delete_confirm">确认删除《%1$s》这首歌的资源文件吗？</string>
+    <string name="song_delete_fail">删除歌曲《%1$s》文件失败，请重试，%2$s</string>
+    <string name="song_deleting">正在删除歌曲文件…</string>
+    <string name="song_file_not_exist_hint">文件不存在!您可以重新导入该歌曲文件,也可以删除该歌曲</string>
+    <string name="song_lang_all">全部</string>
+    <string name="song_lang_burmese">缅甸语</string>
+    <string name="song_lang_cambodian">柬埔寨语</string>
+    <string name="song_lang_chinese">国语</string>
+    <string name="song_lang_english">英语</string>
+    <string name="song_lang_french">法语</string>
+    <string name="song_lang_hindi">印度语</string>
+    <string name="song_lang_indonesia">印尼语</string>
+    <string name="song_lang_japanese">日语</string>
+    <string name="song_lang_khmer">高棉语</string>
+    <string name="song_lang_korean">韩语</string>
+    <string name="song_lang_laotian">老挝语</string>
+    <string name="song_lang_malay">马来语</string>
+    <string name="song_lang_menggu">蒙古语</string>
+    <string name="song_lang_min_nan">闽南语</string>
+    <string name="song_lang_other">其它</string>
+    <string name="song_lang_philippine">菲律宾语</string>
+    <string name="song_lang_russian">俄语</string>
+    <string name="song_lang_thailand">泰语</string>
+    <string name="song_lang_udisk">U盘加歌</string>
+    <string name="song_lang_vietnamese">越南语</string>
+    <string name="song_lang_yue">粤语</string>
+    <string name="song_lyric_empty">未查找到歌词</string>
+    <string name="song_name">歌名：</string>
+    <string name="song_not_found">未能找到歌曲：%1$s</string>
+    <string name="song_not_found_hint">未能找到歌曲</string>
+    <string name="song_recommend">猜你想唱</string>
+    <string name="song_recommend_confirm">一键点歌(%1$d首)</string>
+    <string name="song_recommend_often_prefix">您共唱过</string>
+    <string name="song_recommend_often_unit">次</string>
+    <string name="song_recommend_rank_douyin">抖音榜</string>
+    <string name="song_recommend_rank_hot">热门榜</string>
+    <string name="song_recommend_rank_new">新歌榜</string>
+    <string name="song_recommend_rank_pop">人气热歌</string>
+    <string name="song_recommend_rank_up">飙升榜</string>
+    <string name="song_recommend_setting_tip">打开应用主动弹出猜你想唱歌曲</string>
+    <string name="song_singer">歌手：</string>
+    <string name="song_title">冠名</string>
+    <string name="song_title_empty">暂无用户</string>
+    <string name="song_title_empty_pre">本首歌曲</string>
+    <string name="song_title_empty_tip">快来成为我的第一次吧！</string>
+    <string name="song_title_end">独家冠名</string>
+    <string name="song_title_pre">本首歌曲由</string>
+    <string name="song_title_tip">微信扫码，为歌曲冠名</string>
+    <string name="sound_mixed">混响</string>
+    <string name="sound_pitch">音调</string>
+    <string name="sound_pitch_female">女调</string>
+    <string name="sound_pitch_male">男调</string>
+    <string name="sound_pitch_reset">原调</string>
+    <string name="sound_volume">音量</string>
+    <string name="start_mls_release_db_file_tip">正在释放数据库文件 %1$d%%</string>
+    <string name="start_mls_release_song_file_tip">正在释放资源文件 %1$d%%</string>
+    <string name="status_bar_notification_info_overflow">999+</string>
+    <string name="store_reboot_boot_logo_hint">开机静态图已更新，设备即将自动重启！再次重启后生效！</string>
+    <string name="store_reboot_hint">开机动画已更新，设备即将自动重启！</string>
+    <string name="supermarket_app_not_install">酒水点单服务暂时无法使用</string>
+    <string name="supermarket_not_bind">酒水点单服务暂时无法使用，请确保收银机已成功配置</string>
+    <string name="tab_abc">首拼</string>
+    <string name="tab_handwrite">手写</string>
+    <string name="tab_pinyin">全拼</string>
+    <string name="table_broadcast">报台</string>
+    <string name="table_broadcast_input">请输入台号</string>
+    <string name="table_broadcast_invalid_no">台号必须为 1~999 之间！</string>
+    <string name="table_broadcast_marquee_hint">  请 [%1$s] 号做好准备</string>
+    <string name="table_broadcast_next_song">下一首</string>
+    <string name="table_broadcast_order_success">%1$s 号台点歌成功</string>
+    <string name="table_broadcast_prepare_hint">下面请【%1$s】号做好准备</string>
+    <string name="table_broadcast_setting_disable">已关闭报台功能</string>
+    <string name="table_broadcast_setting_enable">开启报台</string>
+    <string name="table_broadcast_setting_enable_success">已开启报台功能！</string>
+    <string name="table_broadcast_setting_fail">设置报台功能失败</string>
+    <string name="table_broadcast_setting_same">未修改任何报台配置！</string>
+    <string name="table_broadcast_setting_tts">语音开关</string>
+    <string name="table_broadcast_song_ordered">歌曲已被点播，请选择其他歌曲</string>
+    <string name="table_broadcast_table_no">%1$s号</string>
+    <string name="table_broadcast_tts_hint">下面请%1$s号做好准备</string>
+    <string name="tcp_speed">tcp_speed</string>
+    <string name="test_mode_expired_date">有效期至：%1$s</string>
+    <string name="test_mode_hint">测试版本</string>
+    <string name="tone_change_key">升降调</string>
+    <string name="tone_change_mic_volume">麦克风</string>
+    <string name="tone_chant">诵读</string>
+    <string name="tone_concert">演唱</string>
+    <string name="tone_ktv">KTV</string>
+    <string name="tone_lyrical">抒情</string>
+    <string name="tone_movie">影视</string>
+    <string name="tone_pop">流行</string>
+    <string name="tone_pro">专业</string>
+    <string name="tone_rock">摇滚</string>
+    <string name="tone_singer">唱将</string>
+    <string name="tv_ctrl_auto_light_off">智能灯光关</string>
+    <string name="tv_ctrl_auto_light_on">智能灯光开</string>
+    <string name="tv_ctrl_mic_volume">话筒</string>
+    <string name="tv_ctrl_mixed_volume">混响</string>
+    <string name="tv_ctrl_sound_close">静音</string>
+    <string name="tv_ctrl_tone_decr">音调 -</string>
+    <string name="tv_ctrl_tone_female">女调</string>
+    <string name="tv_ctrl_tone_incr">音调 +</string>
+    <string name="tv_ctrl_tone_male">男调</string>
+    <string name="tv_ctrl_tone_standard">标准音调</string>
+    <string name="tv_ctrl_volume">音量</string>
+    <string name="udisk_mode_leave_tip">退出U盘播放模式？</string>
+    <string name="udisk_page_pre">上一级</string>
+    <string name="unit_time_hour">小时</string>
+    <string name="unit_time_minute">分钟</string>
+    <string name="unit_time_second">秒</string>
+    <string name="upgrade_completed">升级成功！</string>
+    <string name="upgrade_download_fail">网络异常，下载升级包失败！</string>
+    <string name="upgrade_download_start">升级包大小：%1$s</string>
+    <string name="upgrade_downloading">下载中......</string>
+    <string name="upgrade_error">升级失败，错误信息：%1$s</string>
+    <string name="upgrade_exit_app">退出应用</string>
+    <string name="upgrade_install">立即安装</string>
+    <string name="upgrade_installing">升级包安装中......</string>
+    <string name="upgrade_invalid_md5">升级包校验出错！</string>
+    <string name="upgrade_new_version">发现新版本</string>
+    <string name="upgrade_new_version_dash">发现新版本 -</string>
+    <string name="upgrade_retry">网络异常，尝试重新下载，重试次数：</string>
+    <string name="upgrade_start">开始升级</string>
+    <string name="usb_device_not_found">未发现U盘，请检查是否有外接设备接入</string>
+    <string name="user_agreement_button_hint">详情</string>
+    <string name="user_agreement_title">用户协议</string>
+    <string name="user_disagree_agreement_hint">您当前选择不同意协议，将无法继续使用该软件</string>
+    <string name="user_mv_tip_item_open">立即查看 ></string>
+    <string name="user_mv_tip_item_tip">"没找到想要的《%1$s》?
+来试试制作自己的伴奏带！"</string>
+    <string name="user_mv_wechat_scan">"微信扫码
+制作我的伴奏带"</string>
+    <string name="v_cache">v-cache</string>
+    <string name="vdec">vdec</string>
+    <string name="video_broadcast">大厅转播</string>
+    <string name="video_broadcast_add">+新增</string>
+    <string name="video_broadcast_add_title">新增节目</string>
+    <string name="video_broadcast_delete">删除</string>
+    <string name="video_broadcast_delete_confirm">确认删除该转播节目？</string>
+    <string name="video_broadcast_empty">当前没有转播节目</string>
+    <string name="video_broadcast_label_name">名称</string>
+    <string name="video_broadcast_label_url">链接</string>
+    <string name="video_broadcast_list">节目列表</string>
+    <string name="video_broadcast_mode_tip">正在转播节目，无法执行该操作！</string>
+    <string name="video_broadcast_setting">大厅转播配置</string>
+    <string name="video_broadcast_setting_tip">添加、删除大厅转播节目</string>
+    <string name="video_broadcast_start">开始转播</string>
+    <string name="video_broadcast_stop">停止转播</string>
+    <string name="view_back_button">返回</string>
+    <string name="view_exit_button">退出</string>
+    <string name="view_order_switch_a_z">A-Z</string>
+    <string name="view_order_switch_hot">热门</string>
+    <string name="volume_mic">麦克风</string>
+    <string name="volume_music">音乐</string>
+    <string name="volume_mute">静音</string>
+    <string name="volume_unmute">放音</string>
+    <string name="wait">再等等</string>
+    <string name="wifi_level_good">良好</string>
+    <string name="wifi_level_great">极佳</string>
+    <string name="wifi_level_normal">一般</string>
+    <string name="wifi_level_weak">较弱</string>
+    <string name="wifi_name">Wi-Fi名称：</string>
+    <string name="wifi_pwd">Wi-Fi密码：</string>
+    <string name="word_limit">字数</string>
+    <string name="word_limit_all">全</string>
+</resources>

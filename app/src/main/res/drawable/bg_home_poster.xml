@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 新歌榜海报背景: 古装美人占位(没有图片时使用渐变) -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="270"
+                android:startColor="#FF1A0A3D"
+                android:centerColor="#FF0F0628"
+                android:endColor="#FF0D0521"
+                android:type="linear" />
+            <corners android:radius="10dp" />
+        </shape>
+    </item>
+    <!-- 中间:圆月 -->
+    <item android:gravity="center" android:width="160dp" android:height="160dp">
+        <shape android:shape="oval">
+            <gradient
+                android:type="radial"
+                android:gradientRadius="80dp"
+                android:startColor="#88FFD700"
+                android:centerColor="#44FFB300"
+                android:endColor="#00FFB300" />
+        </shape>
+    </item>
+</layer-list>

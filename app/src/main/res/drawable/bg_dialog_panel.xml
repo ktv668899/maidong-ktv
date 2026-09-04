@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 调音弹窗背景: 玻璃态深紫 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#EE1A0A3D" />
+    <corners android:radius="12dp" />
+    <stroke android:width="1dp" android:color="#55B070FF" />
+</shape>

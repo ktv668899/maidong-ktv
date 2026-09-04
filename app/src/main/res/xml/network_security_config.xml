@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- 允许明文 HTTP(歌曲源/本地服务器) -->
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+            <!-- Let's Encrypt 2026 新链 (*.cherryonline.cn 使用 YR1/Root YR)：
+                 老设备信任库不含 ISRG Root X1 / Root YR，导致
+                 "Trust anchor for certification path not found"。 -->
+            <certificates src="@raw/isrg_root_x1" />
+            <certificates src="@raw/isrg_root_yr" />
+            <certificates src="@raw/letsencrypt_yr1" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

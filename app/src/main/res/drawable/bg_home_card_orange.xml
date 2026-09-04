@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 首页"歌星"卡片: 橙黄渐变(对应设计图星形图标的橙卡) -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="45"
+                android:startColor="#FFFF8C42"
+                android:centerColor="#FFFF6028"
+                android:endColor="#FFC03A0E"
+                android:type="linear" />
+            <corners android:radius="10dp" />
+        </shape>
+    </item>
+    <item android:left="0dp" android:gravity="right|bottom">
+        <shape android:shape="rectangle">
+            <size android:width="120dp" android:height="120dp" />
+            <gradient
+                android:angle="135"
+                android:startColor="#33FFFFFF"
+                android:centerColor="#11FFFFFF"
+                android:endColor="#00000000"
+                android:type="linear" />
+            <corners android:radius="10dp" />
+        </shape>
+    </item>
+</layer-list>

@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 应用主主题:基于 AppCompat NoActionBar,全屏深色背景 -->
+    <style name="AppTheme" parent="@style/Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">@drawable/bg_window</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowActionBarOverlay">true</item>
+        <item name="colorAccent">@color/colorAccent</item>
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
+    </style>
+
+    <!-- 无动画 Activity 主题 -->
+    <style name="ActivityNoAnimation" parent="@style/Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">@drawable/bg_window</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowFullscreen">true</item>
+    </style>
+
+    <!-- 自定义透明对话框主题:基于系统 Dialog,无进出场动画(引用 DialogNoAnimation) -->
+    <style name="CustomDialogTheme" parent="@android:style/Theme.Dialog">
+        <item name="android:windowBackground">@color/transparent</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowIsFloating">false</item>
+        <item name="android:windowAnimationStyle">@style/DialogNoAnimation</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowActionBarOverlay">true</item>
+    </style>
+
+    <!-- Dialog 无动画样式:进出场均引用空动画 empty_anim -->
+    <style name="DialogNoAnimation">
+        <item name="android:windowEnterAnimation">@anim/empty_anim</item>
+        <item name="android:windowExitAnimation">@anim/empty_anim</item>
+    </style>
+
+    <!-- 加载进度条样式:基于 AppCompat ProgressBar,使用 loading_anim 作为 indeterminate drawable -->
+    <style name="LoadingProgressBar" parent="@style/Widget.AppCompat.ProgressBar">
+        <item name="android:indeterminateDrawable">@anim/loading_anim</item>
+        <item name="android:indeterminateDuration">1000</item>
+        <item name="android:indeterminateBehavior">repeat</item>
+    </style>
+
+    <!-- 自定义进度条样式(com.hhc.muse.progressbar.CustomProgressBar):8 种配色主题 -->
+    <style name="CustomProgressBar_Beauty_Red">
+        <item name="android:layout_width">fill_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="progress_current">0</item>
+        <item name="progress_max">100</item>
+        <item name="progress_reached_bar_height">1.5dip</item>
+        <item name="progress_reached_color">#ffff3d7f</item>
+        <item name="progress_text_color">#ffff3d7f</item>
+        <item name="progress_text_size">10.0sp</item>
+        <item name="progress_unreached_bar_height">0.75dip</item>
+        <item name="progress_unreached_color">#ffcccccc</item>
+    </style>
+
+    <style name="CustomProgressBar_Blue">
+        <item name="android:layout_width">fill_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="progress_current">0</item>
+        <item name="progress_max">100</item>
+        <item name="progress_reached_bar_height">10.0dip</item>
+        <item name="progress_reached_color">#ff09d2df</item>
+        <item name="progress_text_color">#ffffffff</item>
+        <item name="progress_text_size">14.0sp</item>
+        <item name="progress_unreached_bar_height">10.0dip</item>
+        <item name="progress_unreached_color">#66ffffff</item>
+    </style>
+
+    <style name="CustomProgressBar_Default">
+        <item name="android:layout_width">fill_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="progress_current">0</item>
+        <item name="progress_max">100</item>
+        <item name="progress_reached_bar_height">10.0dip</item>
+        <item name="progress_reached_color">#ff2ad7fc</item>
+        <item name="progress_text_color">#ff2ad7fc</item>
+        <item name="progress_text_size">14.0sp</item>
+        <item name="progress_unreached_bar_height">10.0dip</item>
+        <item name="progress_unreached_color">#ffb597ff</item>
+    </style>
+
+    <style name="CustomProgressBar_Funny_Orange">
+        <item name="android:layout_width">fill_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="progress_current">0</item>
+        <item name="progress_max">100</item>
+        <item name="progress_reached_bar_height">1.5dip</item>
+        <item name="progress_reached_color">#ffff530d</item>
+        <item name="progress_text_color">#ffff530d</item>
+        <item name="progress_text_size">10.0sp</item>
+        <item name="progress_unreached_bar_height">0.75dip</item>
+        <item name="progress_unreached_color">#ffcccccc</item>
+    </style>
+
+    <style name="CustomProgressBar_Grace_Yellow">
+        <item name="android:layout_width">fill_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="progress_current">0</item>
+        <item name="progress_max">100</item>
+        <item name="progress_reached_bar_height">1.5dip</item>
+        <item name="progress_reached_color">#ffffc73b</item>
+        <item name="progress_text_color">#ffffc73b</item>
+        <item name="progress_text_size">10.0sp</item>
+        <item name="progress_unreached_bar_height">0.75dip</item>
+        <item name="progress_unreached_color">#ffcccccc</item>
+    </style>
+
+    <style name="CustomProgressBar_Passing_Green">
+        <item name="android:layout_width">fill_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="progress_current">0</item>
+        <item name="progress_max">100</item>
+        <item name="progress_reached_bar_height">1.5dip</item>
+        <item name="progress_reached_color">#ff70a800</item>
+        <item name="progress_text_color">#ff70a800</item>
+        <item name="progress_text_size">10.0sp</item>
+        <item name="progress_unreached_bar_height">0.75dip</item>
+        <item name="progress_unreached_color">#ffcccccc</item>
+    </style>
+
+    <style name="CustomProgressBar_Twinkle_Night">
+        <item name="android:layout_width">fill_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="progress_current">0</item>
+        <item name="progress_max">100</item>
+        <item name="progress_reached_bar_height">1.5dip</item>
+        <item name="progress_reached_color">#ffecf0f1</item>
+        <item name="progress_text_color">#ffecf0f1</item>
+        <item name="progress_text_size">10.0sp</item>
+        <item name="progress_unreached_bar_height">0.75dip</item>
+        <item name="progress_unreached_color">#ffcccccc</item>
+    </style>
+
+    <style name="CustomProgressBar_Warning_Red">
+        <item name="android:layout_width">fill_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="progress_current">0</item>
+        <item name="progress_max">100</item>
+        <item name="progress_reached_bar_height">1.5dip</item>
+        <item name="progress_reached_color">#ffe74c3c</item>
+        <item name="progress_text_color">#ffe74c3c</item>
+        <item name="progress_text_size">10.0sp</item>
+        <item name="progress_unreached_bar_height">0.75dip</item>
+        <item name="progress_unreached_color">#ffcccccc</item>
+    </style>
+
+    <!-- 媒体通知文本外观存根:继承 AppCompat 提供的基础通知文本外观。
+         原本由 androidx.media:media 库提供,此处补齐以使通知模板布局可编译。 -->
+    <style name="TextAppearance.Compat.Notification.Media" parent="TextAppearance.Compat.Notification" />
+    <style name="TextAppearance.Compat.Notification.Title.Media" parent="TextAppearance.Compat.Notification.Title" />
+    <style name="TextAppearance.Compat.Notification.Line2.Media" parent="TextAppearance.Compat.Notification.Line2" />
+    <style name="TextAppearance.Compat.Notification.Time.Media" parent="TextAppearance.Compat.Notification.Time" />
+    <style name="TextAppearance.Compat.Notification.Info.Media" parent="TextAppearance.Compat.Notification.Info" />
+</resources>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 麦动 banner 背景:深黑渐变 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <gradient
+        android:startColor="#FF080C12"
+        android:centerColor="#FF0F161F"
+        android:endColor="#FF161F2A"
+        android:angle="45" />
+</shape>
