@@ -163,6 +163,26 @@ class MainActivity : AppCompatActivity() {
             main.postDelayed(this, 5000)
         }
     }
+
+    /** 全屏右上角扫码点歌二维码显隐控制: 手机连接点歌(页面可见时每秒轮询 state)
+     *  期间自动隐藏, 断开(无请求超过约 4 秒)后恢复显示。 */
+    private val qrAutoHideMonitor = object : Runnable {
+        private var hiddenByClient = false
+        override fun run() {
+            val overlay = fullScreenQrOverlay
+            if (overlay != null && isFullScreen) {
+                val active = remoteServer.hasRecentActivity(4000)
+                if (active && !hiddenByClient) {
+                    hiddenByClient = true
+                    overlay.visibility = View.GONE
+                } else if (!active && hiddenByClient) {
+                    hiddenByClient = false
+                    overlay.visibility = View.VISIBLE
+                }
+            }
+            main.postDelayed(this, 1000)
+        }
+    }
     /** 周期向 hbeat.ktvsky.com 上报设备身份,维持歌曲源对"合法设备"的判定。 */
     private val ktvHeartbeatRunnable = object : Runnable {
         override fun run() {
@@ -471,6 +491,7 @@ class MainActivity : AppCompatActivity() {
         startRemoteServer()
         updateMobileQrOverlay()
         main.postDelayed(remoteNetworkMonitor, 5000)
+        main.postDelayed(qrAutoHideMonitor, 1000)
         // 设备心跳:开机立即上报一次(boot=1),之后每 3600s 保活,维持歌曲源合法设备判定。
         sendDeviceHeartbeat(boot = true)
         main.postDelayed(ktvHeartbeatRunnable, HEARTBEAT_INTERVAL_MS)
@@ -564,6 +585,7 @@ class MainActivity : AppCompatActivity() {
         main.removeCallbacks(homeBannerRunnable)
         main.removeCallbacks(autoFullscreenRunnable)
         main.removeCallbacks(remoteNetworkMonitor)
+        main.removeCallbacks(qrAutoHideMonitor)
         stopRecording(false)
         releaseVocalPlayer()
         if (::playbackEngine.isInitialized) playbackEngine.release()
@@ -2963,6 +2985,18 @@ class MainActivity : AppCompatActivity() {
         val tip = label("手机连接同一局域网后扫码点歌", 18, Color.WHITE)
         tip.gravity = Gravity.CENTER
         box.addView(tip, LinearLayout.LayoutParams(dp(380), dp(54)))
+        // 显示当前服务的 ip:端口 地址(去掉路径,便于对照路由器/局域网排查)。
+        val serverHost = remoteServer.address().orEmpty()
+        val serverPort = remoteServer.port()
+        if (serverHost.isNotEmpty() && serverPort > 0) {
+            val addressLine = label("$serverHost:$serverPort", 16, GOLD)
+            addressLine.gravity = Gravity.CENTER
+            box.addView(addressLine, LinearLayout.LayoutParams(dp(380), dp(34)))
+        }
+        // 提示:扫码连上后播放界面右上角二维码会自动隐藏。
+        val hint = label("扫码点歌后自动隐藏播放界面二维码", 14, Color.rgb(193, 193, 193))
+        hint.gravity = Gravity.CENTER
+        box.addView(hint, LinearLayout.LayoutParams(dp(420), dp(30)))
         AlertDialog.Builder(this)
             .setTitle("扫码点歌")
             .setView(box)

@@ -39,6 +39,7 @@ class LocalRemoteServer(private val context: Context) {
     @Volatile private var boundAddress: String? = null
     @Volatile private var boundPort = -1
     @Volatile private var lastError: String? = null
+    @Volatile private var lastActivityAtMs = 0L
     private var server: ServerSocket? = null
     private var callback: Callback? = null
 
@@ -98,6 +99,13 @@ class LocalRemoteServer(private val context: Context) {
     fun port(): Int = boundPort
     fun address(): String? = boundAddress
     fun error(): String? = lastError
+
+    /** 是否在 [withinMs] 内有手机端请求(扫码点歌页面可见时每秒轮询 state)。 */
+    fun hasRecentActivity(withinMs: Long): Boolean {
+        val last = lastActivityAtMs
+        return last > 0 && System.currentTimeMillis() - last <= withinMs
+    }
+
     fun url(): String? = if (running && boundAddress != null && boundPort > 0) {
         "http://$boundAddress:$boundPort/mobile"
     } else null
@@ -142,6 +150,8 @@ class LocalRemoteServer(private val context: Context) {
                 val path = target.substringBefore('?')
                 val query = parseQuery(target.substringAfter('?', ""))
                 val body = String(bodyBytes, 0, offset, Charsets.UTF_8)
+                // 手机端已成功建立会话并访问页面/接口 → 记录活跃(用于控制二维码显隐)。
+                lastActivityAtMs = System.currentTimeMillis()
                 val response = when {
                     path == "/" || path == "/mobile" || path == "/mobile/" -> asset("mobile/index.html", "text/html; charset=utf-8")
                     path == "/mobile/app.css" -> asset("mobile/app.css", "text/css; charset=utf-8")
