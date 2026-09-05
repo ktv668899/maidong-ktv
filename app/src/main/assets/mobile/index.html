@@ -37,7 +37,7 @@
           <div class="panel-title"><div><span class="tiny-icon">♪</span><b>声音控制</b></div><small>即时生效</small></div>
           <div class="seg"><button id="accompany" data-vocal="accompany"><span>伴</span>伴唱</button><button id="original" data-vocal="original"><span>原</span>原唱</button></div>
           <label><span><i class="volume-icon">♪</i>音乐音量</span><b><em id="musicValue">70</em>%</b><input id="musicVolume" type="range" min="0" max="100" value="70"></label>
-          <label><span><i class="volume-icon mic">●</i>麦克风音量</span><b><em id="micValue">70</em>%</b><input id="micVolume" type="range" min="0" max="100" value="70"></label>
+          <label class="mic-hw"><span><i class="volume-icon mic">●</i>麦克风音量</span><small>由功放/混音器硬件调节</small><input id="micVolume" type="range" min="0" max="100" value="70" disabled></label>
         </article>
 
         <article class="next-card"><div class="next-number">02</div><div><small>下一首</small><b id="nextSong">队列为空</b></div><button data-page="queue">查看队列 <span>›</span></button></article>

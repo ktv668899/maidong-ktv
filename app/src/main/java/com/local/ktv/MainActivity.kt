@@ -5,6 +5,9 @@ import android.app.AlertDialog
 import android.content.DialogInterface
 import android.content.DialogInterface.OnShowListener
 import android.content.Intent
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.content.res.ColorStateList
 import android.content.pm.PackageManager
@@ -512,7 +515,70 @@ class MainActivity : AppCompatActivity() {
             }
         }
         micActivator.start()
+        registerMicInputWatcher()
         Log.i(TAG, "麦克风输入已激活(演唱输出通道占用)")
+    }
+
+    /**
+     * 监听输入设备变化: 外接麦克风(USB 声卡/3.5mm 麦)插入时系统会把默认输入路由切到外接,
+     * 原 AudioRecord 随之失效。检测到变化后重建占用, 让演唱输出通道跟随当前麦克风。
+     */
+    private fun registerMicInputWatcher() {
+        val manager = audioManager ?: return
+        if (Build.VERSION.SDK_INT >= 23) {
+            manager.registerAudioDeviceCallback(micDeviceCallback, null)
+        } else {
+            runCatching {
+                val filter = IntentFilter(Intent.ACTION_HEADSET_PLUG)
+                registerReceiver(micHotplugReceiver, filter)
+            }
+        }
+    }
+
+    private fun unregisterMicInputWatcher() {
+        val manager = audioManager ?: return
+        if (Build.VERSION.SDK_INT >= 23) {
+            manager.unregisterAudioDeviceCallback(micDeviceCallback)
+        } else {
+            runCatching { unregisterReceiver(micHotplugReceiver) }
+        }
+    }
+
+    private val micDeviceCallback = object : android.media.AudioDeviceCallback() {
+        override fun onAudioDevicesAdded(addedDevices: Array<out android.media.AudioDeviceInfo>) {
+            handleMicInputDevicesChanged(addedDevices.any { isMicInputDevice(it) })
+        }
+
+        override fun onAudioDevicesRemoved(removedDevices: Array<out android.media.AudioDeviceInfo>) {
+            handleMicInputDevicesChanged(removedDevices.any { isMicInputDevice(it) })
+        }
+    }
+
+    private val micHotplugReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            handleMicInputDevicesChanged(true)
+        }
+    }
+
+    /** 是否为可用的麦克风输入设备(内置/耳机/USB 等)。 */
+    private fun isMicInputDevice(device: android.media.AudioDeviceInfo): Boolean {
+        if (!device.isSource) return false
+        return when (device.type) {
+            android.media.AudioDeviceInfo.TYPE_BUILTIN_MIC,
+            android.media.AudioDeviceInfo.TYPE_USB_HEADSET,
+            android.media.AudioDeviceInfo.TYPE_USB_DEVICE,
+            android.media.AudioDeviceInfo.TYPE_HDMI,
+            android.media.AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
+            android.media.AudioDeviceInfo.TYPE_LINE_ANALOG,
+            -> true
+            else -> false
+        }
+    }
+
+    /** 输入设备增删后: 重新打开麦克风占用, 跟随系统当前路由(优先外接)。 */
+    private fun handleMicInputDevicesChanged(_changed: Boolean) {
+        // 延迟少许等系统完成路由切换, 再重建 AudioRecord。
+        main.postDelayed({ micActivator.restart() }, 300L)
     }
 
     private fun initializeDatabase() {
@@ -603,6 +669,7 @@ class MainActivity : AppCompatActivity() {
         main.removeCallbacks(remoteNetworkMonitor)
         main.removeCallbacks(qrAutoHideMonitor)
         stopRecording(false)
+        unregisterMicInputWatcher()
         micActivator.stop()
         releaseVocalPlayer()
         if (::playbackEngine.isInitialized) playbackEngine.release()
@@ -2644,15 +2711,11 @@ class MainActivity : AppCompatActivity() {
             })
         root.findViewById<View?>(R.id.btn_mic_down)
             .setOnClickListener(View.OnClickListener { v: View? ->
-                micVolume = max(0, micVolume - 5)
-                micValue.setText(micVolume.toString())
-                saveState()
+                toast("麦克风音量由功放/混音器硬件调节")
             })
         root.findViewById<View?>(R.id.btn_mic_up)
             .setOnClickListener(View.OnClickListener { v: View? ->
-                micVolume = min(100, micVolume + 5)
-                micValue.setText(micVolume.toString())
-                saveState()
+                toast("麦克风音量由功放/混音器硬件调节")
             })
         bindAtmospherePreset(root, R.id.btn_preset_pop, "流行")
         bindAtmospherePreset(root, R.id.btn_preset_lyric, "抒情")

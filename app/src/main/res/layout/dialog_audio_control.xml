@@ -97,12 +97,12 @@
             android:textSize="14sp" />
     </LinearLayout>
 
-    <!-- 麦克风 -->
+    <!-- 麦克风(增益/效果由功放混音器硬件调节, 滑杆仅作指示) -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="4dp"
-        android:text="麦克风音量"
+        android:layout_marginBottom="2dp"
+        android:text="麦克风音量(功放/混音器硬件调节)"
         android:textColor="#FFE0E0FF"
         android:textSize="13sp" />
 
@@ -121,7 +121,8 @@
             android:max="100"
             android:progress="60"
             android:progressTint="#FF27CCA4"
-            android:thumbTint="#FF27CCA4" />
+            android:thumbTint="#FF27CCA4"
+            android:enabled="false" />
 
         <TextView
             android:id="@+id/text_mic_volume_value"
@@ -136,8 +137,8 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="4dp"
-        android:text="麦克风效果"
+        android:layout_marginBottom="2dp"
+        android:text="麦克风效果(功放/混音器硬件调节)"
         android:textColor="#FFE0E0FF"
         android:textSize="13sp" />
 
@@ -156,7 +157,8 @@
             android:max="100"
             android:progress="50"
             android:progressTint="#FF27CCA4"
-            android:thumbTint="#FF27CCA4" />
+            android:thumbTint="#FF27CCA4"
+            android:enabled="false" />
 
         <TextView
             android:id="@+id/text_mic_effect_value"

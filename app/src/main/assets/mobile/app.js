@@ -75,7 +75,9 @@ async function refresh() {
     $("#musicVolume").value = data.musicVolume ?? 70;
     $("#micVolume").value = data.micVolume ?? 70;
     $("#musicValue").textContent = data.musicVolume ?? 70;
-    $("#micValue").textContent = data.micVolume ?? 70;
+    // 麦克风音量由功放/混音器硬件调节(滑杆已禁用), 仅保留显示值。
+    const micHw = $("#micValue");
+    if (micHw) micHw.textContent = data.micVolume ?? 70;
     $("#original").classList.toggle("active", data.vocalMode === "original");
     $("#accompany").classList.toggle("active", data.vocalMode !== "original");
     $("#nextSong").textContent = data.next?.title || "队列为空";
@@ -203,10 +205,9 @@ $("#searchForm").addEventListener("submit", (event) => { event.preventDefault();
 $("#more").addEventListener("click", () => search(false));
 $("#hotPrev").addEventListener("click", () => loadHot(uiState.hotPage - 1));
 $("#hotNext").addEventListener("click", () => loadHot(uiState.hotPage + 1));
-["music", "mic"].forEach((kind) => {
-  $("#" + kind + "Volume").addEventListener("input", (event) => { $("#" + kind + "Value").textContent = event.target.value; });
-  $("#" + kind + "Volume").addEventListener("change", (event) => updateAudio({ [kind + "Volume"]: Number(event.target.value) }));
-});
+// 音乐音量可调; 麦克风音量由功放硬件控制, 不再向设备发送无效果请求。
+$("#musicVolume").addEventListener("input", (event) => { $("#musicValue").textContent = event.target.value; });
+$("#musicVolume").addEventListener("change", (event) => updateAudio({ musicVolume: Number(event.target.value) }));
 document.addEventListener("visibilitychange", () => { uiState.visible = !document.hidden; if (uiState.visible) refresh(); });
 window.setInterval(() => { if (uiState.visible) refresh(); }, 1000);
 refresh();
