@@ -251,6 +251,8 @@ class MainActivity : AppCompatActivity() {
     private var queueAdapter: ArrayAdapter<String?>? = null
     private var audioManager: AudioManager? = null
     private var recorder: MediaRecorder? = null
+    /** 电视/投影等设备需 App 占用麦克风输入后才会启用麦克风声音输出(供演唱)。 */
+    private val micActivator = MicActivator()
     private var currentRecording: File? = null
     private var currentPage = "首页"
 
@@ -497,6 +499,20 @@ class MainActivity : AppCompatActivity() {
         main.postDelayed(ktvHeartbeatRunnable, HEARTBEAT_INTERVAL_MS)
         main.post(lyricTicker)
         main.postDelayed({ checkAppUpdate(false) }, 2500L)
+        // 电视/投影等设备: 请求麦克风权限并保持输入占用, 否则麦克风声音不会输出到扬声器。
+        main.postDelayed({ requestMicActivation() }, 4000L)
+    }
+
+    /** 申请并激活麦克风输入(演唱用)。授权后由 [MicActivator] 常驻占用输入通道。 */
+    private fun requestMicActivation() {
+        if (Build.VERSION.SDK_INT >= 23) {
+            if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), REQUEST_MIC_PERMISSION)
+                return
+            }
+        }
+        micActivator.start()
+        Log.i(TAG, "麦克风输入已激活(演唱输出通道占用)")
     }
 
     private fun initializeDatabase() {
@@ -587,6 +603,7 @@ class MainActivity : AppCompatActivity() {
         main.removeCallbacks(remoteNetworkMonitor)
         main.removeCallbacks(qrAutoHideMonitor)
         stopRecording(false)
+        micActivator.stop()
         releaseVocalPlayer()
         if (::playbackEngine.isInitialized) playbackEngine.release()
         remoteServer.stop()
@@ -3959,6 +3976,8 @@ class MainActivity : AppCompatActivity() {
             requestPermissions(arrayOf<String>(Manifest.permission.RECORD_AUDIO), 11)
             return
         }
+        // MediaRecorder 需要独占麦克风: 先暂停 MicActivator 占用。
+        micActivator.pause()
         try {
             val dir = recordDir()
             if (!dir.exists()) dir.mkdirs()
@@ -3978,7 +3997,8 @@ class MainActivity : AppCompatActivity() {
             status!!.setText("正在录音：" + currentRecording!!.getName())
             if ("首页" == currentPage) showHome()
         } catch (e: Exception) {
-            stopRecording(false)
+            // 录音启动失败: 释放 recorder 并恢复麦克风输入占用。
+            if (recorder != null) stopRecording(false) else micActivator.resume()
             toast("录音启动失败：" + e.message)
         }
     }
@@ -3994,6 +4014,8 @@ class MainActivity : AppCompatActivity() {
         } catch (ignored: Exception) {
         }
         recorder = null
+        // 录音结束 → 恢复麦克风输入占用(演唱声音输出通道)。
+        micActivator.resume()
         if (notify && currentRecording != null) toast("录音已保存：" + currentRecording!!.getName())
         currentRecording = null
         if ("录音" == currentPage) showRecordings()
@@ -9648,6 +9670,14 @@ class MainActivity : AppCompatActivity() {
             recreate()
         }
         if (requestCode == 11 && grantResults.size > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) startRecording()
+        if (requestCode == REQUEST_MIC_PERMISSION && grantResults.size > 0 &&
+            grantResults[0] == PackageManager.PERMISSION_GRANTED
+        ) {
+            micActivator.start()
+            Log.i(TAG, "麦克风权限已授予, 麦克风输入激活")
+        } else if (requestCode == REQUEST_MIC_PERMISSION) {
+            Log.w(TAG, "麦克风权限被拒绝: 部分设备将无麦克风演唱声音输出")
+        }
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
@@ -10103,6 +10133,7 @@ class MainActivity : AppCompatActivity() {
         private const val PREFS = "ktv"
         private const val KEY_CATALOG_URL = "catalog_url"
         private const val KEY_SHOW_MOBILE_QR = "show_mobile_qr"
+        private const val REQUEST_MIC_PERMISSION = 12
 
         private const val TAG = "MainActivity"
     }
