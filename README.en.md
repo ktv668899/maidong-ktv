@@ -71,7 +71,6 @@ Highlights of the reworked data layer:
   (`mconn.cherryonline.cn` `mls-api/v1/sqlite/sync`); Gitee hosts code only, no database files.
 - **Song source**: `w.w345.my` (`i.php` token → `do.php` playback URL) with fixed device identity and
   reproduced signing; ad/mismatched resources (e.g. `wb66.cn/.../719.ts`) are blocked and retried.
-- **Remote logging**: optional RFC 3164 syslog over TCP+TLS (`zb.kasugano.cn:514`).
 - **JS hot-update**: `app/src/main/assets/mobile/ktv_api.js`, requires the `KTV_BRIDGE_API: 7` marker.
 
 ## Building
