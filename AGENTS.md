@@ -33,7 +33,31 @@ App 内部两处端点已指向 Gitea（随本版 APK 生效）：
 - `KtvJsBridge.kt`：`gitea.kasugano.cn/zijunchiang/maidong-ktv/raw/branch/master/app/src/main/assets/mobile/ktv_api.js`（JS 热更新）
 
 > 注意：Gitea 的 raw 规范路径是 `/raw/branch/<分支>/<文件>`；`/raw/<分支>/<文件>` 会 303 跳转。
-> 发布新版本时需在 Gitea 创建 Release 并上传 `.apk` 附件（Gitea Release API 的 `assets[].browser_download_url` 供 App 下载）。
+> Gitea 的 raw 与 release 下载对**无 User-Agent** 的请求同样放行（App 裸 socket 可直连）。
+
+### 发布新版本（Gitea Release）
+
+```bash
+TOKEN=$(sed -E 's|https://zijunchiang:([^@]+)@.*|\1|' ~/.git-credentials-gitea)
+
+# 1) 创建 Release（tag 需高于当前 versionName 才会提示更新）
+curl -X POST -u "zijunchiang:$TOKEN" -H "Content-Type: application/json" \
+  -d '{"tag_name":"v1.2.6","name":"麦动KTV V1.2.6","body":"更新说明","target_commitish":"master"}' \
+  https://gitea.kasugano.cn/api/v1/repos/zijunchiang/maidong-ktv/releases
+
+# 2) 上传 APK 附件（用返回的 release id；附件名必须 ASCII）
+curl -X POST -u "zijunchiang:$TOKEN" \
+  -F "attachment=@麦动KTV-V1.2.6-release.apk" \
+  "https://gitea.kasugano.cn/api/v1/repos/zijunchiang/maidong-ktv/releases/<id>/assets?name=maidong-ktv-V1.2.6-release.apk"
+```
+
+> ⚠️ **附件文件名必须为 ASCII**：Gitea 1.27 的规范下载路径
+> `/releases/download/<tag>/<文件名>` 对非 ASCII 文件名返回 404（`/attachments/<uuid>` 直链虽可用，
+> 但 `releases/latest` API 返回的是规范路径）。因此 Gitea 上的附件用
+> `maidong-ktv-V1.2.x-release.apk` 这类 ASCII 名；本地留存的发布包仍可命名
+> `麦动KTV-V1.2.x-release.apk`。
+>
+> 上传 22MB APK 约需 70s，注意命令超时设置。
 
 ## 二、构建与产物
 
