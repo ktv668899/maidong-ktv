@@ -7,8 +7,8 @@ import java.util.Locale
 /**
  * 曲库下载引导（仅官方 Muse 同步源）。
  *
- * 说明：已移除 Gitee 数据库分片/镜像下载路径（database_publish 不再发布到 Gitee，
- * Gitee 仓库此后只存代码）。曲库统一从官方 Muse 服务（mconn.cherryonline.cn mls-api）
+ * 说明：已移除分片/镜像数据库下载路径（database_publish 不再发布到代码仓库，
+ * 代码仓库此后只存代码）。曲库统一从官方 Muse 服务（mconn.cherryonline.cn mls-api）
  * 同步，由 [MuseDbSync] 负责登录、同步、校验与安装；本类只做版本文件与可读错误包装。
  */
 object DatabaseBootstrapper {

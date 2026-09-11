@@ -10,6 +10,8 @@
 
 ## 📌 项目说明
 
+> **本仓库**：[https://gitea.kasugano.cn/zijunchiang/maidong-ktv](https://gitea.kasugano.cn/zijunchiang/maidong-ktv)
+>
 > **内容框架来源**：[https://gitee.com/yangyachao-X/maidong-ktv](https://gitee.com/yangyachao-X/maidong-ktv)
 >
 > 本仓库基于上游「麦动 KTV」的界面与功能框架进行改造，并使用 **DSH（DeepSeek Harness）** 重写内核与数据源：重新实现曲库同步、歌曲源接入、设备认证、风控应对、远程日志与广告屏蔽等底层逻辑。上游框架的版权归原作者所有，本项目仅作学习与技术交流。
@@ -46,11 +48,11 @@
 
 ## 内核与数据源（DSH 重写部分）
 
-- **曲库**：统一走**官方 Muse 同步**（`mconn.cherryonline.cn` `mls-api/v1/sqlite/sync`，RSA 登录 + 增量文件校验），不再依赖 Gitee 承载数据库；Gitee 仓库仅存代码。
+- **曲库**：统一走**官方 Muse 同步**（`mconn.cherryonline.cn` `mls-api/v1/sqlite/sync`，RSA 登录 + 增量文件校验），不再依赖代码托管仓库承载数据库。
 - **歌曲源**：接入 `w.w345.my`（`i.php` 取 token → `do.php` 解析播放地址），固定设备标识并复刻签名算法；广告/错号资源（如返回 `wb66.cn/.../719.ts` 或文件名与 musicno 不一致）会被拦截并重试。
 - **风控应对**：源对陌生出口 IP 存在试用窗口（约 10 分钟，403"检测到异常行为"），App 检测到 403 后弹窗提示更换公网 IP；同 token 退避重试，不放大请求量。
 - **JS 热更新**：歌曲接口逻辑在 `app/src/main/assets/mobile/ktv_api.js`，安装后从本仓库自动拉取兼容版本（须保留 `KTV_BRIDGE_API: 7` 标记）。
-- **应用更新**：以 Gitee Release 标签作为版本号（如 `1.2.5`），Release 需附带一个 `.apk` 附件；仅当标签高于当前 `BuildConfig.VERSION_NAME` 时提示下载。
+- **应用更新**：以 Gitea Release 标签作为版本号（如 `1.2.5`），Release 需附带一个 `.apk` 附件；仅当标签高于当前 `BuildConfig.VERSION_NAME` 时提示下载。
 
 ## 🔧 编译教程
 

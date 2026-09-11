@@ -30,15 +30,16 @@ import javax.crypto.Cipher
  * 在隐藏 WebView 中运行可热更新的歌曲接口脚本。
  *
  * JS 决定接口地址、参数、签名和响应解析；Android 只提供 HTTP 与 RSA 这两个
- * WebView 中不可靠的底层能力。这样接口变化时只需更新 Gitee 上的 ktv_api.js。
+ * WebView 中不可靠的底层能力。这样接口变化时只需更新 Gitea 上的 ktv_api.js。
  */
 class KtvJsBridge(context: Context) {
     companion object {
         private const val TAG = "KtvJsBridge"
         private const val JS_FILE = "mobile/ktv_api.js"
         private const val CACHE_FILE = "ktv_api_cache.js"
+        // 热更新脚本地址(Gitea 主仓库; raw 规范路径为 /raw/branch/<分支>/<文件>)
         private const val REMOTE_JS_URL =
-            "https://gitee.com/zijunchiang/maidong-ktv/raw/master/app/src/main/assets/mobile/ktv_api.js"
+            "https://gitea.kasugano.cn/zijunchiang/maidong-ktv/raw/branch/master/app/src/main/assets/mobile/ktv_api.js"
         private const val MAX_RESPONSE_BYTES = 2 * 1024 * 1024
         private const val JS_REQUEST_TIMEOUT_MS = 180_000
         // 当前歌曲源 w.w345.my 使用的设备标识(mac + sn)。与用户抓包示例一致,
@@ -250,7 +251,7 @@ class KtvJsBridge(context: Context) {
                         cacheFile.writeText(script, Charsets.UTF_8)
                         tempFile.delete()
                     }
-                    Log.i(TAG, "JS cache updated from Gitee (${script.length} chars)")
+                    Log.i(TAG, "JS cache updated from Gitea (${script.length} chars)")
                     // 启动后刚拉到的新版本直接生效；若已有请求在执行，则留到下次启动。
                     mainHandler.post {
                         if (ready && callbacks.isEmpty() && !destroyed) {

@@ -20,7 +20,7 @@ import javax.crypto.Cipher
 /**
  * 官方曲库同步：login → cookie → sqlite/sync → 下载 gz → 解压安装。
  *
- * 这是原版「时光KTV / 麦动」的曲库分发方式，取代此前临时使用的 Gitee 分片方案。
+ * 这是原版「时光KTV / 麦动」的曲库分发方式，取代此前临时使用的分片分发方案。
  * 授权门控发生在服务端(未授权设备 sync 返回空 files)，本地只负责完整复刻请求协议。
  */
 object MuseDbSync {

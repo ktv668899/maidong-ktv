@@ -59,6 +59,8 @@
 
 ## Project Notice
 
+> **This repository**: [https://gitea.kasugano.cn/zijunchiang/maidong-ktv](https://gitea.kasugano.cn/zijunchiang/maidong-ktv)
+>
 > **UI/feature framework credit**: [https://gitee.com/yangyachao-X/maidong-ktv](https://gitee.com/yangyachao-X/maidong-ktv)
 >
 > This repository reworks the upstream "Maidong KTV" UI and feature framework, and the core/data layer was
@@ -68,7 +70,7 @@
 Highlights of the reworked data layer:
 
 - **Library**: synced exclusively from the official Muse service
-  (`mconn.cherryonline.cn` `mls-api/v1/sqlite/sync`); Gitee hosts code only, no database files.
+  (`mconn.cherryonline.cn` `mls-api/v1/sqlite/sync`); the code host carries source only, no database files.
 - **Song source**: `w.w345.my` (`i.php` token → `do.php` playback URL) with fixed device identity and
   reproduced signing; ad/mismatched resources (e.g. `wb66.cn/.../719.ts`) are blocked and retried.
 - **JS hot-update**: `app/src/main/assets/mobile/ktv_api.js`, requires the `KTV_BRIDGE_API: 7` marker.

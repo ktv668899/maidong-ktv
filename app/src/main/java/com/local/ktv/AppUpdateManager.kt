@@ -11,10 +11,10 @@ import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 
-/** Gitee Release based in-app updater. */
+/** Gitea Release based in-app updater. */
 object AppUpdateManager {
     private const val LATEST_RELEASE_API =
-        "https://gitee.com/api/v5/repos/zijunchiang/maidong-ktv/releases/latest"
+        "https://gitea.kasugano.cn/api/v1/repos/zijunchiang/maidong-ktv/releases/latest"
 
     data class Release(
         val version: String,
@@ -54,7 +54,7 @@ object AppUpdateManager {
                     apkName = apkName,
                 )
             })
-        }, "gitee-update-check").start()
+        }, "gitea-update-check").start()
     }
 
     fun download(
@@ -105,7 +105,7 @@ object AppUpdateManager {
                 require(partial.renameTo(target)) { "无法保存安装包" }
                 target
             })
-        }, "gitee-update-download").start()
+        }, "gitea-update-download").start()
     }
 
     /**

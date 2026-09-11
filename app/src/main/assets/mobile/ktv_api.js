@@ -1,7 +1,7 @@
 /**
  * KTV Song API - JS Hot Update Module
  * ====================================
- * 从 Gitee 热更新, App 无需发版即可修复 API 变更
+ * 从 Gitea 热更新, App 无需发版即可修复 API 变更
  *
  * 用法:
  *   const api = new KtvApi({proxy: 'http://127.0.0.1:7897'})

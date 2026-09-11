@@ -25,12 +25,15 @@ git push origin master              # origin = Gitea（主仓库）
 git push --no-verify gitee master   # 仅在确需回推 Gitee 时使用
 ```
 
-### 待迁移（尚未完成，需单独确认后再改）
+### 运行时端点（已全部迁移到 Gitea）
 
-App 内部仍指向 **Gitee** 的两个运行时端点，迁移到 Gitea 需改代码并重新发版：
+App 内部两处端点已指向 Gitea（随本版 APK 生效）：
 
-- `AppUpdateManager.kt`：`gitee.com/api/v5/repos/.../releases/latest`（App 内检查更新）
-- `KtvJsBridge.kt`：`gitee.com/zijunchiang/maidong-ktv/raw/master/.../ktv_api.js`（JS 热更新）
+- `AppUpdateManager.kt`：`gitea.kasugano.cn/api/v1/repos/zijunchiang/maidong-ktv/releases/latest`（App 内检查更新）
+- `KtvJsBridge.kt`：`gitea.kasugano.cn/zijunchiang/maidong-ktv/raw/branch/master/app/src/main/assets/mobile/ktv_api.js`（JS 热更新）
+
+> 注意：Gitea 的 raw 规范路径是 `/raw/branch/<分支>/<文件>`；`/raw/<分支>/<文件>` 会 303 跳转。
+> 发布新版本时需在 Gitea 创建 Release 并上传 `.apk` 附件（Gitea Release API 的 `assets[].browser_download_url` 供 App 下载）。
 
 ## 二、构建与产物
 
@@ -68,6 +71,6 @@ $BT/apksigner verify 目标名.apk
 
 - **歌曲源**：`app/src/main/assets/mobile/ktv_api.js` 的 `CONFIG.HOSTS`（多源自动排序，失败源沉底）
 - **JS 热更新**：改动 `ktv_api.js` 必须同步提升 `KTV_BRIDGE_API: N` 标记（JS 与 `KtvJsBridge.kt` 两处校验），否则设备仍用缓存旧脚本
-- **曲库**：只走官方 Muse 同步（`MuseDbSync`），不再依赖 Gitee 数据库文件
+- **曲库**：只走官方 Muse 同步（`MuseDbSync`），不再依赖代码仓库数据库文件
 - **麦克风**：`MicActivator` 常驻占用输入通道（TV/投影需占用后才有演唱声音输出），外接设备热插拔会自动重建
 - **仓库可见性**：Gitea 仓库保持 **public**（若后续把 App 更新/热更新端点迁到 Gitea，非 public 会导致 403）

@@ -8232,7 +8232,7 @@ class MainActivity : AppCompatActivity() {
             SettingsEntry(
                 R.drawable.ott_ic_data_upgrade,
                 "应用更新",
-                "当前版本 ${BuildConfig.VERSION_NAME}，更新来源：Gitee Release",
+                "当前版本 ${BuildConfig.VERSION_NAME}，更新来源：Gitea Release",
                 "检查更新",
             ) { checkAppUpdate(true) },
             SettingsEntry(R.drawable.ott_ic_about_us, "关于", actionText = "查看") { showAboutDialog() },

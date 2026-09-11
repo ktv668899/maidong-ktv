@@ -10,8 +10,8 @@ import java.util.concurrent.atomic.AtomicReference
 /**
  * 歌曲 API 客户端 —— JS 热更新桥接
  * =================================
- * - 通过 KtvJsBridge 调用 Gitee 上的 JS 脚本
- * - API 变更时只需更新 Gitee JS 文件，App 无需发版
+ * - 通过 KtvJsBridge 调用 Gitea 上的 JS 脚本
+ * - API 变更时只需更新 Gitea JS 文件，App 无需发版
  * - 首次播放时实时获取 URL，不存在过期问题
  */
 object SongApiClient {
