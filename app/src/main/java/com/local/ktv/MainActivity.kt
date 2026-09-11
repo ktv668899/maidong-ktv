@@ -586,23 +586,37 @@ class MainActivity : AppCompatActivity() {
         databaseBootstrapRunning = true
         showDatabaseLoading(true, "正在初始化曲库...", null)
         io.execute {
-            val remoteVersion = DatabaseBootstrapper.fetchRemoteVersion()
-            val localVersion = DatabaseBootstrapper.getLocalDbVersion()
-            val updateRequired = remoteVersion != null && remoteVersion != localVersion
             var bootstrapError: Throwable? = null
             var usedOldDatabase = false
 
-            var ok = if (updateRequired) false else library.muse.open()
-            if (!ok) {
-                library.muse.close()
-                val result = DatabaseBootstrapper.download(::showDatabaseDownloadProgress)
-                bootstrapError = result.exceptionOrNull()
-                ok = result.isSuccess && library.muse.open()
-                if (!ok) {
-                    // A failed online update must not make an existing local catalog unusable.
-                    usedOldDatabase = library.muse.open()
-                    ok = usedOldDatabase
+            // 先尝试打开本地曲库；仅当本地不可用或已过 30 天时效时才联网同步。
+            var ok = library.muse.open()
+            val syncDue = DatabaseBootstrapper.isSyncDue()
+            if (!ok || syncDue) {
+                val reason = if (!ok) "本地曲库不可用" else "已到 ${DatabaseBootstrapper.SYNC_TTL_DAYS} 天同步时效"
+                Log.i(TAG, "触发曲库服务器同步：$reason")
+                val remoteVersion = DatabaseBootstrapper.fetchRemoteVersion()
+                if (remoteVersion != null) {
+                    val localVersion = DatabaseBootstrapper.getLocalDbVersion()
+                    if (!ok || remoteVersion != localVersion) {
+                        library.muse.close()
+                        val result = DatabaseBootstrapper.download(::showDatabaseDownloadProgress)
+                        bootstrapError = result.exceptionOrNull()
+                        ok = result.isSuccess && library.muse.open()
+                        if (!ok) {
+                            // A failed online update must not make an existing local catalog unusable.
+                            usedOldDatabase = library.muse.open()
+                            ok = usedOldDatabase
+                        }
+                    } else {
+                        // 版本一致：本次已完成有效校验，重置时效起点。
+                        DatabaseBootstrapper.markSynced()
+                    }
+                } else {
+                    Log.w(TAG, "曲库同步到期，但获取远端版本失败，本次继续使用本地曲库")
                 }
+            } else {
+                Log.i(TAG, "曲库未到期(${DatabaseBootstrapper.syncStatusText()})，跳过服务器同步")
             }
 
             val count = if (ok) library.muse.songCount() else 0
@@ -8274,7 +8288,8 @@ class MainActivity : AppCompatActivity() {
                     "统计中…",
                     "更新",
                 ) {
-                    io.execute { library.muse.close(); library.muse.open(); main.post { showSettingsSection(1, false) } }
+                    // 手动强制检查更新(绕过 30 天时效; 仅当服务器版本更新时才下载)
+                    forceDatabaseSync()
                 },
                 SettingsEntry(R.drawable.ott_ic_data_setting, "U盘加歌", "扫描U盘内按规定命名的歌曲文件，并添加到曲库中", "立即加歌") { toast("未检测到U盘") },
                 SettingsEntry(R.drawable.ott_ic_setting_storage_space, "预留存储空间", "当前 ${String.format(Locale.ROOT, "%.1f", reserveStorageGb)} GB") { showReserveStorageDialog() },
@@ -8315,9 +8330,55 @@ class MainActivity : AppCompatActivity() {
         io.execute {
             val count = runCatching { library.muse.songCount() }.getOrDefault(0)
             val downloaded = runCatching { countDownloadedFiles() }.getOrDefault(0)
+            // 同步时效(30 天): 未到期不联网, 到期后才触发服务器同步。
+            val syncText = DatabaseBootstrapper.syncStatusText()
             main.post {
                 if (activeSettingsAdapter === adapter) {
-                    adapter.updateSubtitle("曲库", "数据库 $count 首  本地已下载 $downloaded 首")
+                    adapter.updateSubtitle(
+                        "曲库",
+                        "数据库 $count 首  本地已下载 $downloaded 首  ·  ${DatabaseBootstrapper.SYNC_TTL_DAYS} 天同步: $syncText",
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * 手动强制检查曲库更新(绕过 30 天时效)。
+     * 仅在服务器版本更新(或本地库不可用)时才下载, 避免无谓的大文件传输。
+     */
+    private fun forceDatabaseSync() {
+        showDatabaseLoading(true, "正在检查曲库更新...", null)
+        io.execute {
+            val remoteVersion = DatabaseBootstrapper.fetchRemoteVersion()
+            if (remoteVersion == null) {
+                main.post {
+                    showDatabaseLoading(false, "", null)
+                    toast("检查失败：无法连接曲库服务器")
+                    showSettingsSection(1, false)
+                }
+                return@execute
+            }
+            val localVersion = DatabaseBootstrapper.getLocalDbVersion()
+            if (library.muse.isAvailable() && remoteVersion == localVersion) {
+                DatabaseBootstrapper.markSynced()
+                main.post {
+                    showDatabaseLoading(false, "", null)
+                    toast("曲库已是最新版本")
+                    showSettingsSection(1, false)
+                }
+                return@execute
+            }
+            library.muse.close()
+            val result = DatabaseBootstrapper.download(::showDatabaseDownloadProgress)
+            val ok = result.isSuccess && library.muse.open()
+            main.post {
+                if (ok) {
+                    showDatabaseLoading(false, "", null)
+                    toast("曲库同步完成")
+                    showSettingsSection(1, false)
+                } else {
+                    showDatabaseLoadingFailure("曲库同步失败：${result.exceptionOrNull()?.message.orEmpty()}")
                 }
             }
         }
