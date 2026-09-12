@@ -9,7 +9,7 @@
 | 远端 | 地址 | 状态 |
 |---|---|---|
 | `origin` | `https://gitea.kasugano.cn/zijunchiang/maidong-ktv.git` | ✅ 主仓库，**同步目标** |
-| `gitee` | `https://gitee.com/zijunchiang/maidong-ktv.git` | ⛔ 已停用（推送被钩子拦截） |
+| `gitee` | `https://gitee.com/zijunchiang/maidong-ktv.git` | ⛔ 已停用（推送被钩子拦截）；仓库已精简为**仅 README 文档 + Releases 附件** |
 
 - ✅ 预期动作：完成改动 → 本地 `git commit` → `git push origin master`（同步到 Gitea）
 - ⛔ 禁止：推送到 Gitee（`pre-push` 钩子会拦截，避免误推送）
