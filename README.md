@@ -51,8 +51,8 @@
 - **曲库**：统一走**官方 Muse 同步**（`mconn.cherryonline.cn` `mls-api/v1/sqlite/sync`，RSA 登录 + 增量文件校验），不再依赖代码托管仓库承载数据库。
 - **歌曲源**：接入 `w.w345.my`（`i.php` 取 token → `do.php` 解析播放地址），固定设备标识并复刻签名算法；广告/错号资源（如返回 `wb66.cn/.../719.ts` 或文件名与 musicno 不一致）会被拦截并重试。
 - **风控应对**：源对陌生出口 IP 存在试用窗口（约 10 分钟，403"检测到异常行为"），App 检测到 403 后弹窗提示更换公网 IP；同 token 退避重试，不放大请求量。
-- **JS 热更新**：歌曲接口逻辑在 `app/src/main/assets/mobile/ktv_api.js`，安装后从本仓库自动拉取兼容版本（须保留 `KTV_BRIDGE_API: 7` 标记）。
-- **应用更新**：以 Gitea Release 标签作为版本号（如 `1.2.5`），Release 需附带一个 `.apk` 附件；仅当标签高于当前 `BuildConfig.VERSION_NAME` 时提示下载。
+- **JS 热更新**：歌曲接口逻辑在 `app/src/main/assets/mobile/ktv_api.js`，安装后从本仓库自动拉取兼容版本（须保留 `KTV_BRIDGE_API: 8` 标记）。
+- **应用更新**：以 Gitea Release 标签作为版本号（如 `1.3.0`），Release 需附带一个 `.apk` 附件；仅当标签高于当前 `BuildConfig.VERSION_NAME` 时提示下载。
 
 ## 🔧 编译教程
 
@@ -132,7 +132,7 @@ adb install -r app/build/outputs/apk/release/app-release.apk
 
 - **曲库初始化失败**：检查设备网络能否访问 `mconn.cherryonline.cn`；已在设置页提供「重置数据库」。
 - **点歌报 403 / 无播放地址**：多为歌曲源对当前公网 IP 的试用窗口到期，重启光猫/路由器更换公网 IP 后恢复。
-- **热更新脚本不生效**：确认远端 `ktv_api.js` 保留 `KTV_BRIDGE_API: 7` 标记，否则内置版本优先。
+- **热更新脚本不生效**：确认远端 `ktv_api.js` 保留 `KTV_BRIDGE_API: 8` 标记，否则内置版本优先。
 - **想改签名/ABI**：编辑 `app/build.gradle` 的 `signingConfigs` 与 `ndk.abiFilters` 后重新编译。
 
 ## 项目结构
@@ -145,7 +145,7 @@ maidong-ktv/
 │   │   ├── MuseDbSync.kt              # 官方曲库同步
 │   │   ├── MuseDatabase.kt            # 曲库访问
 │   │   ├── KtvJsBridge.kt             # JS 桥(HTTP/RSA/热更新)
-│   │   ├── MiliLog.kt                 # 远程 syslog 日志
+│   │   ├── MiliLog.kt                 # 远程日志上报(GlogCenter)
 │   │   └── SongOkDownloadManager.kt   # 下载管理
 │   ├── src/main/assets/mobile/ktv_api.js   # 歌曲源逻辑(热更新)
 │   └── src/main/res/                  # 资源 / 证书

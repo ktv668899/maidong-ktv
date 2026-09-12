@@ -1929,6 +1929,8 @@ class MainActivity : AppCompatActivity() {
                 // 关于
                 addSettingsTitle(content, "关于")
                 addSettingsItem(content, "应用名称", "麦动", null)
+                addSettingsItem(content, "框架来源", "杨家三郎/麦动KTV", null)
+                addSettingsItem(content, "内核", "由 DSH 重构数据库源", null)
                 addSettingsItem(content, "版本号", BuildConfig.VERSION_NAME, null)
                 addSettingsItem(
                     content,
@@ -8924,7 +8926,8 @@ class MainActivity : AppCompatActivity() {
         AlertDialog.Builder(this)
             .setTitle("关于麦动")
             .setMessage(
-                "power by 抖音@杨家三郎\n" +
+                "框架来源：杨家三郎/麦动KTV\n" +
+                    "由 DSH 重构数据库源\n" +
                     "此软件免费开源，请勿付费获取\n" +
                     "版本：" + BuildConfig.VERSION_NAME
             )
