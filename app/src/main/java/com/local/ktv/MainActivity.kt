@@ -162,6 +162,8 @@ class MainActivity : AppCompatActivity() {
                 startRemoteServer()
                 updateMobileQrOverlay()
                 updateFullScreenQrOverlay()
+                // 网络/IP 变化后同步日志上报的 serverip。
+                refreshLogDeviceContext()
             }
             main.postDelayed(this, 5000)
         }
@@ -459,8 +461,9 @@ class MainActivity : AppCompatActivity() {
         // 初始化 API 客户端 (歌曲下载链接)
         init("abe235a87118f6de", "080027deed4f")
         playbackEngine = KtvPlaybackEngine(applicationContext)
-        // 远程日志系统: 加载打包证书并后台连接 syslog 服务器, 启动即上报设备/网络信息。
+        // 远程日志系统(GlogCenter): 启动即上报设备/网络信息。
         MiliLog.init(applicationContext)
+        refreshLogDeviceContext()
         reportDeviceBootInfo()
         // 歌曲源窗口/风控到期守卫: 源对陌生出口 IP 可能在短暂窗口后返回 403,
         // 换公网 IP 即恢复。到期时弹一次提示引导用户重启光猫/路由器(重拨换 IP)。
@@ -3500,6 +3503,11 @@ class MainActivity : AppCompatActivity() {
             } catch (ignored: Exception) {
             }
         }, "ktv-heartbeat").start()
+    }
+
+    /** 远程日志: 把设备 IP 与设备标识同步给日志客户端(GlogCenter 的 serverip/user/traceid)。 */
+    private fun refreshLogDeviceContext() {
+        MiliLog.updateDeviceContext(ip = localIp(), deviceId = LEGACY_DEVICE_ID)
     }
 
     /** 远程日志: App 启动时上报设备信息与网络信息(异步, 尽力而为)。 */

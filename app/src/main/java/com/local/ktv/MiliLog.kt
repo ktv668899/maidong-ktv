@@ -3,199 +3,189 @@ package com.local.ktv
 import android.content.Context
 import android.os.Build
 import android.util.Log
-import java.io.BufferedOutputStream
-import java.security.KeyStore
-import java.security.cert.CertificateFactory
-import java.security.cert.X509Certificate
-import java.util.Calendar
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.atomic.AtomicBoolean
-import javax.net.ssl.SSLContext
-import javax.net.ssl.SSLSocket
-import javax.net.ssl.TrustManagerFactory
 
 /**
- * 远程日志客户端 —— 复刻为内网/私有部署的 syslog 服务器(zb.kasugano.cn:514)。
+ * 远程日志客户端 —— GlogCenter（gotoeasy/glogcenter）HTTP 接口。
  *
- * - 传输: TCP + TLS(信任打包的 raw/mili_log.crt 根证书, 服务器为 Let's Encrypt
- *   签发链 ISRG Root X1, 故该根即可完成链校验; 连接目标域名与证书 SAN 不同,
- *   属私有部署惯例, 因此只做链校验、不做主机名校验)。
- * - 格式: BSD syslog RFC 3164 —— <PRI>MMM dd HH:mm:ss HOSTNAME TAG: message
- * - 策略: 单后台线程 + 有界队列; 断线自动重连; 尽力而为, 失败不阻塞业务。
+ * 接口：`POST http://log.kasugano.cn/glc/v1/log/add`，`Content-Type: application/json`，
+ * 单条 JSON 对象（批量用 `/glc/v1/log/addBatch`，此处按单条上报）。
  *
- * 日志事件:
- *   1) App 启动时上报设备/网络信息;
- *   2) 点歌解析歌曲源(w.w345.my / 实际下载域名)时实时上报;
- *   3) 网络错误/接口 403/下载失败/播放失败实时上报。
+ * 字段（均为字符串，对应 GlogCenter 页面列）：
+ *   system      系统名（本 App 固定 [SYSTEM]）
+ *   date        日期时间，格式 `yyyy-MM-dd HH:mm:ss.SSS`（务必与检索格式一致）
+ *   text        日志内容
+ *   servername  主机名（设备型号）
+ *   serverip    主机 IP（设备局域网 IP）
+ *   loglevel    日志级别（INFO / WARN / ERROR）
+ *   traceid     追踪码（此处用设备标识）
+ *   user        用户（此处用设备标识）
+ *
+ * 策略：单后台线程 + 有界队列；发送失败重试一次，连续失败退避；尽力而为，不阻塞业务。
+ * 日志事件：启动设备/网络信息、点歌命中的源与结果、接口 403/网络错误、下载/播放失败。
  */
 object MiliLog {
     private const val TAG = "MiliLog"
-    private const val HOST = "zb.kasugano.cn"
-    private const val PORT = 514
-    private const val TAG_NAME = "MaidongKTV"
-    private const val FACILITY = 16 // local0
-    private const val MAX_MSG_BYTES = 900
+    private const val ENDPOINT = "http://log.kasugano.cn/glc/v1/log/add"
+
+    /** GlogCenter 页面上的「系统名」，用于区分应用。 */
+    private const val SYSTEM = "maidongktv"
+    private const val MAX_TEXT_LEN = 900
     private const val MAX_QUEUE = 300
     private const val CONNECT_TIMEOUT_MS = 8000
-    private const val SOCKET_TIMEOUT_MS = 10000
-    private const val RETRY_SLEEP_MS = 10_000L
-
-    // RFC 3164 severity
-    private const val SEV_ERROR = 3
-    private const val SEV_WARNING = 4
-    private const val SEV_NOTICE = 5
-    private const val SEV_INFO = 6
+    private const val READ_TIMEOUT_MS = 8000
+    private const val RETRY_SLEEP_MS = 1500L
+    private const val FAILURE_BACKOFF_MS = 10_000L
 
     private val started = AtomicBoolean(false)
     private val running = AtomicBoolean(false)
     private val queue = LinkedBlockingQueue<String>(MAX_QUEUE)
-    private var sslContext: SSLContext? = null
-    private var hostname = "android"
-
-    @Volatile private var socket: SSLSocket? = null
     private var senderThread: Thread? = null
 
-    /** 用 app context 初始化(加载打包证书、读取设备标识)。可重复调用。 */
+    @Volatile private var serverName: String = "android"
+    @Volatile private var serverIp: String = ""
+    @Volatile private var traceId: String = ""
+    @Volatile private var user: String = ""
+
+    /** 用 app context 初始化并启动发送线程。可重复调用。 */
     fun init(context: Context) {
         if (started.getAndSet(true)) return
-        val appContext = context.applicationContext
-        hostname = sanitize(Build.MODEL).ifEmpty { "android" }
-        sslContext = buildSslContext(appContext)
+        serverName = sanitize(Build.MODEL).ifEmpty { "android" }
         running.set(true)
-        senderThread = Thread({ sendLoop() }, "mili-syslog").also { it.isDaemon = true; it.start() }
+        senderThread = Thread({ sendLoop() }, "mili-glog").also { it.isDaemon = true; it.start() }
     }
 
-    private fun sanitize(s: String): String =
-        s.map { if (it.isLetterOrDigit() || it == '-' || it == '_') it else ' ' }
-            .joinToString("").trim().replace(Regex("\\s+"), "-")
-
-    private fun buildSslContext(context: Context): SSLContext? = try {
-        val cf = CertificateFactory.getInstance("X.509")
-        val cert = context.resources.openRawResource(R.raw.mili_log).use {
-            cf.generateCertificate(it) as X509Certificate
+    /** 更新上报用的设备网络/身份字段（IP 变化或重新登录时调用）。 */
+    fun updateDeviceContext(ip: String? = null, deviceId: String? = null) {
+        if (!ip.isNullOrBlank()) serverIp = ip
+        if (!deviceId.isNullOrBlank()) {
+            user = deviceId
+            traceId = deviceId
         }
-        val keyStore = KeyStore.getInstance(KeyStore.getDefaultType())
-        keyStore.load(null)
-        keyStore.setCertificateEntry("mili_log", cert)
-        val tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
-        tmf.init(keyStore)
-        SSLContext.getInstance("TLS").apply { init(null, tmf.trustManagers, null) }
-    } catch (e: Throwable) {
-        Log.e(TAG, "buildSslContext failed", e)
-        null
     }
 
-    // ─── 对外上报接口 ────────────────────────────────
+    fun info(msg: String) = enqueue("INFO", msg)
+    fun notice(msg: String) = enqueue("INFO", msg)
+    fun warn(msg: String) = enqueue("WARN", msg)
+    fun error(msg: String) = enqueue("ERROR", msg)
 
-    fun info(msg: String) = enqueue(SEV_INFO, msg)
-    fun notice(msg: String) = enqueue(SEV_NOTICE, msg)
-    fun warn(msg: String) = enqueue(SEV_WARNING, msg)
-    fun error(msg: String) = enqueue(SEV_ERROR, msg)
-
-    private fun enqueue(severity: Int, msg: String) {
-        if (!started.get() || sslContext == null) return
-        val line = format(severity, msg)
-        if (line == null) return
-        // 队列满时丢最旧, 保证新日志能进队。
-        if (!queue.offer(line)) {
+    private fun enqueue(level: String, msg: String) {
+        if (!started.get()) return
+        val body = buildBody(level, msg) ?: return
+        // 队列满时丢最旧，保证新日志能进队。
+        if (!queue.offer(body)) {
             queue.poll()
-            queue.offer(line)
+            queue.offer(body)
         }
     }
 
-    private fun format(severity: Int, msg: String): String? {
-        val body = msg.replace(Regex("[\\r\\n]+"), " ").trim()
-        if (body.isEmpty()) return null
-        val truncated = if (body.toByteArray(Charsets.UTF_8).size > MAX_MSG_BYTES) {
-            body.take(MAX_MSG_BYTES)
-        } else body
-        val now = Calendar.getInstance()
-        val months = arrayOf("Jan", "Feb", "Mar", "Apr", "May", "Jun",
-            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
-        val day = String.format(Locale.US, "%2d", now.get(Calendar.DAY_OF_MONTH))
-        val time = String.format(Locale.US, "%02d:%02d:%02d",
-            now.get(Calendar.HOUR_OF_DAY), now.get(Calendar.MINUTE), now.get(Calendar.SECOND))
-        val pri = FACILITY * 8 + severity
-        // RFC3164: <PRI>TIMESTAMP HOSTNAME TAG: MSG  (TAG 不含空格)
-        return "<$pri>${months[now.get(Calendar.MONTH)]} $day $time $hostname $TAG_NAME: $truncated"
+    private fun buildBody(level: String, msg: String): String? {
+        val text = msg.replace(Regex("[\\r\\n]+"), " ").trim()
+        if (text.isEmpty()) return null
+        val truncated = if (text.toByteArray(Charsets.UTF_8).size > MAX_TEXT_LEN) {
+            text.take(MAX_TEXT_LEN)
+        } else {
+            text
+        }
+        return runCatching {
+            JSONObject().apply {
+                put("system", SYSTEM)
+                put("date", timestamp())
+                put("text", truncated)
+                put("servername", serverName)
+                put("serverip", serverIp)
+                put("loglevel", level)
+                put("traceid", traceId)
+                put("user", user)
+            }.toString()
+        }.getOrNull()
     }
+
+    /** GlogCenter 检索要求的时间格式：yyyy-MM-dd HH:mm:ss.SSS */
+    private fun timestamp(): String =
+        SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.ROOT).format(Date())
+
+    private fun sanitize(value: String): String =
+        value.map { if (it.isLetterOrDigit() || it == '-' || it == '_' || it == ' ') it else ' ' }
+            .joinToString("").trim()
 
     // ─── 发送线程 ────────────────────────────────────
 
     private fun sendLoop() {
         var consecutiveFailures = 0
         while (running.get()) {
-            val line: String = try {
+            val body: String = try {
                 queue.take()
             } catch (e: InterruptedException) {
                 break
             }
-            var sent = false
-            var attempt = 0
-            while (!sent && attempt < 2) {
-                attempt++
-                try {
-                    val s = connectOrReuse()
-                    val out = BufferedOutputStream(s.getOutputStream())
-                    out.write(line.toByteArray(Charsets.UTF_8))
-                    out.write('\n'.code)
-                    out.flush()
-                    sent = true
-                    consecutiveFailures = 0
-                    // 同一连接顺手把队列里已积压的消息发完。
-                    var next: String? = queue.poll()
-                    while (next != null) {
-                        out.write(next.toByteArray(Charsets.UTF_8))
-                        out.write('\n'.code)
-                        out.flush()
-                        next = queue.poll()
-                    }
-                } catch (e: Throwable) {
-                    closeSocket()
-                    if (attempt == 1) {
-                        Log.w(TAG, "syslog send failed (${e.message}), retrying...")
-                        try { Thread.sleep(1500) } catch (ie: InterruptedException) { break }
-                    }
-                }
-            }
+            var sent = post(body)
             if (!sent) {
+                sleepQuietly(RETRY_SLEEP_MS)
+                sent = post(body)
+            }
+            if (sent) {
+                consecutiveFailures = 0
+                // 顺手把已积压的日志发完。
+                var next: String? = queue.poll()
+                while (next != null) {
+                    post(next)
+                    next = queue.poll()
+                }
+            } else {
                 consecutiveFailures++
-                Log.w(TAG, "syslog send dropped: $line")
+                Log.w(TAG, "glog send dropped (failures=$consecutiveFailures): ${body.take(120)}")
                 if (consecutiveFailures >= 3) {
                     consecutiveFailures = 0
-                    try { Thread.sleep(RETRY_SLEEP_MS) } catch (ie: InterruptedException) { break }
+                    sleepQuietly(FAILURE_BACKOFF_MS)
                 }
             }
         }
-        closeSocket()
     }
 
-    private fun connectOrReuse(): SSLSocket {
-        val existing = socket
-        if (existing != null && existing.isConnected && !existing.isClosed && !existing.isOutputShutdown) {
-            return existing
+    private fun post(body: String): Boolean = try {
+        val connection = (URL(ENDPOINT).openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            doOutput = true
+            connectTimeout = CONNECT_TIMEOUT_MS
+            readTimeout = READ_TIMEOUT_MS
+            setRequestProperty("Content-Type", "application/json; charset=utf-8")
+            setRequestProperty("User-Agent", "MaidongKTV/${BuildConfig.VERSION_NAME}")
         }
-        val context = sslContext ?: throw IllegalStateException("SSL context not ready")
-        val raw = context.socketFactory.createSocket() as SSLSocket
-        raw.connect(java.net.InetSocketAddress(HOST, PORT), CONNECT_TIMEOUT_MS)
-        raw.soTimeout = SOCKET_TIMEOUT_MS
-        raw.startHandshake()
-        socket = raw
-        Log.i(TAG, "syslog connected to $HOST:$PORT")
-        return raw
+        try {
+            connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+            val code = connection.responseCode
+            // 读取并丢弃响应体，确保请求完成（也便于排查）。
+            val stream = if (code in 200..299) connection.inputStream else connection.errorStream
+            runCatching { stream?.use { it.readBytes() } }
+            code in 200..299
+        } finally {
+            connection.disconnect()
+        }
+    } catch (e: Throwable) {
+        Log.w(TAG, "glog send error: ${e.message}")
+        false
     }
 
-    private fun closeSocket() {
-        try { socket?.close() } catch (ignored: Exception) {}
-        socket = null
+    private fun sleepQuietly(ms: Long) {
+        try {
+            Thread.sleep(ms)
+        } catch (ignored: InterruptedException) {
+            Thread.currentThread().interrupt()
+        }
     }
 
-    /** 供测试/关闭时调用。 */
+    /** 停止发送（退出时调用）。 */
     fun shutdown() {
         running.set(false)
         senderThread?.interrupt()
         senderThread = null
-        closeSocket()
     }
 }

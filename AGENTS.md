@@ -98,4 +98,9 @@ $BT/apksigner verify 目标名.apk
 - **曲库**：只走官方 Muse 同步（`MuseDbSync`），不再依赖代码仓库数据库文件
 - **曲库同步时效**：默认 **30 天**（`DatabaseBootstrapper.SYNC_TTL_DAYS`）。未到期启动**不联网**、直接用本地曲库；到期后才查询服务器版本，有更新才下载。时效起点记录在 `db_sync_at.txt`，由 `DatabaseBootstrapper.markSynced()` 写入（下载成功或校验为最新时）。设置页「曲库 → 更新」为手动强制检查（绕过时效，仅在服务器版本更新时下载）
 - **麦克风**：`MicActivator` 常驻占用输入通道（TV/投影需占用后才有演唱声音输出），外接设备热插拔会自动重建
+- **远程日志**：GlogCenter HTTP 接口 `POST http://log.kasugano.cn/glc/v1/log/add`（单条 JSON，字段
+  `system`/`date`/`text`/`servername`/`serverip`/`loglevel`/`traceid`/`user`；`date` 必须为
+  `yyyy-MM-dd HH:mm:ss.SSS`，否则按时间检索异常）。客户端为 `MiliLog`（有界队列 + 后台线程 + 失败重试），
+  调用点 `MiliLog.info/notice/warn/error` 保持不变；设备 IP/标识通过 `MiliLog.updateDeviceContext()` 注入，
+  网络变化时自动刷新
 - **仓库可见性**：Gitea 仓库保持 **public**（若后续把 App 更新/热更新端点迁到 Gitea，非 public 会导致 403）
