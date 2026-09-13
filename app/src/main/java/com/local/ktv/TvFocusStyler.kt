@@ -13,13 +13,26 @@ import java.util.WeakHashMap
 /** Applies the original OTT red-to-orange focus fill to remote-control targets. */
 object TvFocusStyler {
     private val installed = Collections.newSetFromMap(WeakHashMap<View, Boolean>())
-    private val preservedBackgrounds = Collections.newSetFromMap(WeakHashMap<View, Boolean>())
+    private val fillSuppressed = Collections.newSetFromMap(WeakHashMap<View, Boolean>())
 
-    /** Preserve image/video backgrounds while suppressing Android's grey focus halo. */
-    fun preserveBackground(view: View) {
-        preservedBackgrounds.add(view)
+    /**
+     * 禁止对该 View 施加焦点/按下填充 —— 用于「大面积展示型表面」。
+     *
+     * 背景：[install] 会把背景整体替换成不透明的红→橙渐变，作为遥控器焦点/按下的视觉反馈。
+     * 这对按钮、Tab、卡片是期望效果；但对铺满屏幕或覆盖播放画面的表面型 View
+     * （播放器宿主、视频层、播放触摸层、全屏播放容器、启动加载遮罩、二维码浮层）就是灾难：
+     * 只要触摸一次（`state_pressed`）就会用一个纯色层盖住整屏内容，即「纯色遮罩层」。
+     *
+     * 调用后该 View 保留自身背景且不再被 [install] 处理，平台默认灰色高亮也被关闭。
+     *
+     * @param focusable 是否顺带让该 View 可被遥控器聚焦（默认 true，与旧的 [install] 行为一致）；
+     *   纯触摸捕获层（如 `playerTouchOverlay`）应传 false，否则会抢走遥控器焦点
+     *   且自身没有任何焦点视觉反馈。
+     */
+    fun suppressFill(view: View, focusable: Boolean = true) {
+        fillSuppressed.add(view)
         disablePlatformHighlight(view)
-        if (view.isClickable && view.isEnabled && view.visibility == View.VISIBLE) {
+        if (focusable && view.isClickable && view.isEnabled && view.visibility == View.VISIBLE) {
             view.isFocusable = true
             view.isFocusableInTouchMode = false
         }
@@ -37,9 +50,12 @@ object TvFocusStyler {
     private fun install(view: View, force: Boolean) {
         disablePlatformHighlight(view)
         if (!view.isEnabled || view.visibility != View.VISIBLE || !view.isClickable) return
+        // 显式标记为「表面型」的 View: 既不填充背景, 也不替调用方强制可聚焦
+        // (例如 playerTouchOverlay 刻意要求 isFocusable=false, 否则会抢走遥控器焦点)。
+        if (!force && fillSuppressed.contains(view)) return
         view.isFocusable = true
         view.isFocusableInTouchMode = false
-        if (!force && (preservedBackgrounds.contains(view) || view.background?.isStateful == true)) return
+        if (!force && view.background?.isStateful == true) return
         if (!installed.add(view) && !force) return
         val normal = view.background ?: ColorDrawable(Color.TRANSPARENT)
         val normalShape = normal as? GradientDrawable

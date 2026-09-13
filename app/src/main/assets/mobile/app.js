@@ -72,9 +72,9 @@ async function refresh() {
     $("#playButton span:last-child").textContent = data.playing ? "暂停" : "继续";
     $("#playButton").dataset.action = data.playing ? "pause" : "resume";
     $("#playButton .control-icon").textContent = data.playing ? "Ⅱ" : "▶";
-    $("#musicVolume").value = data.musicVolume ?? 70;
+    $("#musicVolume").value = data.musicVolume ?? 85;
     $("#micVolume").value = data.micVolume ?? 70;
-    $("#musicValue").textContent = data.musicVolume ?? 70;
+    $("#musicValue").textContent = data.musicVolume ?? 85;
     // 麦克风音量由功放/混音器硬件调节(滑杆已禁用), 仅保留显示值。
     const micHw = $("#micValue");
     if (micHw) micHw.textContent = data.micVolume ?? 70;

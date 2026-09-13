@@ -15,7 +15,7 @@ class KtvStore {
     @JvmField var autoNext = true
     @JvmField var originalVocal = true
     @JvmField var vocalChannelMode = "自动"
-    @JvmField var musicVolume = 70
+    @JvmField var musicVolume = DEFAULT_MUSIC_VOLUME
     @JvmField var micVolume = 70
     @JvmField var tone = 0
     @JvmField var atmosphere = "标准"
@@ -64,7 +64,7 @@ class KtvStore {
             autoNext = root.optBoolean("autoNext", true)
             originalVocal = root.optBoolean("originalVocal", true)
             vocalChannelMode = root.optString("vocalChannelMode", "自动")
-            musicVolume = root.optInt("musicVolume", 70)
+            musicVolume = root.optInt("musicVolume", DEFAULT_MUSIC_VOLUME)
             micVolume = root.optInt("micVolume", 70)
             tone = root.optInt("tone", 0)
             atmosphere = root.optString("atmosphere", "标准")
@@ -203,6 +203,14 @@ class KtvStore {
     private fun toggleId(ids: MutableSet<String>, id: String): Boolean = if (ids.remove(id)) false else ids.add(id)
 
     companion object {
+        /**
+         * App 内部输出音量默认值(%)。
+         *
+         * 三处音量入口（播放界面-调音、声音设置-歌曲最大音量、远程控制-音乐音量）共用它；
+         * 远程页面 `assets/mobile/{index.html,app.js}` 里的默认值需与之保持一致。
+         */
+        const val DEFAULT_MUSIC_VOLUME = 85
+
         @JvmStatic
         fun stableId(song: Song): String = song.id?.takeIf(String::isNotEmpty)
             ?: song.path?.takeIf(String::isNotEmpty)

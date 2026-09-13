@@ -103,7 +103,7 @@ $BT/apksigner verify 目标名.apk
 
 ### 版本号
 
-- `app/build.gradle`：`versionName "1.3.2"` / `versionCode 8`
+- `app/build.gradle`：`versionName "1.3.3"` / `versionCode 9`
 - App 内显示统一用纯版本号（不加 `(versionCode)` 括号）
 
 ## 三、关键实现约束（避免踩坑）
@@ -134,6 +134,17 @@ $BT/apksigner verify 目标名.apk
   客户端为 `MiliLog`（有界队列 + 后台线程 + 失败重试），调用点 `MiliLog.info/notice/warn/error`
   保持不变。启动上报（`reportDeviceBootInfo()`）只采集这 10 项：包名、版本号、安装时间、品牌、型号、
   设备名、Android 版本、CPU 架构、内核版本、屏幕分辨率
+- **焦点填充与「纯色遮罩层」**：`TvFocusStyler.install()` 会把背景整体换成**不透明**红→橙渐变，
+  作为遥控器焦点/按下的反馈（`prepareTvFocusableTree(window.decorView)` 与对话框的
+  `installTree(decorView)` 会遍历整棵树施加）。按钮/Tab/卡片/list 行需要这个反馈；但
+  **大面积展示型表面绝不能加** —— 否则触摸一次（`state_pressed`）就用纯色盖住整屏内容。
+  已排除的表面：播放画面宿主（`home_player_container` / `player_container`）、视频层
+  （`persistentVideo`）、播放触摸层（`playerTouchOverlay`）、全屏播放容器（`R.id.container`）、
+  启动加载遮罩（`databaseLoadingOverlay`）、手机点歌二维码浮层、全屏音量面板。
+  **新增此类铺满/覆盖播放画面的 View 时，必须调用 `TvFocusStyler.suppressFill(view)`**
+- **音量默认值**：`KtvStore.DEFAULT_MUSIC_VOLUME`（当前 85%）是唯一来源，
+  `KtvStore` 默认值与 `optInt` 兜底、`MainActivity.musicVolume` 初值、调音弹窗「默认」按钮
+  都引用它；远程页面 `assets/mobile/{index.html,app.js}` 的默认值需手工跟改
 - **音量控制（只控 App 输出，不动系统音量）**：`musicVolume`(0-100) 是 **App 内部输出音量**，
   统一在 `applyPlaybackMode()` 内按线性系数施加到播放器（`KtvVideoView.setPlaybackVolume` /
   `selectAudioChannel`）与副音轨播放器（`vocalPlayer` / `embeddedVocalEngine`）。

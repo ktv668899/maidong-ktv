@@ -376,7 +376,7 @@ class MainActivity : AppCompatActivity() {
     }
     private var originalVocal = true
     private var vocalChannelMode = "自动"
-    private var musicVolume = 70
+    private var musicVolume = KtvStore.DEFAULT_MUSIC_VOLUME
     private var micVolume = 70
     private var tone = 0
     private var atmosphere = "标准"
@@ -2423,8 +2423,11 @@ class MainActivity : AppCompatActivity() {
         val panel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
+            // 仅用于吞掉触摸(点击穿透到全屏容器会误切控制层显示), 不是操作项;
+            // 因此禁止焦点/按下填充, 否则触摸时整块面板会变成纯色。
             isClickable = true
         }
+        TvFocusStyler.suppressFill(panel)
         val indicator = CircularVolumeView(this).apply {
             setVolume(musicVolume)
             visibility = View.GONE
@@ -2675,9 +2678,9 @@ class MainActivity : AppCompatActivity() {
         btnDefault.setOnClickListener(View.OnClickListener { v: View? ->
             seekMicVol.setProgress(60)
             seekMicEffect.setProgress(50)
-            seekMusicVol.setProgress(80)
+            seekMusicVol.setProgress(KtvStore.DEFAULT_MUSIC_VOLUME)
             micVolume = 60
-            musicVolume = 80
+            musicVolume = KtvStore.DEFAULT_MUSIC_VOLUME
             applyPlaybackMode()
             saveState()
             tvMicVol.setText("60")
@@ -3141,6 +3144,8 @@ class MainActivity : AppCompatActivity() {
             bottomMargin = dp(76)
         }
         root.addView(box, params)
+        // 二维码浮层是展示型表面: 被焦点填充盖住会直接遮掉二维码。
+        TvFocusStyler.suppressFill(box)
         mobileQrOverlay = box
     }
 
@@ -3179,6 +3184,8 @@ class MainActivity : AppCompatActivity() {
         }
         container.addView(box, params)
         box.bringToFront()
+        // 同手机点歌二维码: 展示型表面不做焦点填充。
+        TvFocusStyler.suppressFill(box)
         fullScreenQrOverlay = box
     }
 
@@ -6631,6 +6638,8 @@ class MainActivity : AppCompatActivity() {
         rankCategoryGrid = findViewById(R.id.rank_category_grid)
         paginationBar = findViewById<View?>(R.id.pagination_bar)
         fullScreenContainer = findViewById<FrameLayout?>(R.id.container)
+        // 全屏播放容器: 点击用于显隐控制层, 本身是铺满屏幕的表面, 不能有焦点/按下填充。
+        fullScreenContainer?.let { TvFocusStyler.suppressFill(it) }
 
         // 设置顶栏按钮事件
         if (btnTopSearch != null) btnTopSearch!!.setOnClickListener(View.OnClickListener { v: View? -> showQuickSearchPage() })
@@ -6670,6 +6679,8 @@ class MainActivity : AppCompatActivity() {
                 if (isFullScreen) exitFullScreenPlayer() else showFullScreenPlayer()
             }
         }
+        // 视频层本身也是表面型 View, 只做点击进入/退出全屏, 不要焦点填充。
+        TvFocusStyler.suppressFill(persistentVideo)
         val root = playerLayerRoot
         if (root != null) {
             val maskIndex = root.indexOfChild(findViewById<View>(R.id.mask))
@@ -6719,6 +6730,10 @@ class MainActivity : AppCompatActivity() {
                 isFocusable = false
                 setOnClickListener { showFullScreenPlayer() }
                 elevation = dp(10).toFloat()
+                // 这层铺满播放画面且浮在最上层: 一旦被套上焦点/按下填充,
+                // 触摸就会把整块播放画面刷成纯色(遮罩层), 必须显式排除。
+                // 它只负责抓触摸, 保持 isFocusable=false, 不参与遥控器焦点。
+                TvFocusStyler.suppressFill(this, focusable = false)
             }.also { root.addView(it, insertionIndex + 1, FrameLayout.LayoutParams(1, 1)) }
         }
         homeVideo = persistentVideo
@@ -6765,7 +6780,9 @@ class MainActivity : AppCompatActivity() {
             homeCardRank, homeCardSong, homeCardSinger, homeCardLocal, homeCardRegular,
             homeCardFavorite, homeCardCategory,
         ).forEach(::installPressFeedback)
-        listOfNotNull(homePlayerHost, subPagePlayerHost, homePoster).forEach(TvFocusStyler::preserveBackground)
+        // 播放画面宿主/海报是「表面型」View: 不能套焦点/按下填充,
+        // 否则触摸一次就会用纯色层盖住整个播放画面或海报(见 TvFocusStyler.suppressFill)。
+        listOfNotNull(homePlayerHost, subPagePlayerHost, homePoster).forEach(TvFocusStyler::suppressFill)
         (homePoster as? FrameLayout)?.foreground = getDrawable(R.drawable.bg_player_focus)
         configureTvFocusNavigation()
         prepareTvFocusableTree(window.decorView)
@@ -8571,6 +8588,8 @@ class MainActivity : AppCompatActivity() {
                 isFocusable = true
                 elevation = dp(30).toFloat()
             }
+            // 启动加载遮罩铺满整屏: 不允许被焦点/按下填充覆盖, 否则点击启动界面会整屏变纯色。
+            TvFocusStyler.suppressFill(overlay)
             val center = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER
