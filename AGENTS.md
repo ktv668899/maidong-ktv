@@ -103,7 +103,7 @@ $BT/apksigner verify 目标名.apk
 
 ### 版本号
 
-- `app/build.gradle`：`versionName "1.3.1"` / `versionCode 7`
+- `app/build.gradle`：`versionName "1.3.2"` / `versionCode 8`
 - App 内显示统一用纯版本号（不加 `(versionCode)` 括号）
 
 ## 三、关键实现约束（避免踩坑）
@@ -134,4 +134,12 @@ $BT/apksigner verify 目标名.apk
   客户端为 `MiliLog`（有界队列 + 后台线程 + 失败重试），调用点 `MiliLog.info/notice/warn/error`
   保持不变。启动上报（`reportDeviceBootInfo()`）只采集这 10 项：包名、版本号、安装时间、品牌、型号、
   设备名、Android 版本、CPU 架构、内核版本、屏幕分辨率
+- **音量控制（只控 App 输出，不动系统音量）**：`musicVolume`(0-100) 是 **App 内部输出音量**，
+  统一在 `applyPlaybackMode()` 内按线性系数施加到播放器（`KtvVideoView.setPlaybackVolume` /
+  `selectAudioChannel`）与副音轨播放器（`vocalPlayer` / `embeddedVocalEngine`）。
+  **严禁调用 `AudioManager.setStreamVolume` / `adjustStreamVolume` 修改系统音量**。
+  三条入口必须全部收敛到 `applyPlaybackMode()`：播放界面-调音（`showFullScreenVolumeDialog()` 与
+  `showAudioControlDialog()` 的音乐音量滑杆）、声音设置-歌曲最大音量、远程控制-音乐音量
+  （`remoteAudio()` 的 `musicVolume`）。曲线是纯衰减（100% 即 unity gain），不做系统级增益；
+  设备最终响度仍取决于系统音量，App 不再替用户改动它
 - **仓库可见性**：Gitea 仓库保持 **public**（若后续把 App 更新/热更新端点迁到 Gitea，非 public 会导致 403）

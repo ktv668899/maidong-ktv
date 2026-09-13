@@ -2474,7 +2474,7 @@ class MainActivity : AppCompatActivity() {
             indicator.alpha = 1f
             indicator.visibility = View.VISIBLE
             renderMuteButton()
-            applySystemMusicVolume()
+            // 只调 App 内部输出音量, 不改系统音量(见 applyPlaybackMode)。
             applyPlaybackMode()
             saveState()
             main.removeCallbacks(hideFullScreenVolumeIndicatorRunnable)
@@ -2631,7 +2631,6 @@ class MainActivity : AppCompatActivity() {
             } else {
                 musicVolume = muteBeforeVol
             }
-            applySystemMusicVolume()
             applyPlaybackMode()
             seekMusicVol.setProgress(musicVolume)
             tvMusicVol.setText(musicVolume.toString())
@@ -2667,7 +2666,6 @@ class MainActivity : AppCompatActivity() {
 
             override fun onStartTrackingTouch(s: SeekBar?) {}
             override fun onStopTrackingTouch(s: SeekBar?) {
-                applySystemMusicVolume()
                 applyPlaybackMode()
                 saveState()
             }
@@ -2680,7 +2678,6 @@ class MainActivity : AppCompatActivity() {
             seekMusicVol.setProgress(80)
             micVolume = 60
             musicVolume = 80
-            applySystemMusicVolume()
             applyPlaybackMode()
             saveState()
             tvMicVol.setText("60")
@@ -4325,13 +4322,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun applySystemMusicVolume() {
-        if (audioManager == null) return
-        val max = audioManager!!.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-        val value = max(0, min(max, (musicVolume * max) / 100))
-        audioManager!!.setStreamVolume(AudioManager.STREAM_MUSIC, value, 0)
-    }
-
     private fun clamp(value: Int, min: Int, max: Int): Int {
         return max(min, min(max, value))
     }
@@ -5397,6 +5387,15 @@ class MainActivity : AppCompatActivity() {
         persistRuntimeState()
     }
 
+    /**
+     * 应用原伴唱/声道与输出音量。
+     *
+     * 音量语义：`musicVolume`(0-100) 是 **App 内部输出音量**，按线性系数施加到播放器
+     * (`KtvVideoView.setPlaybackVolume` / `selectAudioChannel`) 与副音轨播放器上，
+     * **绝不修改系统音量**（不调用 `AudioManager.setStreamVolume`）。
+     * 播放界面-调音、声音设置-歌曲最大音量、远程控制-音乐音量三处都收敛到这里，
+     * 保证三条入口行为一致且都不影响系统音量。
+     */
     private fun applyPlaybackMode() {
         val videoPlayer = player ?: return
         videoPlayer.setTone(tone)
