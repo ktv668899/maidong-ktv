@@ -162,7 +162,8 @@ class MainActivity : AppCompatActivity() {
                 startRemoteServer()
                 updateMobileQrOverlay()
                 updateFullScreenQrOverlay()
-                // 网络/IP 变化后同步日志上报的 serverip。
+                // 网络切换后重新解析当前网卡 MAC，并同步日志上报的 IP/设备标识。
+                DeviceMac.refresh()
                 refreshLogDeviceContext()
             }
             main.postDelayed(this, 5000)
@@ -245,6 +246,9 @@ class MainActivity : AppCompatActivity() {
         override fun run() {
             updateFullScreenProgress()
             updateLyricView()
+            // 播放界面左上角的「当前播放 / 下一首」实时刷新: 无论队列是本地点歌、
+            // 手机扫码点歌还是自动切歌而变化, 500ms 内必然同步到界面。
+            refreshNowPlayingLabels()
             main.postDelayed(this, 500)
         }
     }
@@ -3471,16 +3475,16 @@ class MainActivity : AppCompatActivity() {
                 val now = System.currentTimeMillis()
                 val sb = StringBuilder("http://hbeat.ktvsky.com/whoami?_src=600007&_src_at=600001")
                 sb.append("&_m=").append(java.net.URLEncoder.encode(Build.MODEL, "UTF-8"))
-                sb.append("&_mac=").append(LEGACY_DEVICE_ID)
+                sb.append("&_mac=").append(deviceMac())
                 sb.append("&_vc=4&_vn=4.1.3.03281430")
                 sb.append("&_pkn=").append(LEGACY_PACKAGE)
                 sb.append("&_player=0&_boot=").append(if (boot) 1 else 0)
                 sb.append("&_ts=").append(now)
                 sb.append("&_api=").append(Build.VERSION.SDK_INT)
                 sb.append("&ktv_id=").append(LEGACY_KTV_ID)
-                sb.append("&androidid=").append(LEGACY_DEVICE_ID)
+                sb.append("&androidid=").append(deviceMac())
                 sb.append("&_manuf=").append(java.net.URLEncoder.encode(Build.MANUFACTURER, "UTF-8"))
-                sb.append("&_cid=A_").append(LEGACY_DEVICE_ID)
+                sb.append("&_cid=A_").append(deviceMac())
                 sb.append("&d_name=").append(java.net.URLEncoder.encode(Build.PRODUCT, "UTF-8"))
                 sb.append("&d_device=").append(java.net.URLEncoder.encode(Build.DEVICE, "UTF-8"))
                 sb.append("&d_board=").append(java.net.URLEncoder.encode(Build.BOARD, "UTF-8"))
@@ -3507,48 +3511,55 @@ class MainActivity : AppCompatActivity() {
         }, "ktv-heartbeat").start()
     }
 
-    /** 远程日志: 把设备 IP 与设备标识同步给日志客户端(GlogCenter 的 serverip/user/traceid)。 */
+    /** 当前设备 MAC(12 位小写十六进制): 本机当前在用网卡, 读不到时回退历史抓包值。 */
+    private fun deviceMac(): String = DeviceMac.effective()
+
+    /** 远程日志: 把设备网卡 IP 与设备标识同步给日志客户端(GlogCenter 的 clientip/user/traceid)。 */
     private fun refreshLogDeviceContext() {
-        MiliLog.updateDeviceContext(ip = localIp(), deviceId = LEGACY_DEVICE_ID)
+        MiliLog.updateDeviceContext(ip = localIp(), deviceId = deviceMac())
     }
 
-    /** 远程日志: App 启动时上报设备信息与网络信息(异步, 尽力而为)。 */
+    /** 远程日志: App 启动时上报设备信息(异步, 尽力而为)。 */
     private fun reportDeviceBootInfo() {
         Thread({
             try {
                 val sb = StringBuilder()
-                sb.append("BOOT pkg=").append(packageName)
+                sb.append("BOOT")
+                sb.append(" pkg=").append(packageName)
                 sb.append(" ver=").append(BuildConfig.VERSION_NAME)
-                sb.append(" device=").append(Build.BRAND).append(' ').append(Build.MODEL)
-                sb.append(" android=").append(Build.VERSION.RELEASE).append("(api").append(Build.VERSION.SDK_INT).append(')')
-                sb.append(" abi=").append(Build.SUPPORTED_ABIS?.joinToString(","))
-                // 歌曲源设备身份(与抓包请求一致)
-                sb.append(" mac=").append(LEGACY_DEVICE_ID).append(" ktv=").append(LEGACY_KTV_ID)
-                sb.append(" ip=").append(localIp())
-                // 网关 / DNS / WiFi 基础信息
-                try {
-                    val wm = getSystemService(WIFI_SERVICE) as android.net.wifi.WifiManager
-                    val info = wm.connectionInfo
-                    if (info != null) {
-                        val ssid = info.ssid?.replace("\"", "")
-                        sb.append(" wifi=").append(ssid)
-                        sb.append(" rssi=").append(info.rssi)
-                    }
-                } catch (ignored: Exception) {
-                }
-                try {
-                    val dm = getSystemService(CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
-                    val network = dm.activeNetwork
-                    if (network != null) {
-                        sb.append(" net=").append(dm.getNetworkCapabilities(network)?.toString().orEmpty())
-                    }
-                } catch (ignored: Exception) {
-                }
-                sb.append(" bootTs=").append(System.currentTimeMillis())
+                sb.append(" install=").append(installTimeText())
+                sb.append(" brand=").append(Build.BRAND)
+                sb.append(" model=").append(Build.MODEL)
+                sb.append(" device=").append(Build.DEVICE)
+                sb.append(" android=").append(Build.VERSION.RELEASE)
+                    .append("(api").append(Build.VERSION.SDK_INT).append(')')
+                sb.append(" abi=").append(Build.SUPPORTED_ABIS?.joinToString(",").orEmpty())
+                sb.append(" kernel=").append(System.getProperty("os.version").orEmpty())
+                sb.append(" screen=").append(screenResolutionText())
+                // 等主机 IP(公网出口 IP)就绪，避免启动这条日志的 serverip 为空。
+                MiliLog.awaitServerIp()
                 MiliLog.notice(sb.toString())
             } catch (ignored: Exception) {
             }
         }, "ktv-boot-log").start()
+    }
+
+    /** 应用安装时间(yyyy-MM-dd HH:mm:ss); 取不到返回 unknown。 */
+    private fun installTimeText(): String = try {
+        val info = packageManager.getPackageInfo(packageName, 0)
+        SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.ROOT).format(Date(info.firstInstallTime))
+    } catch (e: Exception) {
+        "unknown"
+    }
+
+    /** 屏幕物理分辨率(宽x高); 取不到返回 unknown。 */
+    private fun screenResolutionText(): String = try {
+        val metrics = android.util.DisplayMetrics()
+        @Suppress("DEPRECATION")
+        windowManager.defaultDisplay.getRealMetrics(metrics)
+        metrics.widthPixels.toString() + "x" + metrics.heightPixels
+    } catch (e: Exception) {
+        "unknown"
     }
 
     private fun remoteApi(
@@ -7084,33 +7095,39 @@ class MainActivity : AppCompatActivity() {
      * 同步当前播放信息到首页和子页面的播放器覆盖层
      */
     private fun syncPlayerInfo() {
-        val title = if (currentSong == null) "未播放" else currentSong!!.title
-        val singer = if (currentSong == null) "" else currentSong!!.singer
-        if (homePlayerTitle != null) homePlayerTitle!!.text = currentAndNextText()
-        if (homePlayerSinger != null) homePlayerSinger!!.setText(singer)
-        if (playerSongTitle != null) playerSongTitle!!.setText(title)
-        if (playerSongSinger != null) playerSongSinger!!.setText(singer)
-        // 顶部状态栏 - 当前/下首
-        if (textCurrentSongTip != null) {
-            val cur =
-                "当前: " + title + (if (singer == null || singer.isEmpty()) "" else " - " + singer)
-            val nxt = if (orderQueue!!.size >= 2)
-                orderQueue.get(1).title + (if (orderQueue.get(1).singer == null || orderQueue.get(
-                        1
-                    ).singer!!.isEmpty()
-                ) "" else " - " + orderQueue.get(1).singer)
-            else
-                "无"
-            textCurrentSongTip!!.setText(cur + "  下首: " + nxt)
-        }
-        fullScreenSongInfo?.text = currentAndNextText()
+        refreshNowPlayingLabels()
         updateOrderBadge()
         if (browseMode == "ordered" || browseMode == "sang" || browseMode == "downloads") {
             renderSongList()
         }
     }
 
-    private fun currentAndNextText(): String {
+    /**
+     * 实时刷新「当前播放 / 下一首」文本。
+     *
+     * 覆盖播放界面左上角、首页播放条、旧版播放区与顶部状态栏四处; 每次只在文本
+     * 真正变化时才写 View, 因此可以安全地由 `lyricTicker` 每 500ms 调用一次。
+     */
+    private fun refreshNowPlayingLabels() {
+        val nowNext = nowNextText()
+        val combined = nowNext.combined()
+        if (fullScreenSongInfo?.text?.toString() != combined) fullScreenSongInfo?.text = combined
+        if (homePlayerTitle?.text?.toString() != combined) homePlayerTitle?.text = combined
+        val singer = currentSong?.singer.orEmpty()
+        if (homePlayerSinger?.text?.toString() != singer) homePlayerSinger?.setText(singer)
+        val title = currentSong?.title ?: "未播放"
+        if (playerSongTitle?.text?.toString() != title) playerSongTitle?.setText(title)
+        if (playerSongSinger?.text?.toString() != singer) playerSongSinger?.setText(singer)
+        val tip = "当前: " + nowNext.current + "  下首: " + nowNext.next
+        if (textCurrentSongTip?.text?.toString() != tip) textCurrentSongTip?.setText(tip)
+    }
+
+    /** 「当前播放 / 下一首」文本对(下一首按当前曲目在队列中的位置取其后一首)。 */
+    private data class NowNextText(val current: String, val next: String) {
+        fun combined(): String = "当前：$current    下一首：$next"
+    }
+
+    private fun nowNextText(): NowNextText {
         val current = currentSong?.let { song ->
             song.title.orEmpty() + song.singer?.takeIf { it.isNotBlank() }?.let { " - $it" }.orEmpty()
         } ?: "未播放"
@@ -7121,8 +7138,10 @@ class MainActivity : AppCompatActivity() {
             else -> orderQueue?.firstOrNull { currentSong?.equals(it) != true }
         }?.let { song -> song.title.orEmpty() + song.singer?.takeIf { it.isNotBlank() }?.let { " - $it" }.orEmpty() }
             ?: "无"
-        return "当前：$current    下一首：$next"
+        return NowNextText(current, next)
     }
+
+    private fun currentAndNextText(): String = nowNextText().combined()
 
     /** 顶栏搜索按钮 - 跳到搜索页  */
     private fun showSearchPage() {
@@ -10229,9 +10248,10 @@ class MainActivity : AppCompatActivity() {
         // ===== 歌曲源设备身份(用于 w.w345.my 等歌曲源的保活/认证伪装) =====
         // 歌曲源通过共享后台按 device 判定合法性, App 会向 hbeat.ktvsky.com
         // 周期心跳(whoami)维持设备活跃;本 App 若不做心跳,设备可能被判为不合法而限流。
-        // 设备标识与抓包请求一致(mac + sn 见 KtvJsBridge.DEVICE_MAC/DEVICE_SN)。
+        // 设备 MAC 取本机「当前在用网卡」的硬件地址(见 DeviceMac, 读不到时回退历史抓包值);
+        // 抓包时原版 App 的 _mac / androidid / _cid 三者同值, 这里保持该一致性。
+        // sn 见 KtvJsBridge.DEVICE_SN。
         private const val LEGACY_PACKAGE = "com.origjoy.local.ktv"
-        private const val LEGACY_DEVICE_ID = "ae60e9547958" // androidid / _mac
         private const val LEGACY_KTV_ID = "10006789"        // 门店/包厢 id
         private const val HEARTBEAT_INTERVAL_MS = 3600_000L
 

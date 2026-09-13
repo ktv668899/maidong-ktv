@@ -42,9 +42,10 @@ class KtvJsBridge(context: Context) {
             "https://gitea.kasugano.cn/zijunchiang/maidong-ktv/raw/branch/master/app/src/main/assets/mobile/ktv_api.js"
         private const val MAX_RESPONSE_BYTES = 2 * 1024 * 1024
         private const val JS_REQUEST_TIMEOUT_MS = 180_000
-        // 当前歌曲源 w.w345.my 使用的设备标识(mac + sn)。与用户抓包示例一致,
-        // w.w345.my 与 e.ac19.cn 同后台,按 device 识别; 随机/变化的 device 会被风控。
-        private const val DEVICE_MAC = "ae60e9547958"
+        // 歌曲源(w.w345.my 与 e.ac19.cn 同后台)按 device 识别; 随机/变化的 device 会被风控。
+        // mac 取本机「当前在用网卡」的硬件地址(读不到时回退历史抓包值, 见 DeviceMac);
+        // sn 沿用抓包注册值, 保证 mac 变化后仍能对上原有账号体系。
+        private val DEVICE_MAC: String get() = DeviceMac.effective()
         private const val DEVICE_SN = "2d7bb4a7d7f7"
     }
 
@@ -144,7 +145,7 @@ class KtvJsBridge(context: Context) {
               Promise.resolve().then(async function() {
                 if (!window.api) {
                   // 歌曲源按 device 识别:随机/每次更换的 device 会被判"异常行为"。
-                  // 固定使用抓包注册设备的 mac+sn(与抓包请求一致),并保持版本号一致。
+                  // 使用本机当前网卡 mac + 抓包注册的 sn(会话内保持稳定),并保持版本号一致。
                   if (window.KtvApiConfig) {
                     window.KtvApiConfig.VER = '2.0';
                     window.KtvApiConfig.VN = '4.1.3.03281430';

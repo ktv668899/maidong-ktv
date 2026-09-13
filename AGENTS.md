@@ -98,10 +98,25 @@ $BT/apksigner verify 目标名.apk
 - **曲库**：只走官方 Muse 同步（`MuseDbSync`），不再依赖代码仓库数据库文件
 - **曲库同步时效**：默认 **30 天**（`DatabaseBootstrapper.SYNC_TTL_DAYS`）。未到期启动**不联网**、直接用本地曲库；到期后才查询服务器版本，有更新才下载。时效起点记录在 `db_sync_at.txt`，由 `DatabaseBootstrapper.markSynced()` 写入（下载成功或校验为最新时）。设置页「曲库 → 更新」为手动强制检查（绕过时效，仅在服务器版本更新时下载）
 - **麦克风**：`MicActivator` 常驻占用输入通道（TV/投影需占用后才有演唱声音输出），外接设备热插拔会自动重建
+- **设备 MAC**：统一由 `DeviceMac` 解析**当前在用网卡**的硬件地址（12 位小写十六进制）。优先
+  `wlan*`/`eth*`/`en*`，忽略虚拟/蜂窝/VPN 接口；Android 6 起 `WifiInfo.getMacAddress()` 恒为
+  `02:00:00:00:00:00`，因此直接读 `NetworkInterface.getHardwareAddress()`；读出 `02:00:00:00:00:00`
+  或全 0 视为无效。读取失败回退 `DeviceMac.FALLBACK_MAC`（历史抓包值），保证身份永不为空。
+  结果按进程缓存，网络切换时由 `remoteNetworkMonitor` 调用 `DeviceMac.refresh()` 重解析。
+  消费方：`KtvJsBridge.DEVICE_MAC`（JS 端 `mac`）、whoami 心跳的 `_mac`/`androidid`/`_cid`
+  （抓包时三者同值，保持一致）
+- **播放信息实时刷新**：`refreshNowPlayingLabels()` 是播放界面左上角「当前播放 / 下一首」、首页播放条、
+  旧版播放区与顶部状态栏的**唯一**刷新入口，只在文本变化时写 View；已挂到 `lyricTicker`（500ms）上，
+  因此队列变化（本地点歌 / 扫码点歌 / 自动切歌）最迟 500ms 内必然同步。新增播放信息展示时请复用它，
+  不要另起刷新路径
 - **远程日志**：接入 GlogCenter 集中式日志（HTTP 接口，单条 JSON）。**域名属敏感信息，不得写入任何文档**
   （端点常量见代码 `MiliLog.ENDPOINT`，需要时查代码，勿在 README/AGENTS 中记录域名）。字段：
-  `system`/`date`/`text`/`servername`/`serverip`/`loglevel`/`traceid`/`user`；`date` 必须为
-  `yyyy-MM-dd HH:mm:ss.SSS`，否则按时间检索异常。客户端为 `MiliLog`（有界队列 + 后台线程 + 失败重试），
-  调用点 `MiliLog.info/notice/warn/error` 保持不变；设备 IP/标识通过 `MiliLog.updateDeviceContext()` 注入，
-  网络变化时自动刷新
+  `system`/`date`/`text`/`servername`/`serverip`/`clientip`/`loglevel`/`traceid`/`user`；`date` 必须为
+  `yyyy-MM-dd HH:mm:ss.SSS`，否则按时间检索异常。其中 `serverip` = **主机 IP**（公网出口 IP，
+  由 `MiliLog.PUBLIC_IP_URL` 查询，结果缓存 5 分钟、失败 1 分钟后重试，查询在独立后台线程，
+  绝不在主线程发起），`clientip` = **客户端 IP**（设备当前网卡获取到的局域网 IP，由
+  `MiliLog.updateDeviceContext(ip = ...)` 注入，网络变化时自动刷新并顺带复核公网 IP）。
+  客户端为 `MiliLog`（有界队列 + 后台线程 + 失败重试），调用点 `MiliLog.info/notice/warn/error`
+  保持不变。启动上报（`reportDeviceBootInfo()`）只采集这 10 项：包名、版本号、安装时间、品牌、型号、
+  设备名、Android 版本、CPU 架构、内核版本、屏幕分辨率
 - **仓库可见性**：Gitea 仓库保持 **public**（若后续把 App 更新/热更新端点迁到 Gitea，非 public 会导致 403）
