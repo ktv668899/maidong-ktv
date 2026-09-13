@@ -2,17 +2,30 @@
 
 > 本文件供后续开发（含 AI 助手会话）遵循，优先级高于默认习惯。
 
-## 一、代码同步策略（2026-09-11 更新）
+## 一、代码同步与发布策略（2026-09-14 更新）
 
-**代码主仓库已迁移至 Gitea：https://gitea.kasugano.cn/zijunchiang/maidong-ktv**
+**代码主仓库：Gitea `https://gitea.kasugano.cn/zijunchiang/maidong-ktv`**
 
-| 远端 | 地址 | 状态 |
+| 远端 | 地址 | 用途 |
 |---|---|---|
-| `origin` | `https://gitea.kasugano.cn/zijunchiang/maidong-ktv.git` | ✅ 主仓库，**同步目标** |
-| `gitee` | `https://gitee.com/zijunchiang/maidong-ktv.git` | ⛔ 已停用（推送被钩子拦截）；仓库已精简为**仅 README 文档 + Releases 附件** |
+| `origin` | `https://gitea.kasugano.cn/zijunchiang/maidong-ktv.git` | ✅ 代码主仓库，**唯一的代码同步目标** |
+| `gitee` | `https://gitee.com/zijunchiang/maidong-ktv.git` | 📦 **不推代码**，只用于发布 Release；仓库内只保留 README 文档 + Releases 附件 |
 
-- ✅ 预期动作：完成改动 → 本地 `git commit` → `git push origin master`（同步到 Gitea）
-- ⛔ 禁止：推送到 Gitee（`pre-push` 钩子会拦截，避免误推送）
+### 四条硬性规则
+
+1. **推送失败只重试 3 次**：Gitea 不可用（网络不通／服务器故障／返回非 200）时，最多重试 **3 次**
+   （间隔约 60s）。3 次仍失败就**停止重试**，改动保留为本地 commit，**留到下次一起同步**
+   （不要无限重试、不要为了"推上去"而改推 Gitee）。恢复同步时直接 `git push origin master`
+   把积压的 commit 一并推上即可。
+2. **Gitee 不再同步代码，只发布版本**：Gitee 仓库保持「仅 README 文档 + Releases 附件」状态，
+   **禁止推送源码**（`pre-push` 钩子会拦截 `gitee.com`）。Gitee 上只做一件事：创建 Release 并上传 APK 附件。
+3. **每次更新版本号 +1**：完成一次修改就把版本号递增（`versionName` 与 `versionCode` 同步递增），
+   例如 `1.3.0` → `1.3.1` → `1.3.2`。不要在同一个版本号下反复改动交付。
+4. **发布是手动操作**：**未收到明确的「发布新版本」指令时，默认只在本地打包测试**——
+   产物按内部测试约定命名 `maidong-ktv-<版本>-<改动说明>-双ABI-release.apk`，
+   **不创建 Release、不上传附件、不推送 tag、不在 Gitee 建 Release**。
+   只有收到发布指令后，才按「发布新版本」小节在 Gitea（以及需要的 Gitee）建 Release。
+
 - 凭据：Gitea 访问令牌 `dsh-sync`（可在 Gitea「设置 → 应用 → 访问令牌」随时吊销），
   存放于 `~/.git-credentials-gitea`（权限 600），由本仓库级 `credential.helper` 引用；
   账号密码不写入仓库配置。
@@ -21,9 +34,11 @@
 
 ```bash
 cd /home/zijun/dsh/maidongktv/maidong-ktv
-git push origin master              # origin = Gitea（主仓库）
-git push --no-verify gitee master   # 仅在确需回推 Gitee 时使用
+git push origin master              # origin = Gitea（唯一的代码同步目标）
 ```
+
+> Gitee 不参与代码同步；确需回推文档时用 `git push --no-verify gitee master`，
+> 但按规则 2 正常情况下不应执行。
 
 ### 运行时端点（已全部迁移到 Gitea）
 
@@ -88,7 +103,7 @@ $BT/apksigner verify 目标名.apk
 
 ### 版本号
 
-- `app/build.gradle`：`versionName "1.3.0"` / `versionCode 6`
+- `app/build.gradle`：`versionName "1.3.1"` / `versionCode 7`
 - App 内显示统一用纯版本号（不加 `(versionCode)` 括号）
 
 ## 三、关键实现约束（避免踩坑）
