@@ -111,6 +111,7 @@ function renderEqualizer(eq) {
     bands.forEach((band, index) => {
       const input = $("#eqBand" + index);
       if (!input) return;
+      attachThumbOnlyDrag(input);
       input.addEventListener("input", () => {
         const value = $("#eqValue" + index);
         if (value) value.textContent = Number(input.value).toFixed(1);
@@ -141,6 +142,40 @@ function renderEqualizer(eq) {
 
 function currentEqLevels() {
   return Array.from($$("#eqBands input[type=range]")).map((input) => Number(input.value));
+}
+
+/**
+ * 触控优化：滑块必须按住「控件点（滑块）」才能拖动，点轨道空白处不跳变数值。
+ *
+ * `<input type="range">` 默认点轨道任意位置都会跳值并开始拖动；这里在指针按下时先做
+ * 命中判断 —— 命中滑块才放行浏览器原生拖动，否则 preventDefault 拦掉这次手势。
+ * 只有粘性标记滑块处于按下状态时才放行，手指移出轨道仍可继续拖动（由原生处理）。
+ */
+function attachThumbOnlyDrag(input) {
+  if (!input || input.dataset.thumbOnly === "1") return;
+  input.dataset.thumbOnly = "1";
+  const blocked = (event) => {
+    const rect = input.getBoundingClientRect();
+    const point = event.touches && event.touches.length ? event.touches[0] : event;
+    const x = point.clientX;
+    const y = point.clientY;
+    // 粗略还原轨道几何：控件左右各留半个滑块宽度。
+    const thumb = 22;
+    const trackLeft = rect.left + thumb / 2;
+    const trackRight = rect.right - thumb / 2;
+    const span = trackRight - trackLeft;
+    if (span <= 0 || y < rect.top - thumb || y > rect.bottom + thumb) return true;
+    const min = Number(input.min || 0);
+    const max = Number(input.max || 100);
+    const ratio = (Number(input.value) - min) / (max - min || 1);
+    const thumbX = trackLeft + ratio * span;
+    // 命中滑块（含手指触控容差）→ 放行拖动；否则拦掉，避免点轨道跳值。
+    return Math.abs(x - thumbX) > Math.max(thumb, 26);
+  };
+  const guard = (event) => { if (blocked(event)) event.preventDefault(); };
+  input.addEventListener("pointerdown", guard, { passive: false });
+  input.addEventListener("touchstart", guard, { passive: false });
+  input.addEventListener("mousedown", guard);
 }
 
 async function updateEqualizer(values) {
@@ -270,6 +305,7 @@ $("#more").addEventListener("click", () => search(false));
 $("#hotPrev").addEventListener("click", () => loadHot(uiState.hotPage - 1));
 $("#hotNext").addEventListener("click", () => loadHot(uiState.hotPage + 1));
 // 音乐音量可调; 麦克风音量由功放硬件控制, 不再向设备发送无效果请求。
+attachThumbOnlyDrag($("#musicVolume"));
 $("#musicVolume").addEventListener("input", (event) => { $("#musicValue").textContent = event.target.value; });
 $("#musicVolume").addEventListener("change", (event) => updateAudio({ musicVolume: Number(event.target.value) }));
 // 均衡器入口(与设备端弹窗等价): 开关 / 恢复标准

@@ -11,8 +11,8 @@ android {
         applicationId "com.local.ktv"
         minSdk 21
         targetSdk 25
-        versionCode 13
-        versionName "1.3.7"
+        versionCode 14
+        versionName "1.3.8"
         ndk {
             // 双 ABI 打包:兼容 64 位(Exynos 1580 等 arm64-v8a)与 32 位设备(极米 Play 超越版
             // 的 Amlogic 950X2/S905X2 采用 32 位 Android 用户态,必须包含 armeabi-v7a,否则

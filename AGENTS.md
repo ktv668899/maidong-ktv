@@ -108,7 +108,7 @@ $BT/apksigner verify 目标名.apk
 
 ### 版本号
 
-- `app/build.gradle`：`versionName "1.3.7"` / `versionCode 13`
+- `app/build.gradle`：`versionName "1.3.8"` / `versionCode 14`
 - App 内显示统一用纯版本号（不加 `(versionCode)` 括号）
 
 ## 三、关键实现约束（避免踩坑）
@@ -166,14 +166,21 @@ $BT/apksigner verify 目标名.apk
   因此由 500ms 的 `lyricTicker` → `syncEqualizerSessions()` 周期对齐，消失的会话延迟 3s 释放。
   `globalMix`（会话 0）是设备不支持按会话挂载时的显式开关，会影响本机所有声音，默认关闭。
   均衡器已并入**「调音」弹窗**（`showTuningDialog()`，自上而下：音量横向杆 → 均衡器开关 →
-  预设 → EQ 竖向杆），主界面右上角与播放界面「调音」是同一个弹窗；另有声音设置入口与
+  预设 → EQ 频段横向杆，每个频段一行：频率 | 滑杆 | 增益），主界面右上角与播放界面「调音」
+  是同一个弹窗；另有声音设置入口与
   远程点歌页面「均衡器」卡片（`PATCH /api/v1/player/equalizer`，状态随
   `GET /api/v1/state` 的 `equalizer` 字段下发）。预设：App 内为「自定义/流行/摇滚/舞曲」
   （`appPresetNames()`，手动改频段即转「自定义」并自动保存），远程页面额外保留「标准」
   供「恢复标准」使用。设置持久化在 `KtvStore.eq*`；
   **刻度固定 30 档**（`eqSliderSteps`），步进由设备增益范围均分，保证 0 dB 一定可选中。
-  EQ 竖向杆是自绘控件 `VerticalEqBar`（SeekBar 只支持横向），已 `suppressFill` 并自绘焦点框；
-  它在上下键到达量程端点时会放行按键，否则遥控器会困在滑杆上出不去
+  音量与频段共用自绘控件 `EqSlider`（横向），已 `suppressFill` 并自绘焦点/调节描边。
+  ⚠️ **它的交互是刻意定制的，不要换回 SeekBar**：
+  - **遥控**：焦点在控件上时方向键**不**改数值（先让焦点在控件间移动）；按**确认键进入调节态**
+    （描边变亮变粗）后方向键才调值，**再按确认键退出**调节态；调节态下 BACK 只退出调节态、
+    不关弹窗；失焦自动退出。这是"需按确认键才可调节控件点、同理按确认键退出控制"的实现。
+  - **触控**：必须按住滑块（控件点）才拖动，点轨道空白不跳值（`hitsThumb` 命中判断，
+    容差 `thumbTouchSlop`）。远程点歌页面同规则，见 `attachThumbOnlyDrag()`（app.js，对
+    `input[type=range]` 做指针命中判断，未命中则 preventDefault）
 - **公放随机清单**：`RandomPlayQueue`（纯内存单例）——随机续播不再「每次现随机挑一首」，
   而是一次性生成打乱顺序的临时清单，一轮内不重复；播完一首 `markFinished` +1；
   `next()` 每次都重新比对曲库，**自动吸纳新增歌曲**、剔除已删除歌曲；一轮播完自动开新一轮。

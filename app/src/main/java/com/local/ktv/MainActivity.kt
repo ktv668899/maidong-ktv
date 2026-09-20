@@ -2557,21 +2557,22 @@ class MainActivity : AppCompatActivity() {
             FloatArray(caps.bandCount) { saved.getOrElse(it) { 0f } }
         }
         // 分辨率自适应：**文字行全部 wrap_content**（高度由文本决定，永不被压扁/裁字），
-        // 只有 EQ 频段区是可伸缩的 —— 屏幕放不下时收缩的是频段区，不是文字。
+        // 只有均衡器频段行是可伸缩的 —— 屏幕放不下时收缩的是频段行高，不是文字。
         val metrics = resources.displayMetrics
         val screenHeightDp = metrics.heightPixels / metrics.density
-        // 矮屏(高度<620dp)只用来收窄竖杆列宽；文字尺寸不随分辨率变化。
         val compact = screenHeightDp < 620f
         val chromeDp = if (compact) 132 else 152
         val contentBudgetDp = (screenHeightDp * 0.92f - chromeDp).coerceAtLeast(240f)
-        // 文字/控件行占位的保守估计(内边距 + 标题 + 音量标题 + 开关 + 预设)，最终以实测量为准。
-        val textRowsDp = 30f + 34f + 30f + 50f + 58f
-        var bandAreaHeight = dp((contentBudgetDp - textRowsDp).coerceIn(112f, 216f).toInt())
-        val barColumnWidth = dp(if (compact) 38 else 46)
+        val bandCount = caps.bandCount.coerceAtLeast(1)
+        // 非频段部分(内边距/标题/音量标题+杆/开关/预设)的保守占位，最终以实测量为准。
+        val otherRowsDp = 30f + 34f + 30f + 44f + 50f + 58f
+        var bandRowHeight = dp(
+            ((contentBudgetDp - otherRowsDp) / bandCount).coerceIn(38f, 56f).toInt(),
+        )
         Log.i(
             TAG,
             "tuning dialog adaptive: screen=${screenHeightDp}dp compact=$compact " +
-                "budget=${contentBudgetDp}dp band=${bandAreaHeight}px",
+                "budget=${contentBudgetDp}dp bandRows=$bandCount row=${bandRowHeight}px",
         )
 
         val panel = LinearLayout(this).apply {
@@ -2616,37 +2617,31 @@ class MainActivity : AppCompatActivity() {
         panel.addView(titleRow, LinearLayout.LayoutParams(-1, -2))
 
         // ── 1. 音量：横向控制杆（即时生效）──
+        // 交互：遥控器按「确认」进入调节态后才能左右调；触控必须按住滑块才能拖动。
         val volumeTitle = label("音量  $musicVolume%", 16, Color.WHITE)
         panel.addView(volumeTitle, LinearLayout.LayoutParams(-1, -2))
         var lastVolumeAppliedAt = 0L
-        val volumeBar = SeekBar(this).apply {
-            max = 100
-            progress = musicVolume
-            isFocusable = true
-            isFocusableInTouchMode = true
-            setPadding(0, 0, 0, 0)
-            TvFocusStyler.installAction(this)
-            setOnSeekBarChangeListener(object : OnSeekBarChangeListener {
-                override fun onProgressChanged(bar: SeekBar?, progress: Int, fromUser: Boolean) {
-                    musicVolume = progress.coerceIn(0, 100)
+        val volumeBar = EqSlider(this).apply {
+            setRange(0f, 100f, 100)
+            setLevel(musicVolume.toFloat())
+            onLevelChanged = { value, fromUser ->
+                if (fromUser) {
+                    musicVolume = Math.round(value).coerceIn(0, 100)
                     volumeTitle.text = "音量  $musicVolume%"
-                    // 拖动时按 100ms 节流即时生效，避免每个像素都重建音轨。
+                    // 按 100ms 节流即时生效，避免每一步都重建音轨。
                     val now = System.currentTimeMillis()
                     if (now - lastVolumeAppliedAt >= 100L) {
                         lastVolumeAppliedAt = now
                         applyPlaybackMode()
                     }
                 }
-
-                override fun onStartTrackingTouch(bar: SeekBar?) = Unit
-
-                override fun onStopTrackingTouch(bar: SeekBar?) {
-                    applyPlaybackMode()
-                    saveState()
-                }
-            })
+            }
+            onInteractionFinished = {
+                applyPlaybackMode()
+                saveState()
+            }
         }
-        panel.addView(volumeBar, LinearLayout.LayoutParams(-1, -2))
+        panel.addView(volumeBar, LinearLayout.LayoutParams(-1, dp(44)))
 
         // ── 2. 均衡器开关（默认关闭）──
         lateinit var eqSwitch: TextView
@@ -2683,8 +2678,8 @@ class MainActivity : AppCompatActivity() {
         }
         eqArea.addView(presetRow, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(10) })
 
-        // ── 4. EQ 频段：竖向控制杆 ──
-        // 刻度文字用无内边距的 caption：高度由文本自身决定, 不会再被固定 dp 裁掉。
+        // ── 4. EQ 频段：横向控制杆（每个频段一行：频率 | 滑杆 | 增益）──
+        // 刻度文字用无内边距的 caption：高度由文本自身决定, 不会被固定 dp 裁掉。
         fun caption(text: String, sp: Int, color: Int): TextView = TextView(this).apply {
             this.text = text
             textSize = sp.toFloat()
@@ -2693,8 +2688,9 @@ class MainActivity : AppCompatActivity() {
             includeFontPadding = false
             setPadding(0, 0, 0, 0)
         }
-        val bars = ArrayList<VerticalEqBar>(caps.bandCount)
-        val valueViews = ArrayList<TextView>(caps.bandCount)
+        val bars = ArrayList<EqSlider>(bandCount)
+        val valueViews = ArrayList<TextView>(bandCount)
+        val bandRows = ArrayList<View>(bandCount)
         fun syncBars() {
             val applied = KtvEqualizer.levelsSnapshot()
             for (index in working.indices) {
@@ -2703,25 +2699,23 @@ class MainActivity : AppCompatActivity() {
                 valueViews.getOrNull(index)?.text = eqLevelText(working[index])
             }
         }
-        val barRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-        }
-        eqArea.addView(barRow, LinearLayout.LayoutParams(-1, bandAreaHeight).apply { topMargin = dp(6) })
         caps.frequencies.forEachIndexed { index, _ ->
-            val column = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                gravity = Gravity.CENTER_HORIZONTAL
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
             }
+            row.addView(
+                caption(bandLabels.getOrElse(index) { "${index + 1}" } + "Hz", 13, Color.WHITE),
+                LinearLayout.LayoutParams(dp(62), -1),
+            )
             val value = caption(
                 eqLevelText(working.getOrElse(index) { 0f }),
-                12,
+                13,
                 Color.argb(170, 255, 255, 255),
             )
             valueViews.add(value)
-            column.addView(value, LinearLayout.LayoutParams(-1, -2))
-            val bar = VerticalEqBar(this).apply {
-                setRange(caps.minDb, caps.maxDb, eqSliderSteps)
+            val bar = EqSlider(this).apply {
+                setRange(caps.minDb, caps.maxDb, eqSliderSteps, zeroLine = true)
                 setLevel(working.getOrElse(index) { 0f })
                 onLevelChanged = { level, fromUser ->
                     if (fromUser) {
@@ -2737,14 +2731,13 @@ class MainActivity : AppCompatActivity() {
                         applyEqualizerSettings()
                     }
                 }
+                onInteractionFinished = { applyEqualizerSettings() }
             }
             bars.add(bar)
-            column.addView(bar, LinearLayout.LayoutParams(barColumnWidth, 0, 1f))
-            column.addView(
-                caption(bandLabels.getOrElse(index) { "${index + 1}" } + "Hz", 12, Color.WHITE),
-                LinearLayout.LayoutParams(-1, -2),
-            )
-            barRow.addView(column, LinearLayout.LayoutParams(0, -1, 1f))
+            row.addView(bar, LinearLayout.LayoutParams(0, -1, 1f))
+            row.addView(value, LinearLayout.LayoutParams(dp(58), -1))
+            bandRows.add(row)
+            eqArea.addView(row, LinearLayout.LayoutParams(-1, bandRowHeight))
         }
 
         KtvEqualizer.appPresetNames().forEach { name ->
@@ -2803,16 +2796,18 @@ class MainActivity : AppCompatActivity() {
                 View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
             )
             val overflow = panel.measuredHeight - maxContentHeight
-            if (overflow > 0) {
-                val shrunk = (bandAreaHeight - overflow).coerceAtLeast(dp(96))
+            if (overflow > 0 && bandRows.isNotEmpty()) {
+                val shrunk = (bandRowHeight - overflow / bandRows.size).coerceAtLeast(dp(34))
                 Log.i(
                     TAG,
-                    "tuning dialog shrink band: measured=${panel.measuredHeight}px " +
-                        "max=${maxContentHeight}px band=$bandAreaHeight->$shrunk",
+                    "tuning dialog shrink band rows: measured=${panel.measuredHeight}px " +
+                        "max=${maxContentHeight}px row=$bandRowHeight->$shrunk",
                 )
-                if (shrunk < bandAreaHeight) {
-                    bandAreaHeight = shrunk
-                    barRow.layoutParams = barRow.layoutParams.apply { height = bandAreaHeight }
+                if (shrunk < bandRowHeight) {
+                    bandRowHeight = shrunk
+                    bandRows.forEach { row ->
+                        row.layoutParams = row.layoutParams.apply { height = bandRowHeight }
+                    }
                 }
             }
             // 最终兜底：宽度上限 + 内容区高度上限（仍放不下时弹窗内滚动，绝不裁切）。
