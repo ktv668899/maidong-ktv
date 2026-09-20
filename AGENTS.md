@@ -108,7 +108,7 @@ $BT/apksigner verify 目标名.apk
 
 ### 版本号
 
-- `app/build.gradle`：`versionName "1.3.5"` / `versionCode 11`
+- `app/build.gradle`：`versionName "1.3.6"` / `versionCode 12`
 - App 内显示统一用纯版本号（不加 `(versionCode)` 括号）
 
 ## 三、关键实现约束（避免踩坑）
@@ -179,4 +179,11 @@ $BT/apksigner verify 目标名.apk
   `next()` 每次都重新比对曲库，**自动吸纳新增歌曲**、剔除已删除歌曲；一轮播完自动开新一轮。
   **不显示**（界面不展示）、**不关联已点清单**（`orderQueue` 完全独立，随机歌曲不入队）、
   **App 退出即清理**（`onDestroy` 里 `isFinishing` 时 `clear()`，不落盘）
+- **弹窗分辨率自适应**：TV/投影/盒子的分辨率与 density 差异很大（1280x720、1920x1080，
+  density 1.0~2.5），固定 dp 尺寸在矮屏上会被屏幕裁切。统一用 `fitDialogToScreen(dialog, scroll,
+  content, preferredWidthDp, …)`：宽度取 `min(preferredWidthDp, 屏幕宽*0.94)`，高度把内容所在的
+  ScrollView 限制为 `屏幕高*0.92 - 弹窗标题/按钮框架(chromeDp)` —— **不要再用 `WRAP_CONTENT` 作为
+  弹窗高度**。内容高度由「屏幕预算 - 固定区高度」反推（调音弹窗的 EQ 频段区就是这样自适应），
+  预算不足时弹窗内滚动而不是被裁掉。已应用：调音弹窗、扫码点歌弹窗、声音设置弹窗。
+  新增/改动弹窗时请复用该 helper，别再写死 `setLayout(w, WRAP_CONTENT)`
 - **仓库可见性**：Gitea 仓库保持 **public**（若后续把 App 更新/热更新端点迁到 Gitea，非 public 会导致 403）

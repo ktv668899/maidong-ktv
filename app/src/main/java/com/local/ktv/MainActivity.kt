@@ -1763,6 +1763,56 @@ class MainActivity : AppCompatActivity() {
         afterShow: (() -> Unit)? = null,
     ): AlertDialog = create().showForTv(preferredButton, afterShow)
 
+    /**
+     * 弹窗分辨率自适应（在 [showForTv] 的 afterShow 里调用）。
+     *
+     * TV / 投影 / 盒子的分辨率与 density 差异很大（1280x720、1920x1080，density 1.0~2.0），
+     * 固定 dp 尺寸在矮屏上会被屏幕裁掉。这里统一按当前屏幕可用区域收敛：
+     * - 宽度取 `min(preferredWidthDp, 屏幕宽 * widthRatio)`；
+     * - 高度不交给 `WRAP_CONTENT`，而是把内容所在的 [scroll] 高度限制为
+     *   `屏幕高 * heightRatio - 弹窗标题/按钮区(chromeDp)`，内容更高时在弹窗内滚动。
+     *
+     * 这样内容放得下时窗口紧凑，放不下时滚动，任何分辨率下都不会被裁切。
+     */
+    private fun fitDialogToScreen(
+        dialog: AlertDialog,
+        scroll: View,
+        content: View,
+        preferredWidthDp: Int,
+        widthRatio: Float = 0.94f,
+        heightRatio: Float = 0.92f,
+        chromeDp: Int = 150,
+    ) {
+        val metrics = resources.displayMetrics
+        val availableWidth = (metrics.widthPixels * widthRatio).toInt()
+        val availableHeight = (metrics.heightPixels * heightRatio).toInt()
+        val width = if (preferredWidthDp > 0) {
+            min(dp(preferredWidthDp), availableWidth)
+        } else {
+            availableWidth
+        }
+
+        // 先按最终宽度量一次内容的原始高度：放得下就紧凑，放不下才滚动。
+        content.measure(
+            View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.AT_MOST),
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+        )
+        val maxContentHeight = (availableHeight - dp(chromeDp)).coerceAtLeast(dp(120))
+        val contentHeight = content.measuredHeight.coerceAtMost(maxContentHeight)
+        val params = scroll.layoutParams
+        if (params != null) {
+            params.width = ViewGroup.LayoutParams.MATCH_PARENT
+            params.height = contentHeight
+            scroll.layoutParams = params
+        } else {
+            scroll.layoutParams = android.widget.FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                contentHeight,
+            )
+        }
+        dialog.window?.setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT)
+    }
+
     private fun AlertDialog.restoreSourceFocusOnDismiss(): AlertDialog {
         val sourcePage = currentPage
         val sourceView = this@MainActivity.window.decorView.findFocus()
@@ -2506,6 +2556,29 @@ class MainActivity : AppCompatActivity() {
         val working = KtvEqualizer.levelsSnapshot().let { saved ->
             FloatArray(caps.bandCount) { saved.getOrElse(it) { 0f } }
         }
+        // 分辨率自适应：按屏幕高度算出「弹窗内容能占多少」，把剩余空间留给 EQ 频段区，
+        // 矮屏自动压缩频段区高度(而不是把弹窗顶出屏幕)，再叠加 fitDialogToScreen 的
+        // 高度上限兜底 —— 任何分辨率下都不会被裁切。
+        val metrics = resources.displayMetrics
+        val screenHeightDp = metrics.heightPixels / metrics.density
+        val compact = screenHeightDp < 620f
+        val chromeDp = if (compact) 132 else 152
+        val contentBudgetDp = (screenHeightDp * 0.92f - chromeDp).coerceAtLeast(240f)
+        // 固定区：面板内边距 30 + 标题 42 + 音量标题 28 + 音量杆 + 开关(含间距) 50 + 预设(含间距)
+        val fixedHeightDp = 30f + 42f + 28f +
+            (if (compact) 38 else 44) + 50f +
+            (if (compact) 44 else 52) + 10f
+        val bandAreaDp = (contentBudgetDp - fixedHeightDp).coerceIn(112f, 216f)
+        val bandAreaHeight = dp(bandAreaDp.toInt())
+        val barColumnWidth = dp(if (compact) 38 else 46)
+        val barCaptionHeight = dp(if (compact) 18 else 20)
+        val volumeRowHeight = dp(if (compact) 38 else 44)
+        val presetRowHeight = dp(if (compact) 44 else 52)
+        Log.i(
+            TAG,
+            "tuning dialog adaptive: screen=${screenHeightDp}dp compact=$compact " +
+                "budget=${contentBudgetDp}dp bandArea=${bandAreaDp}dp",
+        )
 
         val panel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -2576,7 +2649,7 @@ class MainActivity : AppCompatActivity() {
                 }
             })
         }
-        panel.addView(volumeBar, LinearLayout.LayoutParams(-1, dp(44)))
+        panel.addView(volumeBar, LinearLayout.LayoutParams(-1, volumeRowHeight))
 
         // ── 2. 均衡器开关（默认关闭）──
         lateinit var eqSwitch: TextView
@@ -2611,7 +2684,7 @@ class MainActivity : AppCompatActivity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
         }
-        eqArea.addView(presetRow, LinearLayout.LayoutParams(-1, dp(52)).apply { topMargin = dp(10) })
+        eqArea.addView(presetRow, LinearLayout.LayoutParams(-1, presetRowHeight).apply { topMargin = dp(10) })
 
         // ── 4. EQ 频段：竖向控制杆 ──
         val bars = ArrayList<VerticalEqBar>(caps.bandCount)
@@ -2628,7 +2701,7 @@ class MainActivity : AppCompatActivity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
         }
-        eqArea.addView(barRow, LinearLayout.LayoutParams(-1, dp(216)).apply { topMargin = dp(6) })
+        eqArea.addView(barRow, LinearLayout.LayoutParams(-1, bandAreaHeight).apply { topMargin = dp(6) })
         caps.frequencies.forEachIndexed { index, _ ->
             val column = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
@@ -2640,7 +2713,7 @@ class MainActivity : AppCompatActivity() {
                 Color.argb(170, 255, 255, 255),
             ).apply { gravity = Gravity.CENTER }
             valueViews.add(value)
-            column.addView(value, LinearLayout.LayoutParams(-1, dp(20)))
+            column.addView(value, LinearLayout.LayoutParams(-1, barCaptionHeight))
             val bar = VerticalEqBar(this).apply {
                 setRange(caps.minDb, caps.maxDb, eqSliderSteps)
                 setLevel(working.getOrElse(index) { 0f })
@@ -2660,12 +2733,12 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             bars.add(bar)
-            column.addView(bar, LinearLayout.LayoutParams(dp(46), 0, 1f))
+            column.addView(bar, LinearLayout.LayoutParams(barColumnWidth, 0, 1f))
             column.addView(
                 label(bandLabels.getOrElse(index) { "${index + 1}" } + "Hz", 12, Color.WHITE).apply {
                     gravity = Gravity.CENTER
                 },
-                LinearLayout.LayoutParams(-1, dp(20)),
+                LinearLayout.LayoutParams(-1, barCaptionHeight),
             )
             barRow.addView(column, LinearLayout.LayoutParams(0, -1, 1f))
         }
@@ -2713,9 +2786,15 @@ class MainActivity : AppCompatActivity() {
                 setBackgroundDrawableResource(android.R.color.transparent)
                 attributes = attributes.apply { dimAmount = 0.72f }
                 addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-                val available = (resources.displayMetrics.widthPixels * 0.94f).toInt()
-                setLayout(min(dp(760), available), ViewGroup.LayoutParams.WRAP_CONTENT)
             }
+            // 分辨率自适应：宽度上限 + 内容区高度上限（超出时弹窗内滚动，绝不裁切）。
+            fitDialogToScreen(
+                dialog = dialog,
+                scroll = scroll,
+                content = panel,
+                preferredWidthDp = 760,
+                chromeDp = if (compact) 128 else 150,
+            )
             volumeBar.requestFocus()
         })
     }
@@ -3025,34 +3104,54 @@ class MainActivity : AppCompatActivity() {
                 .create().showForTv(DialogInterface.BUTTON_POSITIVE)
             return
         }
+        // 分辨率自适应：二维码与文案高度按当前屏幕收敛，矮屏压缩、大屏放大(夹在 160~280dp)。
+        val metrics = resources.displayMetrics
+        val screenWidthDp = metrics.widthPixels / metrics.density
+        val screenHeightDp = metrics.heightPixels / metrics.density
+        val compact = screenHeightDp < 620f
+        val qrSide = min(
+            min((screenHeightDp * 0.42f).toInt(), (screenWidthDp * 0.62f).toInt()),
+            if (compact) 220 else 280,
+        ).coerceAtLeast(160)
         val box = LinearLayout(this)
         box.setOrientation(LinearLayout.VERTICAL)
         box.setGravity(Gravity.CENTER_HORIZONTAL)
-        box.setPadding(dp(24), dp(18), dp(24), dp(12))
+        box.setPadding(dp(20), dp(12), dp(20), dp(8))
         val qr = ImageView(this)
         qr.setBackgroundColor(Color.WHITE)
-        qr.setImageBitmap(qrBitmap(url, dp(260)))
-        box.addView(qr, LinearLayout.LayoutParams(dp(280), dp(280)))
-        val tip = label("手机连接同一局域网后扫码点歌", 18, Color.WHITE)
+        // 位图按最终显示尺寸生成，保证任何分辨率下二维码都清晰可扫。
+        qr.setImageBitmap(qrBitmap(url, dp(qrSide)))
+        box.addView(qr, LinearLayout.LayoutParams(dp(qrSide), dp(qrSide)))
+        val tip = label("手机连接同一局域网后扫码点歌", if (compact) 16 else 18, Color.WHITE)
         tip.gravity = Gravity.CENTER
-        box.addView(tip, LinearLayout.LayoutParams(dp(380), dp(54)))
+        box.addView(tip, LinearLayout.LayoutParams(-1, dp(if (compact) 42 else 54)))
         // 显示当前服务的 ip:端口 地址(去掉路径,便于对照路由器/局域网排查)。
         val serverHost = remoteServer.address().orEmpty()
         val serverPort = remoteServer.port()
         if (serverHost.isNotEmpty() && serverPort > 0) {
             val addressLine = label("$serverHost:$serverPort", 16, GOLD)
             addressLine.gravity = Gravity.CENTER
-            box.addView(addressLine, LinearLayout.LayoutParams(dp(380), dp(34)))
+            box.addView(addressLine, LinearLayout.LayoutParams(-1, dp(32)))
         }
         // 提示:扫码连上后播放界面右上角二维码会自动隐藏。
         val hint = label("扫码点歌后自动隐藏播放界面二维码", 14, Color.rgb(193, 193, 193))
         hint.gravity = Gravity.CENTER
-        box.addView(hint, LinearLayout.LayoutParams(dp(420), dp(30)))
-        AlertDialog.Builder(this)
+        box.addView(hint, LinearLayout.LayoutParams(-1, dp(if (compact) 26 else 30)))
+        val scroll = android.widget.ScrollView(this).apply { addView(box) }
+        val dialog = AlertDialog.Builder(this)
             .setTitle("扫码点歌")
-            .setView(box)
+            .setView(scroll)
             .setPositiveButton("确定", null)
-            .create().showForTv(DialogInterface.BUTTON_POSITIVE)
+            .create()
+        dialog.showForTv(DialogInterface.BUTTON_POSITIVE) {
+            fitDialogToScreen(
+                dialog = dialog,
+                scroll = scroll,
+                content = box,
+                preferredWidthDp = 460,
+                chromeDp = if (compact) 128 else 150,
+            )
+        }
     }
 
     private fun restartRemoteServer() {
@@ -8921,8 +9020,14 @@ class MainActivity : AppCompatActivity() {
                 saveState()
             }.create()
         dialog.showForTv(DialogInterface.BUTTON_NEGATIVE) {
-            val available = (resources.displayMetrics.widthPixels * 0.92f).toInt()
-            dialog.window?.setLayout(min(dp(790), available), ViewGroup.LayoutParams.WRAP_CONTENT)
+            // 同样的分辨率自适应：内容过高时在弹窗内滚动而不是被裁切。
+            fitDialogToScreen(
+                dialog = dialog,
+                scroll = scroll,
+                content = body,
+                preferredWidthDp = 790,
+                widthRatio = 0.92f,
+            )
         }
     }
 
