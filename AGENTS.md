@@ -108,7 +108,7 @@ $BT/apksigner verify 目标名.apk
 
 ### 版本号
 
-- `app/build.gradle`：`versionName "1.3.8"` / `versionCode 14`
+- `app/build.gradle`：`versionName "1.3.9"` / `versionCode 15`
 - App 内显示统一用纯版本号（不加 `(versionCode)` 括号）
 
 ## 三、关键实现约束（避免踩坑）
@@ -139,6 +139,29 @@ $BT/apksigner verify 目标名.apk
   客户端为 `MiliLog`（有界队列 + 后台线程 + 失败重试），调用点 `MiliLog.info/notice/warn/error`
   保持不变。启动上报（`reportDeviceBootInfo()`）只采集这 10 项：包名、版本号、安装时间、品牌、型号、
   设备名、Android 版本、CPU 架构、内核版本、屏幕分辨率
+- **播放界面右上角二维码**：跟随全屏控制层一起出现/隐藏 —— 在
+  `setFullScreenChromeVisible()` 里同步 `fullScreenQrOverlay` 的可见性，`updateFullScreenQrOverlay()`
+  新建时按 `fullScreenChromeVisible` 初始化。**不要**再按「手机是否在点歌」自动隐藏
+  （原 `qrAutoHideMonitor` 已删除，扫码弹窗里的对应提示文案也一并删除）
+- **远程页面滑杆(触控)**：`<input type="range">` **绝不能被 `<label>` 包裹** —— label 会把
+  内部任意位置的点击转发给 range，表现为"点轨道/点文字就跳值"。行容器用 `<div class="audio-row">`
+  / `<div class="eq-band">`；CSS 选择器也随之用类选择器而不是标签选择器。
+  另外滑杆元素本身高度设 32px（触控目标够大），视觉细轨道由
+  `::-webkit-slider-runnable-track` / `::-moz-range-track` 绘制，滑块 22px + 5px 边框。
+  `attachThumbOnlyDrag()` 仍作为第二道防线（命中滑块才放行原生拖动，容差按 32px 滑块算）
+- **远程搜索性能**：曲库 DB 有 **67 万首 / 约 1GB**（`muse.db`），搜索是 I/O 密集操作。
+  实测（同一台机器直连该 DB，`rec_score` 复合索引齐全）：
+  - 中文 `name_trim LIKE '%kw%'`：热态 **2~280ms**（走 `idx_rec_score` 顺序扫描 + 早停，无临时排序）
+  - 拼音 `name_cap/name_full GLOB 'kw*'`：热态 **0.2~150ms**（前缀范围扫描 + 临时 B-tree 排序；
+    `A*` 这类高频前缀会扫很多行），冷态（首次读 1GB 文件）可达 **1~15s**
+  - 歌手检索（`EXISTS` + singers LIKE）：热态 **34~70ms**
+  结论与对策：**瓶颈在冷态 I/O 与重复查询**，因此
+  1) 设备端加 `remoteSearchCache`（LRU 24 条 = 最近 4 个查询 × 6 页，TTL 60s，曲库刷新时清空），
+     同一「类型+关键词+页码」直接复用 JSON，翻页与重复搜索不再查库；
+  2) 手机端：搜索请求用 `AbortController` 取消旧请求、同关键词不重复请求、
+     首页返回后**预热第 2 页**（把设备缓存捂热）、搜索期间暂停 1s 的状态轮询避免抢 I/O。
+  ⚠️ 不要试图用「一次多取几页」来省请求：实测 `LIMIT 201` 的代价远高于 `LIMIT 21`
+  （`name_full GLOB` 301 行 6.2s vs 21 行 0.7s，冷态），会把体验做得更差
 - **焦点填充与「纯色遮罩层」**：`TvFocusStyler.install()` 会把背景整体换成**不透明**红→橙渐变，
   作为遥控器焦点/按下的反馈（`prepareTvFocusableTree(window.decorView)` 与对话框的
   `installTree(decorView)` 会遍历整棵树施加）。按钮/Tab/卡片/list 行需要这个反馈；但
@@ -154,9 +177,10 @@ $BT/apksigner verify 目标名.apk
   统一在 `applyPlaybackMode()` 内按线性系数施加到播放器（`KtvVideoView.setPlaybackVolume` /
   `selectAudioChannel`）与副音轨播放器（`vocalPlayer` / `embeddedVocalEngine`）。
   **严禁调用 `AudioManager.setStreamVolume` / `adjustStreamVolume` 修改系统音量**。
-  三条入口必须全部收敛到 `applyPlaybackMode()`：**「调音」弹窗**（`showTuningDialog()`，播放界面与
-  主界面右上角共用同一个弹窗）的音量横向控制杆、声音设置-歌曲最大音量、远程控制-音乐音量
-  （`remoteAudio()` 的 `musicVolume`）。曲线是纯衰减（100% 即 unity gain），不做系统级增益；
+  入口只有两处，且都必须收敛到 `applyPlaybackMode()`：**「调音」弹窗**（`showTuningDialog()`，
+  播放界面与主界面右上角共用同一个弹窗）的音量横向控制杆、远程控制-音乐音量
+  （`remoteAudio()` 的 `musicVolume`）。**声音设置弹窗里不再有音量滑杆与均衡器入口**
+  （避免同一功能两套入口），它只保留「切到点播歌曲时音量/原伴唱」这类策略选择。曲线是纯衰减（100% 即 unity gain），不做系统级增益；
   设备最终响度仍取决于系统音量，App 不再替用户改动它
 - **音频均衡器**：内核 `KtvEqualizer`（参考开源项目 OpenEQ，`Turbofan3360/OpenEQ`，GPL-3.0 的
   `EQUtils.kt`）——直接用系统 `android.media.audiofx.Equalizer`，**按设备真实频段数与增益范围自适应**
@@ -167,8 +191,7 @@ $BT/apksigner verify 目标名.apk
   `globalMix`（会话 0）是设备不支持按会话挂载时的显式开关，会影响本机所有声音，默认关闭。
   均衡器已并入**「调音」弹窗**（`showTuningDialog()`，自上而下：音量横向杆 → 均衡器开关 →
   预设 → EQ 频段横向杆，每个频段一行：频率 | 滑杆 | 增益），主界面右上角与播放界面「调音」
-  是同一个弹窗；另有声音设置入口与
-  远程点歌页面「均衡器」卡片（`PATCH /api/v1/player/equalizer`，状态随
+  是同一个弹窗；另有远程点歌页面「均衡器」卡片（`PATCH /api/v1/player/equalizer`，状态随
   `GET /api/v1/state` 的 `equalizer` 字段下发）。预设：App 内为「自定义/流行/摇滚/舞曲」
   （`appPresetNames()`，手动改频段即转「自定义」并自动保存），远程页面额外保留「标准」
   供「恢复标准」使用。设置持久化在 `KtvStore.eq*`；

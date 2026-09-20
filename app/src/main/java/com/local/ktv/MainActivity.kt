@@ -150,6 +150,18 @@ class MainActivity : AppCompatActivity() {
     private val remoteServer by lazy { LocalRemoteServer(this) }
     @Volatile private var remoteStateVersion = 1L
     private val remoteSongCache = Collections.synchronizedMap(LinkedHashMap<String, Song>())
+
+    /**
+     * 远程搜索结果的短期缓存（LRU，最多 24 条 = 最近 4 个查询 × 6 页）。
+     *
+     * 曲库 DB 有 67 万首/约 1GB，搜索是 I/O 密集操作（实测同一查询冷态数秒、热态数十至数百毫秒）。
+     * 同一「类型+关键词+页码」重复请求直接复用上次的 JSON，翻页（「更多」）与重复搜索不再查库。
+     * TTL 60s + 曲库刷新时清空，保证隐藏/删除歌曲后结果及时跟上。
+     */
+    private val remoteSearchCache = object : LinkedHashMap<String, Pair<String, Long>>(8, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Pair<String, Long>>?): Boolean =
+            size > 24
+    }
     private var mobileQrOverlay: View? = null
     private var fullScreenQrOverlay: View? = null
     private var updateCheckStarted = false
@@ -170,25 +182,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** 全屏右上角扫码点歌二维码显隐控制: 手机连接点歌(页面可见时每秒轮询 state)
-     *  期间自动隐藏, 断开(无请求超过约 4 秒)后恢复显示。 */
-    private val qrAutoHideMonitor = object : Runnable {
-        private var hiddenByClient = false
-        override fun run() {
-            val overlay = fullScreenQrOverlay
-            if (overlay != null && isFullScreen) {
-                val active = remoteServer.hasRecentActivity(4000)
-                if (active && !hiddenByClient) {
-                    hiddenByClient = true
-                    overlay.visibility = View.GONE
-                } else if (!active && hiddenByClient) {
-                    hiddenByClient = false
-                    overlay.visibility = View.VISIBLE
-                }
-            }
-            main.postDelayed(this, 1000)
-        }
-    }
     /** 周期向 hbeat.ktvsky.com 上报设备身份,维持歌曲源对"合法设备"的判定。 */
     private val ktvHeartbeatRunnable = object : Runnable {
         override fun run() {
@@ -505,7 +498,6 @@ class MainActivity : AppCompatActivity() {
         startRemoteServer()
         updateMobileQrOverlay()
         main.postDelayed(remoteNetworkMonitor, 5000)
-        main.postDelayed(qrAutoHideMonitor, 1000)
         // 设备心跳:开机立即上报一次(boot=1),之后每 3600s 保活,维持歌曲源合法设备判定。
         sendDeviceHeartbeat(boot = true)
         main.postDelayed(ktvHeartbeatRunnable, HEARTBEAT_INTERVAL_MS)
@@ -690,7 +682,6 @@ class MainActivity : AppCompatActivity() {
         main.removeCallbacks(homeBannerRunnable)
         main.removeCallbacks(autoFullscreenRunnable)
         main.removeCallbacks(remoteNetworkMonitor)
-        main.removeCallbacks(qrAutoHideMonitor)
         stopRecording(false)
         unregisterMicInputWatcher()
         micActivator.stop()
@@ -2419,6 +2410,8 @@ class MainActivity : AppCompatActivity() {
         fullScreenChromeVisible = visible
         fullScreenControls?.visibility = if (visible) View.VISIBLE else View.GONE
         fullScreenProgressRow?.visibility = if (visible) View.VISIBLE else View.GONE
+        // 右上角二维码跟随控制层一起出现/隐藏（不再按"手机是否在点歌"自动隐藏）。
+        fullScreenQrOverlay?.visibility = if (visible) View.VISIBLE else View.GONE
         main.removeCallbacks(hideFullScreenChromeRunnable)
         if (visible && isFullScreen) {
             val controls = fullScreenControls
@@ -3156,10 +3149,6 @@ class MainActivity : AppCompatActivity() {
             addressLine.gravity = Gravity.CENTER
             box.addView(addressLine, LinearLayout.LayoutParams(-1, dp(32)))
         }
-        // 提示:扫码连上后播放界面右上角二维码会自动隐藏。
-        val hint = label("扫码点歌后自动隐藏播放界面二维码", 14, Color.rgb(193, 193, 193))
-        hint.gravity = Gravity.CENTER
-        box.addView(hint, LinearLayout.LayoutParams(-1, dp(if (compact) 26 else 30)))
         val scroll = android.widget.ScrollView(this).apply { addView(box) }
         val dialog = AlertDialog.Builder(this)
             .setTitle("扫码点歌")
@@ -3254,6 +3243,8 @@ class MainActivity : AppCompatActivity() {
         }
         container.addView(box, params)
         box.bringToFront()
+        // 跟随控制层显隐：控制层收起时二维码也不显示(新建时按当前状态初始化)。
+        box.visibility = if (fullScreenChromeVisible) View.VISIBLE else View.GONE
         // 同手机点歌二维码: 展示型表面不做焦点填充。
         TvFocusStyler.suppressFill(box)
         fullScreenQrOverlay = box
@@ -3741,12 +3732,22 @@ class MainActivity : AppCompatActivity() {
         return remoteOk(equalizerJson().put("message", "均衡器已更新"))
     }
 
+    /** 远程搜索结果缓存有效期。 */
+    private val SEARCH_CACHE_TTL_MS = 60_000L
+
     private fun remoteSearchJson(query: Map<String, String>): JSONObject {
         val keyword = query["q"].orEmpty().trim()
         val type = query["type"].orEmpty().lowercase(Locale.ROOT).let { if (it == "song") "song" else "singer" }
         val page = (query["page"]?.toIntOrNull() ?: 1).coerceAtLeast(1)
         val pageSize = (query["pageSize"]?.toIntOrNull() ?: 20).coerceIn(1, 50)
         val offset = (page - 1) * pageSize
+        // 命中缓存: 不再查 1GB 曲库(翻页/重复搜索基本瞬时)。
+        val cacheKey = "$type|$keyword|$page|$pageSize"
+        remoteSearchCache[cacheKey]?.let { (json, at) ->
+            if (System.currentTimeMillis() - at < SEARCH_CACHE_TTL_MS) {
+                runCatching { JSONObject(json) }.getOrNull()?.let { return it }
+            }
+        }
         val songs = if (library.muse.isAvailable() && keyword.isNotBlank()) {
             if (type == "singer") library.muse.searchSongsBySingerKeyword(keyword, offset, pageSize + 1)
             else library.muse.searchSongs(keyword, offset, pageSize + 1)
@@ -3767,8 +3768,10 @@ class MainActivity : AppCompatActivity() {
             array.put(songJson(song))
         }
         while (remoteSongCache.size > 500) remoteSongCache.remove(remoteSongCache.keys.first())
-        return JSONObject().put("songs", array).put("page", page).put("pageSize", pageSize)
+        val payload = JSONObject().put("songs", array).put("page", page).put("pageSize", pageSize)
             .put("type", type).put("hasMore", hasMore)
+        remoteSearchCache[cacheKey] = payload.toString() to System.currentTimeMillis()
+        return payload
     }
 
     private fun remoteHotJson(query: Map<String, String>): JSONObject {
@@ -6190,6 +6193,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshLibrary(after: Runnable?) {
+        // 曲库变化后远程搜索结果缓存立即失效，避免还搜到已隐藏/已删除的歌。
+        remoteSearchCache.clear()
         busy(true, "正在扫描曲库...")
         io.execute(Runnable {
             val locals = library.scanLocal().size
@@ -8956,7 +8961,6 @@ class MainActivity : AppCompatActivity() {
         var pendingOrderedSongOriginal = orderedSongOriginal
         var pendingOrderedVolumeMode = orderedVolumeMode
         var pendingOrderedVocalMode = orderedVocalMode
-        var pendingMusicVolume = musicVolume
         fun title(text: String) = TextView(this).apply {
             this.text = text; textSize = 16f; setTextColor(Color.WHITE); setPadding(0, dp(4), 0, 0)
         }
@@ -8979,23 +8983,12 @@ class MainActivity : AppCompatActivity() {
                     changed(index)
                 }
             }
-        val musicVolumeTitle = title("歌曲最大音量  ${pendingMusicVolume}%")
+        // 说明：音量调节与均衡器入口已从这里移除 —— 它们统一收敛到「调音」弹窗，
+        // 避免同一功能出现两套入口（音量滑杆 + 均衡器开关/预设/频段都在「调音」里）。
         val left = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             addView(title("切到点播歌曲时音量："))
             addView(choices(arrayOf("跟随上首音量", "跟随上首点播歌曲音量"), pendingOrderedVolumeMode) { pendingOrderedVolumeMode = it })
-            addView(musicVolumeTitle)
-            addView(SeekBar(this@MainActivity).apply {
-                max = 100; progress = pendingMusicVolume
-                setOnSeekBarChangeListener(object : OnSeekBarChangeListener {
-                    override fun onProgressChanged(bar: SeekBar?, value: Int, fromUser: Boolean) {
-                        pendingMusicVolume = value
-                        musicVolumeTitle.text = "歌曲最大音量  ${pendingMusicVolume}%"
-                    }
-                    override fun onStartTrackingTouch(bar: SeekBar?) = Unit
-                    override fun onStopTrackingTouch(bar: SeekBar?) = Unit
-                })
-            })
         }
         val right = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -9009,26 +9002,9 @@ class MainActivity : AppCompatActivity() {
             addView(left, LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = dp(28) })
             addView(right, LinearLayout.LayoutParams(0, -2, 1f))
         }
-        // 均衡器入口：与播放界面/主页「调音」里的入口等价，修改即时生效。
-        val eqEntry = TextView(this).apply {
-            text = "均衡器入口  ›"
-            textSize = 17f
-            setTextColor(Color.WHITE)
-            gravity = Gravity.CENTER
-            background = getDrawable(R.drawable.bg_btn_glass)
-            isClickable = true
-            isFocusable = true
-            setPadding(dp(12), dp(10), dp(12), dp(10))
-            setOnClickListener { showTuningDialog() }
-            TvFocusStyler.installAction(this)
-        }
         val body = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             addView(content, LinearLayout.LayoutParams(-1, -2))
-            addView(eqEntry, LinearLayout.LayoutParams(-1, dp(48)).apply {
-                marginStart = dp(28)
-                marginEnd = dp(28)
-            })
         }
         val scroll = android.widget.ScrollView(this).apply { addView(body) }
         val dialog = AlertDialog.Builder(this).setTitle("声音设置")
@@ -9038,7 +9014,6 @@ class MainActivity : AppCompatActivity() {
                 orderedSongOriginal = pendingOrderedSongOriginal
                 orderedVolumeMode = pendingOrderedVolumeMode
                 orderedVocalMode = pendingOrderedVocalMode
-                musicVolume = pendingMusicVolume
                 applyPlaybackMode()
                 saveState()
             }.create()

@@ -1,9 +1,10 @@
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => document.querySelectorAll(selector);
 const uiState = {
-  page: 1, query: "", searchMode: "singer", busy: false,
+  page: 1, query: "", searchMode: "song", busy: false,
   hotPage: 1, hotPageSize: 10, hotBusy: false,
-  visible: true, connected: false, eqEnabled: false
+  visible: true, connected: false, eqEnabled: false,
+  equalizer: null, searchAbort: null, searchKey: ""
 };
 
 function escapeHtml(value) {
@@ -81,7 +82,9 @@ async function refresh() {
     $("#original").classList.toggle("active", data.vocalMode === "original");
     $("#accompany").classList.toggle("active", data.vocalMode !== "original");
     $("#nextSong").textContent = data.next?.title || "队列为空";
-    renderEqualizer(data.equalizer);
+    // 均衡器卡片默认收起: 收起时跳过 DOM 更新(避免每秒轮询重绘), 展开时再渲染一次。
+    uiState.equalizer = data.equalizer;
+    if (!$("#eqBody")?.classList.contains("hidden")) renderEqualizer(data.equalizer);
   } catch (_) {
     setConnected(false);
   }
@@ -107,7 +110,7 @@ function renderEqualizer(eq) {
   const bands = Array.isArray(eq.bands) ? eq.bands : [];
   const container = $("#eqBands");
   if (container && container.childElementCount !== bands.length) {
-    container.innerHTML = bands.map((band, index) => `<label class="eq-band"><span>${escapeHtml(band.label)}Hz</span><b><em id="eqValue${index}">${Number(band.level).toFixed(1)}</em>dB</b><input id="eqBand${index}" type="range" min="${eq.minDb}" max="${eq.maxDb}" step="1" value="${band.level}"></label>`).join("");
+    container.innerHTML = bands.map((band, index) => `<div class="eq-band"><span>${escapeHtml(band.label)}Hz</span><b><em id="eqValue${index}">${Number(band.level).toFixed(1)}</em>dB</b><input id="eqBand${index}" type="range" min="${eq.minDb}" max="${eq.maxDb}" step="1" value="${band.level}"></div>`).join("");
     bands.forEach((band, index) => {
       const input = $("#eqBand" + index);
       if (!input) return;
@@ -160,7 +163,7 @@ function attachThumbOnlyDrag(input) {
     const x = point.clientX;
     const y = point.clientY;
     // 粗略还原轨道几何：控件左右各留半个滑块宽度。
-    const thumb = 22;
+    const thumb = 32;
     const trackLeft = rect.left + thumb / 2;
     const trackRight = rect.right - thumb / 2;
     const span = trackRight - trackLeft;
@@ -200,31 +203,52 @@ async function updateAudio(values) {
 }
 
 async function search(reset = true) {
-  if (uiState.busy) return;
   if (reset) {
-    uiState.page = 1;
-    uiState.query = $("#query").value.trim();
-    if (!uiState.query) {
+    const nextQuery = $("#query").value.trim();
+    if (!nextQuery) {
       toast(`请输入${uiState.searchMode === "singer" ? "歌手" : "歌曲"}名称`);
       $("#query").focus();
       return;
     }
+    // 同一关键词+同一搜索方式且结果已渲染 → 不重复请求设备(设备端也要查 1GB 曲库)。
+    const key = `${uiState.searchMode}|${nextQuery}`;
+    if (key === uiState.searchKey && $("#results").childElementCount) {
+      $("#searchResultBlock").scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    uiState.page = 1;
+    uiState.query = nextQuery;
+    uiState.searchKey = key;
     $("#results").innerHTML = "";
     $("#searchResultBlock").classList.remove("hidden");
     $("#resultTitle").textContent = uiState.searchMode === "singer" ? "歌手搜索结果" : "歌曲搜索结果";
     $("#resultSummary").textContent = `正在搜索“${uiState.query}”`;
+    $("#more").classList.add("hidden");
+    if (uiState.searchAbort) uiState.searchAbort.abort();
+    uiState.searchAbort = new AbortController();
   }
+  const signal = uiState.searchAbort ? uiState.searchAbort.signal : undefined;
+  const requestedPage = uiState.page;
   uiState.busy = true;
   try {
-    const data = await api(`/api/v1/songs?q=${encodeURIComponent(uiState.query)}&type=${uiState.searchMode}&page=${uiState.page}&pageSize=20`);
-    const rows = (data.songs || []).map((song, index) => songRow(song, false, false, (uiState.page - 1) * 20 + index)).join("");
+    const data = await api(`/api/v1/songs?q=${encodeURIComponent(uiState.query)}&type=${uiState.searchMode}&page=${requestedPage}&pageSize=20`, { signal });
+    const rows = (data.songs || []).map((song, index) => songRow(song, false, false, (requestedPage - 1) * 20 + index)).join("");
     if (rows) $("#results").insertAdjacentHTML("beforeend", rows);
     else if (reset) $("#results").innerHTML = '<div class="empty">没有找到相关歌曲<br><small>请更换关键词后重试</small></div>';
     $("#resultSummary").textContent = `“${uiState.query}”${data.hasMore ? "，还有更多" : ""}`;
     $("#more").classList.toggle("hidden", !data.hasMore);
-    uiState.page += 1;
-  } catch (error) { toast(error.message); }
-  finally { uiState.busy = false; }
+    uiState.page = requestedPage + 1;
+    // 预热下一页: 设备端会把它缓存下来, 用户点「更多」时基本瞬时。
+    if (requestedPage === 1 && data.hasMore) {
+      window.setTimeout(() => {
+        api(`/api/v1/songs?q=${encodeURIComponent(uiState.query)}&type=${uiState.searchMode}&page=2&pageSize=20`)
+          .catch(() => {});
+      }, 500);
+    }
+  } catch (error) {
+    // 被下一次搜索取消属于正常情况, 不弹提示。
+    if (error && error.name !== "AbortError") toast(error.message);
+  } finally { uiState.busy = false; }
 }
 
 async function loadHot(page) {
@@ -317,8 +341,11 @@ $("#eqCollapse")?.addEventListener("click", () => {
   if (!body) return;
   const collapsed = body.classList.toggle("hidden");
   $("#eqCollapse").setAttribute("aria-expanded", collapsed ? "false" : "true");
+  // 展开时补一次渲染(收起期间轮询跳过了 EQ 的 DOM 更新)。
+  if (!collapsed) renderEqualizer(uiState.equalizer);
 });
 document.addEventListener("visibilitychange", () => { uiState.visible = !document.hidden; if (uiState.visible) refresh(); });
-window.setInterval(() => { if (uiState.visible) refresh(); }, 1000);
+// 搜索进行中暂停状态轮询: 避免与设备端 1GB 曲库查询抢 I/O。
+window.setInterval(() => { if (uiState.visible && !uiState.busy) refresh(); }, 1000);
 refresh();
 loadHot(1);

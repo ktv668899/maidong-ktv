@@ -36,8 +36,8 @@
         <article class="glass-card audio-panel">
           <div class="panel-title"><div><span class="tiny-icon">♪</span><b>声音控制</b></div><small>即时生效</small></div>
           <div class="seg"><button id="accompany" data-vocal="accompany"><span>伴</span>伴唱</button><button id="original" data-vocal="original"><span>原</span>原唱</button></div>
-          <label><span><i class="volume-icon">♪</i>音乐音量</span><b><em id="musicValue">85</em>%</b><input id="musicVolume" type="range" min="0" max="100" value="85"></label>
-          <label class="mic-hw"><span><i class="volume-icon mic">●</i>麦克风音量</span><small>由功放/混音器硬件调节</small><input id="micVolume" type="range" min="0" max="100" value="70" disabled></label>
+          <div class="audio-row"><span><i class="volume-icon">♪</i>音乐音量</span><b><em id="musicValue">85</em>%</b><input id="musicVolume" type="range" min="0" max="100" value="85"></div>
+          <div class="audio-row mic-hw"><span><i class="volume-icon mic">●</i>麦克风音量</span><small>由功放/混音器硬件调节</small><input id="micVolume" type="range" min="0" max="100" value="70" disabled></div>
         </article>
 
         <article class="glass-card eq-panel">
@@ -62,10 +62,10 @@
       <section id="search" class="page">
         <div class="page-heading"><div><p>SONG LIBRARY</p><h2>想唱什么？</h2></div><span>海量本地曲库</span></div>
         <div class="search-mode" role="group" aria-label="搜索方式">
-          <button type="button" data-search-mode="singer" class="active">歌手</button>
-          <button type="button" data-search-mode="song">歌曲</button>
+          <button type="button" data-search-mode="song" class="active">歌曲</button>
+          <button type="button" data-search-mode="singer">歌手</button>
         </div>
-        <form id="searchForm" class="search-box"><span class="search-icon"></span><input id="query" autocomplete="off" placeholder="输入歌手名或拼音"><button type="submit">搜索</button></form>
+        <form id="searchForm" class="search-box"><span class="search-icon"></span><input id="query" autocomplete="off" placeholder="输入歌曲名或拼音"><button type="submit">搜索</button></form>
         <div id="searchResultBlock" class="search-result-block hidden">
           <div class="block-title"><h3 id="resultTitle">歌手搜索结果</h3><span id="resultSummary"></span></div>
           <div id="results" class="list"></div><button id="more" class="more hidden">加载更多歌曲</button>
