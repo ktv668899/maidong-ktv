@@ -3,7 +3,7 @@ const $$ = (selector) => document.querySelectorAll(selector);
 const uiState = {
   page: 1, query: "", searchMode: "singer", busy: false,
   hotPage: 1, hotPageSize: 10, hotBusy: false,
-  visible: true, connected: false
+  visible: true, connected: false, eqEnabled: false
 };
 
 function escapeHtml(value) {
@@ -81,9 +81,73 @@ async function refresh() {
     $("#original").classList.toggle("active", data.vocalMode === "original");
     $("#accompany").classList.toggle("active", data.vocalMode !== "original");
     $("#nextSong").textContent = data.next?.title || "队列为空";
+    renderEqualizer(data.equalizer);
   } catch (_) {
     setConnected(false);
   }
+}
+
+// ─── 均衡器（与设备端 KtvEqualizer 同步，频段由设备真实能力决定）───
+function renderEqualizer(eq) {
+  if (!eq) return;
+  uiState.eqEnabled = !!eq.enabled;
+  const state = $("#eqState");
+  if (state) state.textContent = eq.enabled ? (eq.preset || "自定义") : "已关闭";
+  const toggle = $("#eqToggle");
+  if (toggle) {
+    toggle.textContent = eq.enabled ? "关闭均衡器" : "开启均衡器";
+    toggle.classList.toggle("active", !!eq.enabled);
+  }
+  const hint = $("#eqHint");
+  if (hint) {
+    hint.textContent = eq.globalMix
+      ? "当前作用于全局混音（会影响本机所有声音）"
+      : "均衡器作用于本机播放输出，不改动系统音量";
+  }
+  const bands = Array.isArray(eq.bands) ? eq.bands : [];
+  const container = $("#eqBands");
+  if (container && container.childElementCount !== bands.length) {
+    container.innerHTML = bands.map((band, index) => `<label class="eq-band"><span>${escapeHtml(band.label)}Hz</span><b><em id="eqValue${index}">${Number(band.level).toFixed(1)}</em>dB</b><input id="eqBand${index}" type="range" min="${eq.minDb}" max="${eq.maxDb}" step="1" value="${band.level}"></label>`).join("");
+    bands.forEach((band, index) => {
+      const input = $("#eqBand" + index);
+      if (!input) return;
+      input.addEventListener("input", () => {
+        const value = $("#eqValue" + index);
+        if (value) value.textContent = Number(input.value).toFixed(1);
+      });
+      input.addEventListener("change", () => updateEqualizer({ levels: currentEqLevels() }));
+    });
+  } else if (container) {
+    bands.forEach((band, index) => {
+      const input = $("#eqBand" + index);
+      // 正在拖动的那根滑杆不要被轮询覆盖。
+      if (input && document.activeElement !== input) input.value = band.level;
+      const value = $("#eqValue" + index);
+      if (value) value.textContent = Number(band.level).toFixed(1);
+    });
+  }
+  const presets = Array.isArray(eq.presets) ? eq.presets : [];
+  const presetBox = $("#eqPresets");
+  if (presetBox && presetBox.childElementCount !== presets.length) {
+    presetBox.innerHTML = presets.map((name) => `<button type="button" class="eq-preset" data-preset="${escapeHtml(name)}">${escapeHtml(name)}</button>`).join("");
+    presetBox.querySelectorAll(".eq-preset").forEach((button) => {
+      button.addEventListener("click", () => updateEqualizer({ preset: button.dataset.preset }));
+    });
+  }
+  presetBox?.querySelectorAll(".eq-preset").forEach((button) => {
+    button.classList.toggle("active", button.dataset.preset === eq.preset);
+  });
+}
+
+function currentEqLevels() {
+  return Array.from($$("#eqBands input[type=range]")).map((input) => Number(input.value));
+}
+
+async function updateEqualizer(values) {
+  try {
+    await api("/api/v1/player/equalizer", { method: "PATCH", body: JSON.stringify(values) });
+    await refresh();
+  } catch (error) { toast(error.message); }
 }
 
 async function playerAction(action) {
@@ -208,6 +272,9 @@ $("#hotNext").addEventListener("click", () => loadHot(uiState.hotPage + 1));
 // 音乐音量可调; 麦克风音量由功放硬件控制, 不再向设备发送无效果请求。
 $("#musicVolume").addEventListener("input", (event) => { $("#musicValue").textContent = event.target.value; });
 $("#musicVolume").addEventListener("change", (event) => updateAudio({ musicVolume: Number(event.target.value) }));
+// 均衡器入口(与设备端弹窗等价): 开关 / 恢复标准
+$("#eqToggle")?.addEventListener("click", () => updateEqualizer({ enabled: !uiState.eqEnabled }));
+$("#eqReset")?.addEventListener("click", () => updateEqualizer({ preset: "标准" }));
 document.addEventListener("visibilitychange", () => { uiState.visible = !document.hidden; if (uiState.visible) refresh(); });
 window.setInterval(() => { if (uiState.visible) refresh(); }, 1000);
 refresh();

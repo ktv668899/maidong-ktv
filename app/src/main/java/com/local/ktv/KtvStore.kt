@@ -47,6 +47,12 @@ class KtvStore {
     @JvmField var tableBroadcastEnabled = true
     @JvmField var tableBroadcastSeconds = 8
     @JvmField var tableBroadcastText = "欢迎光临"
+    // ===== 均衡器（KtvEqualizer）=====
+    @JvmField var eqEnabled = false
+    @JvmField var eqPreset = "标准"
+    /** 各频段增益(dB)，逗号分隔；不同设备频段数可能不同，加载后会按实际频段数对齐。 */
+    @JvmField var eqLevels = ""
+    @JvmField var eqGlobalMix = false
     @JvmField val orderQueue = mutableListOf<Song>()
     @JvmField val sangHistory = mutableListOf<Song>()
     @JvmField val scoreHistory = mutableListOf<String>()
@@ -96,6 +102,10 @@ class KtvStore {
             tableBroadcastEnabled = root.optBoolean("tableBroadcastEnabled", true)
             tableBroadcastSeconds = root.optInt("tableBroadcastSeconds", 8)
             tableBroadcastText = root.optString("tableBroadcastText", "欢迎光临")
+            eqEnabled = root.optBoolean("eqEnabled", false)
+            eqPreset = root.optString("eqPreset", "标准")
+            eqLevels = root.optString("eqLevels", "")
+            eqGlobalMix = root.optBoolean("eqGlobalMix", false)
             readSongs(root.optJSONArray("orderQueue"), orderQueue)
             readSongs(root.optJSONArray("sangHistory"), sangHistory)
             root.optJSONArray("scoreHistory").copyStringsTo(scoreHistory)
@@ -164,6 +174,10 @@ class KtvStore {
                 put("tableBroadcastEnabled", tableBroadcastEnabled)
                 put("tableBroadcastSeconds", tableBroadcastSeconds)
                 put("tableBroadcastText", tableBroadcastText)
+                put("eqEnabled", eqEnabled)
+                put("eqPreset", eqPreset)
+                put("eqLevels", eqLevels)
+                put("eqGlobalMix", eqGlobalMix)
                 put("orderQueue", writeSongs(orderQueue))
                 put("sangHistory", writeSongs(sangHistory))
                 put("scoreHistory", JSONArray(scoreHistory.take(100)))

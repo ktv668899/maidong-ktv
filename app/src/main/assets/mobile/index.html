@@ -40,6 +40,17 @@
           <label class="mic-hw"><span><i class="volume-icon mic">●</i>麦克风音量</span><small>由功放/混音器硬件调节</small><input id="micVolume" type="range" min="0" max="100" value="70" disabled></label>
         </article>
 
+        <article class="glass-card eq-panel">
+          <div class="panel-title"><div><span class="tiny-icon">≡</span><b>均衡器</b></div><small id="eqState">已关闭</small></div>
+          <div class="seg eq-switch">
+            <button type="button" id="eqToggle">开启均衡器</button>
+            <button type="button" id="eqReset">恢复标准</button>
+          </div>
+          <div id="eqBands" class="eq-bands"></div>
+          <div id="eqPresets" class="eq-presets"></div>
+          <p class="eq-hint" id="eqHint">均衡器作用于本机播放输出，不改动系统音量</p>
+        </article>
+
         <article class="next-card"><div class="next-number">02</div><div><small>下一首</small><b id="nextSong">队列为空</b></div><button data-page="queue">查看队列 <span>›</span></button></article>
       </section>
 

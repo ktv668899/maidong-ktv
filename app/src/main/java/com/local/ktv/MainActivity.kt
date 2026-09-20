@@ -246,6 +246,8 @@ class MainActivity : AppCompatActivity() {
         override fun run() {
             updateFullScreenProgress()
             updateLyricView()
+            // 播放会话会随歌曲变化，均衡器需要周期性对齐到当前实际播放的会话。
+            syncEqualizerSessions()
             // 播放界面左上角的「当前播放 / 下一首」实时刷新: 无论队列是本地点歌、
             // 手机扫码点歌还是自动切歌而变化, 500ms 内必然同步到界面。
             refreshNowPlayingLabels()
@@ -694,6 +696,12 @@ class MainActivity : AppCompatActivity() {
         micActivator.stop()
         releaseVocalPlayer()
         if (::playbackEngine.isInitialized) playbackEngine.release()
+        KtvEqualizer.releaseAll()
+        if (isFinishing) {
+            // 公放随机清单只在内存中，App 退出即清理（不属于已点清单，也不落盘）。
+            RandomPlayQueue.clear()
+            MiliLog.info("RANDOM-CLEAR app exit")
+        }
         remoteServer.stop()
         library.muse.close()
         stateIo.shutdown()
@@ -2503,9 +2511,13 @@ class MainActivity : AppCompatActivity() {
             }
             showVolumeResult()
         }
-        listOf(minus, plus, mute).forEachIndexed { index, button ->
-            button.nextFocusLeftId = listOf(minus, plus, mute).getOrNull(index - 1)?.id ?: button.id
-            button.nextFocusRightId = listOf(minus, plus, mute).getOrNull(index + 1)?.id ?: button.id
+        // 播放界面「调音」面板里的均衡器入口（与主页顶栏「调音」弹窗里的入口等价）。
+        val equalizer = volumeButton("均衡器")
+        equalizer.setOnClickListener { showEqualizerDialog() }
+        val volumeButtons = listOf(minus, plus, mute, equalizer)
+        volumeButtons.forEachIndexed { index, button ->
+            button.nextFocusLeftId = volumeButtons.getOrNull(index - 1)?.id ?: button.id
+            button.nextFocusRightId = volumeButtons.getOrNull(index + 1)?.id ?: button.id
             button.nextFocusUpId = fullScreenToneControl?.id ?: button.id
             button.nextFocusDownId = button.id
             buttons.addView(button, LinearLayout.LayoutParams(dp(136), dp(58)).apply {
@@ -2744,6 +2756,11 @@ class MainActivity : AppCompatActivity() {
         bindAtmospherePreset(root, R.id.btn_preset_lyric, "抒情")
         bindAtmospherePreset(root, R.id.btn_preset_rock, "摇滚")
         bindAtmospherePreset(root, R.id.btn_preset_singer, "唱将")
+        // 均衡器入口：主页顶栏「调音」/播放界面「调音」/控制层「音量」都走本弹窗。
+        root.findViewById<View?>(R.id.btn_tuning_equalizer)?.setOnClickListener {
+            dialog.dismiss()
+            showEqualizerDialog()
+        }
 
         dialog.showForTv(afterShow = {
             dialog.window?.apply {
@@ -2761,6 +2778,314 @@ class MainActivity : AppCompatActivity() {
             atmosphere = preset
             saveState()
             toast("音效: " + preset)
+        })
+    }
+
+    // ===== 均衡器 =====
+
+    /** 把持久化的 "1.0,-2.0,..." 解析成频段增益数组。 */
+    private fun parseEqLevels(raw: String?): FloatArray {
+        if (raw.isNullOrBlank()) return FloatArray(0)
+        return raw.split(',').mapNotNull { it.trim().toFloatOrNull() }.toFloatArray()
+    }
+
+    /**
+     * 均衡器滑杆的刻度数。
+     *
+     * 步进 = 设备增益范围 / 该刻度数，这样刻度会随设备自适应，同时保证 **0 dB 一定落在
+     * 某个刻度上**（若写死 2 dB 步进，-15~+15 的范围里就没有 0 dB 这一档，无法调到"平坦"）。
+     */
+    private val eqSliderSteps = 30
+
+    private fun eqLevelText(level: Float): String =
+        (if (level > 0f) "+" else "") + String.format(Locale.ROOT, "%.1f", level)
+
+    /**
+     * 让均衡器挂到当前所有实际播放会话上。
+     *
+     * 会话 id 随歌曲变化(IJK 每次 prepare 都可能重建 AudioTrack)，因此由 500ms 的
+     * `lyricTicker` 周期调用：新会话自动挂上，消失的会话延迟释放。
+     */
+    private fun syncEqualizerSessions() {
+        if (KtvEqualizer.attachedSessionCount() == 0 && !KtvEqualizer.enabled) return
+        KtvEqualizer.syncSessions(
+            listOf(
+                player?.audioSessionId() ?: 0,
+                vocalPlayer?.audioSessionId ?: 0,
+                embeddedVocalEngine?.audioSessionId() ?: 0,
+            ),
+        )
+    }
+
+    /** 均衡器开关/参数变化后的统一收尾：立刻挂载 + 落盘。 */
+    private fun applyEqualizerSettings() {
+        syncEqualizerSessions()
+        saveState()
+    }
+
+    /**
+     * 均衡器弹窗 —— App 内统一入口（主页顶栏「调音」、播放界面「调音」、
+     * 声音设置「均衡器入口」，以及远程点歌页面的同名入口）。
+     *
+     * 内核见 [KtvEqualizer]：参考开源项目 OpenEQ，直接使用系统 `audiofx.Equalizer`，
+     * 并按设备真实支持的频段数与增益范围自适应，因此频段是动态生成的。
+     * UI 与「调音」弹窗保持一致：深色圆角面板 + 紫色频段卡 + 橙色焦点反馈。
+     */
+    private fun showEqualizerDialog() {
+        val caps = KtvEqualizer.capabilities(this)
+        val bandLabels = KtvEqualizer.bandLabels(caps)
+        val working = KtvEqualizer.levelsSnapshot().let { saved ->
+            FloatArray(caps.bandCount) { saved.getOrElse(it) { 0f } }
+        }
+        val globalSupported = KtvEqualizer.globalMixSupported()
+
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = getDrawable(R.drawable.bg_tuning_dialog)
+            setPadding(dp(26), dp(16), dp(26), dp(18))
+        }
+        TvFocusStyler.suppressFill(panel)
+
+        // ── 标题 ──
+        val titleRow = FrameLayout(this)
+        titleRow.addView(
+            label("均衡器", 24, Color.WHITE).apply { gravity = Gravity.CENTER },
+            FrameLayout.LayoutParams(-1, dp(46)),
+        )
+        val close = label("×", 22, Color.argb(153, 255, 255, 255)).apply {
+            gravity = Gravity.CENTER
+            isClickable = true
+            isFocusable = true
+            TvFocusStyler.installAction(this)
+        }
+        titleRow.addView(
+            close,
+            FrameLayout.LayoutParams(dp(44), dp(40), Gravity.END or Gravity.CENTER_VERTICAL),
+        )
+        panel.addView(titleRow, LinearLayout.LayoutParams(-1, dp(46)))
+
+        // ── 状态行：总开关 / 全局混音 / 重置 ──
+        val switchRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        fun pill(text: String, action: () -> Unit): TextView = TextView(this).apply {
+            this.text = text
+            textSize = 16f
+            setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER
+            background = getDrawable(R.drawable.bg_btn_glass)
+            isClickable = true
+            isFocusable = true
+            setPadding(dp(10), dp(6), dp(10), dp(6))
+            setOnClickListener { action() }
+            TvFocusStyler.installAction(this)
+        }
+        lateinit var enabledPill: TextView
+        lateinit var globalPill: TextView
+        fun renderPills() {
+            enabledPill.text = if (KtvEqualizer.enabled) "均衡器：开启" else "均衡器：关闭"
+            enabledPill.setTextColor(if (KtvEqualizer.enabled) Color.rgb(39, 204, 164) else Color.WHITE)
+            globalPill.text = if (!globalSupported) {
+                "全局混音：不支持"
+            } else if (KtvEqualizer.globalMix) {
+                "全局混音：开"
+            } else {
+                "全局混音：关"
+            }
+            globalPill.alpha = if (globalSupported) 1f else 0.45f
+        }
+        enabledPill = pill(if (KtvEqualizer.enabled) "均衡器：开启" else "均衡器：关闭") {
+            KtvEqualizer.setEnabled(!KtvEqualizer.enabled)
+            renderPills()
+            applyEqualizerSettings()
+            toast(if (KtvEqualizer.enabled) "均衡器已开启" else "均衡器已关闭")
+        }
+        if (KtvEqualizer.enabled) enabledPill.setTextColor(Color.rgb(39, 204, 164))
+        globalPill = pill("全局混音：关") {
+            if (!globalSupported) {
+                toast("本机不支持全局混音")
+                return@pill
+            }
+            KtvEqualizer.setGlobalMix(!KtvEqualizer.globalMix)
+            renderPills()
+            applyEqualizerSettings()
+            toast(if (KtvEqualizer.globalMix) "均衡器已作用于全局混音" else "均衡器只作用于本 App")
+        }
+        // 「重置」要回到『标准』预设并刷新滑杆，但滑杆此时还没建好，用 lateinit 延后绑定。
+        lateinit var resetEqualizer: () -> Unit
+        val resetPill = pill("重置") { resetEqualizer() }
+        renderPills()
+        switchRow.addView(enabledPill, LinearLayout.LayoutParams(-2, dp(40)).apply { marginEnd = dp(8) })
+        switchRow.addView(globalPill, LinearLayout.LayoutParams(-2, dp(40)).apply { marginEnd = dp(8) })
+        switchRow.addView(resetPill, LinearLayout.LayoutParams(-2, dp(40)))
+        panel.addView(switchRow, LinearLayout.LayoutParams(-1, dp(48)))
+
+        // ── 设备能力提示 ──
+        val hint = label(
+            "本机支持 ${caps.bandCount} 段 · ${String.format(Locale.ROOT, "%.0f", caps.minDb)} ~ " +
+                "${String.format(Locale.ROOT, "%.0f", caps.maxDb)} dB" +
+                if (globalSupported) "" else " · 本机不支持全局混音",
+            13,
+            Color.argb(150, 255, 255, 255),
+        )
+        panel.addView(hint, LinearLayout.LayoutParams(-1, dp(26)))
+
+        // ── 频段滑杆 ──
+        val bars = ArrayList<SeekBar>(caps.bandCount)
+        val valueViews = ArrayList<TextView>(caps.bandCount)
+        // 刻度换算：0 dB 必定落在某个刻度上(见 eqSliderSteps 说明)。
+        val stepDb = (caps.maxDb - caps.minDb) / eqSliderSteps
+        fun toProgress(level: Float): Int =
+            Math.round((level - caps.minDb) / stepDb).coerceIn(0, eqSliderSteps)
+        fun fromProgress(progress: Int): Float =
+            (caps.minDb + progress * stepDb).coerceIn(caps.minDb, caps.maxDb)
+        // 预设按钮与高亮渲染先声明（频段滑杆回调里要用来刷新"自定义"高亮）。
+        val presetButtons = LinkedHashMap<String, TextView>()
+        fun renderPresets() {
+            presetButtons.forEach { (name, view) ->
+                val active = name == KtvEqualizer.preset
+                view.setTextColor(if (active) Color.rgb(255, 204, 92) else Color.WHITE)
+                view.alpha = if (active) 1f else 0.82f
+            }
+        }
+        /** 把内核当前频段值回灌到滑杆与数值文本。 */
+        fun syncBarsFromEqualizer() {
+            val applied = KtvEqualizer.levelsSnapshot()
+            for (index in working.indices) {
+                working[index] = applied.getOrElse(index) { 0f }
+                bars[index].progress = toProgress(working[index])
+                valueViews[index].text = eqLevelText(working[index])
+                valueViews[index].setTextColor(
+                    if (working[index] == 0f) Color.argb(170, 255, 255, 255)
+                    else Color.rgb(255, 204, 92),
+                )
+            }
+        }
+        fun applyBandLevels() {
+            KtvEqualizer.setLevels(working.copyOf())
+            KtvEqualizer.markCustomPreset()
+            syncBarsFromEqualizer()
+            applyEqualizerSettings()
+        }
+
+        caps.frequencies.forEachIndexed { index, _ ->
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+            }
+            row.addView(
+                label(bandLabels.getOrElse(index) { "${index + 1}" } + "Hz", 15, Color.WHITE).apply {
+                    gravity = Gravity.CENTER
+                },
+                LinearLayout.LayoutParams(dp(74), dp(38)),
+            )
+            val seek = SeekBar(this).apply {
+                max = eqSliderSteps
+                isFocusable = true
+                isFocusableInTouchMode = true
+                setPadding(0, 0, 0, 0)
+                TvFocusStyler.installAction(this)
+                setOnSeekBarChangeListener(object : OnSeekBarChangeListener {
+                    override fun onProgressChanged(bar: SeekBar?, progress: Int, fromUser: Boolean) {
+                        if (!fromUser) return
+                        working[index] = fromProgress(progress)
+                        valueViews[index].text = eqLevelText(working[index])
+                        valueViews[index].setTextColor(
+                            if (working[index] == 0f) Color.argb(170, 255, 255, 255)
+                            else Color.rgb(255, 204, 92)
+                        )
+                    }
+
+                    override fun onStartTrackingTouch(bar: SeekBar?) = Unit
+
+                    override fun onStopTrackingTouch(bar: SeekBar?) {
+                        KtvEqualizer.setLevels(working.copyOf())
+                        KtvEqualizer.markCustomPreset()
+                        renderPresets()
+                        applyEqualizerSettings()
+                    }
+                })
+            }
+            bars.add(seek)
+            row.addView(seek, LinearLayout.LayoutParams(0, dp(38), 1f))
+            val value = label("0.0", 15, Color.argb(170, 255, 255, 255)).apply {
+                gravity = Gravity.CENTER
+            }
+            valueViews.add(value)
+            row.addView(value, LinearLayout.LayoutParams(dp(76), dp(38)))
+            panel.addView(row, LinearLayout.LayoutParams(-1, dp(42)))
+        }
+
+        // ── 预设 ──
+        val presetRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+        }
+        KtvEqualizer.presetNames().forEach { name ->
+            val presetButton = TextView(this).apply {
+                text = name
+                textSize = 16f
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER
+                isClickable = true
+                isFocusable = true
+                background = getDrawable(R.drawable.bg_tuning_counter)
+                TvFocusStyler.installAction(this)
+                setOnClickListener {
+                    KtvEqualizer.applyPreset(name)
+                    syncBarsFromEqualizer()
+                    renderPresets()
+                    applyEqualizerSettings()
+                    toast("均衡器预设：" + name)
+                }
+            }
+            presetButtons[name] = presetButton
+            presetRow.addView(
+                presetButton,
+                LinearLayout.LayoutParams(0, dp(56), 1f).apply { marginStart = dp(3); marginEnd = dp(3) },
+            )
+        }
+        panel.addView(presetRow, LinearLayout.LayoutParams(-1, dp(64)))
+        renderPresets()
+        resetEqualizer = {
+            KtvEqualizer.applyPreset("标准")
+            syncBarsFromEqualizer()
+            renderPresets()
+            applyEqualizerSettings()
+            toast("均衡器已重置为标准")
+        }
+
+        // ── 底部 ──
+        val actions = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.END or Gravity.CENTER_VERTICAL
+        }
+        val done = pill("完成") { }
+        actions.addView(done, LinearLayout.LayoutParams(dp(110), dp(44)))
+        panel.addView(actions, LinearLayout.LayoutParams(-1, dp(52)))
+
+        val scroll = android.widget.ScrollView(this).apply { addView(panel) }
+        val dialog = AlertDialog.Builder(this)
+            .setView(scroll)
+            .create()
+        close.setOnClickListener { dialog.dismiss() }
+        done.setOnClickListener { dialog.dismiss() }
+        dialog.restoreSourceFocusOnDismiss()
+        dialog.showForTv(afterShow = {
+            dialog.window?.apply {
+                setBackgroundDrawableResource(android.R.color.transparent)
+                attributes = attributes.apply { dimAmount = 0.72f }
+                addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+                val available = (resources.displayMetrics.widthPixels * 0.92f).toInt()
+                setLayout(min(dp(700), available), ViewGroup.LayoutParams.WRAP_CONTENT)
+            }
+            // 初始化滑杆位置(不触发 fromUser 回调，避免被当成自定义)。
+            bars.forEachIndexed { index, bar ->
+                bar.progress = toProgress(working.getOrElse(index) { 0f })
+                valueViews[index].text = eqLevelText(working.getOrElse(index) { 0f })
+            }
+            enabledPill.requestFocus()
         })
     }
 
@@ -3581,6 +3906,7 @@ class MainActivity : AppCompatActivity() {
                 method == "POST" && path == "/api/v1/queue" -> remoteOrder(JSONObject(body))
                 method == "POST" && path == "/api/v1/player/actions" -> remotePlayerAction(JSONObject(body))
                 method == "PATCH" && path == "/api/v1/player/audio" -> remoteAudio(JSONObject(body))
+                method == "PATCH" && path == "/api/v1/player/equalizer" -> remoteEqualizer(JSONObject(body))
                 path.startsWith("/api/v1/queue/") && method in arrayOf("PATCH", "DELETE") -> {
                     remoteQueueMutation(method, URLDecoder.decode(path.substringAfterLast('/'), "UTF-8"))
                 }
@@ -3602,7 +3928,72 @@ class MainActivity : AppCompatActivity() {
             put("vocalMode", if (originalVocal) "original" else "accompany")
             put("musicVolume", musicVolume)
             put("micVolume", micVolume)
+            // 均衡器状态(远程点歌页面的均衡器入口据此渲染频段)
+            put("equalizer", equalizerJson())
         }
+    }
+
+    /** 均衡器状态 + 本机支持的频段(供远程页面渲染)。 */
+    private fun equalizerJson(): JSONObject {
+        val caps = KtvEqualizer.capabilities(this)
+        val labels = KtvEqualizer.bandLabels(caps)
+        val levels = KtvEqualizer.levelsSnapshot()
+        return JSONObject().apply {
+            put("enabled", KtvEqualizer.enabled)
+            put("preset", KtvEqualizer.preset)
+            put("globalMix", KtvEqualizer.globalMix)
+            put("globalMixSupported", KtvEqualizer.globalMixSupported())
+            put("minDb", caps.minDb.toDouble())
+            put("maxDb", caps.maxDb.toDouble())
+            put("bands", JSONArray().apply {
+                for (index in 0 until caps.bandCount) {
+                    put(
+                        JSONObject().apply {
+                            put("label", labels.getOrElse(index) { (index + 1).toString() })
+                            put("freq", caps.frequencies.getOrElse(index) { 0f }.toDouble())
+                            put("level", levels.getOrElse(index) { 0f }.toDouble())
+                        },
+                    )
+                }
+            })
+            put("presets", JSONArray(KtvEqualizer.presetNames()))
+        }
+    }
+
+    /** 远程点歌页面：调节均衡器（与 App 内均衡器弹窗等价）。 */
+    private fun remoteEqualizer(json: JSONObject): LocalRemoteServer.ApiResponse {
+        if (json.has("globalMix")) {
+            if (!KtvEqualizer.globalMixSupported()) {
+                return remoteError(400, "GLOBAL_MIX_UNSUPPORTED", "本机不支持全局混音")
+            }
+            KtvEqualizer.setGlobalMix(json.optBoolean("globalMix"))
+        }
+        if (json.has("enabled")) {
+            KtvEqualizer.setEnabled(json.optBoolean("enabled"))
+        }
+        if (json.has("preset")) {
+            val name = json.optString("preset")
+            if (name !in KtvEqualizer.presetNames()) {
+                return remoteError(400, "BAD_PRESET", "预设不存在")
+            }
+            KtvEqualizer.applyPreset(name)
+        }
+        if (json.has("levels")) {
+            val array = json.optJSONArray("levels")
+                ?: return remoteError(400, "BAD_LEVELS", "频段格式错误")
+            val caps = KtvEqualizer.capabilities(this)
+            val levels = FloatArray(caps.bandCount) { index ->
+                array.optDouble(index, 0.0).toFloat().coerceIn(caps.minDb, caps.maxDb)
+            }
+            KtvEqualizer.setLevels(levels)
+            KtvEqualizer.markCustomPreset()
+        }
+        main.post {
+            syncEqualizerSessions()
+            saveState()
+            remoteStateVersion++
+        }
+        return remoteOk(equalizerJson().put("message", "均衡器已更新"))
     }
 
     private fun remoteSearchJson(query: Map<String, String>): JSONObject {
@@ -5254,6 +5645,14 @@ class MainActivity : AppCompatActivity() {
         // 队列为空(最后一首已播完/随机续播中未点歌)
         if (orderQueue!!.isEmpty()) {
             if (fromCompletion && autoNext) {
+                // 公放清单里的这首播完了：计数 +1，然后取清单里的下一首（同一轮不重复）。
+                currentSong?.takeIf { RandomPlayQueue.isCurrentTrack(it) }?.let { finished ->
+                    val count = RandomPlayQueue.markFinished(finished)
+                    MiliLog.info(
+                        "RANDOM-DONE title=${finished.title} count=$count " +
+                            "cycle=${RandomPlayQueue.cycle} remaining=${RandomPlayQueue.remaining}",
+                    )
+                }
                 playRandomLocalSong()
                 return
             }
@@ -5331,15 +5730,20 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             val allLocalSongs = localSongs.values.toList()
-            val alternatives = allLocalSongs.filter { stableId(it) != previousSongId }
-            val selected = (if (alternatives.isNotEmpty()) alternatives else allLocalSongs).randomOrNull()
             main.post {
                 if (requestSerial != randomLocalRequestSerial || orderQueue!!.isNotEmpty() || currentSong != null) {
                     return@post
                 }
+                // 伪随机公放清单：按打乱后的顺序取下一首（一轮内不重复，自动吸纳新增歌曲）。
+                val selected = RandomPlayQueue.next(allLocalSongs, avoidId = previousSongId)
                 if (selected != null) {
                     lastRandomLocalSongId = stableId(selected)
+                    RandomPlayQueue.markStarted(selected)
                     status?.text = "随机播放：${selected.title}"
+                    MiliLog.info(
+                        "RANDOM-PLAY title=${selected.title} cycle=${RandomPlayQueue.cycle} " +
+                            "remaining=${RandomPlayQueue.remaining} played=${RandomPlayQueue.playedInCycle}",
+                    )
                     play(selected)
                 } else {
                     playbackPreparing = false
@@ -8859,7 +9263,28 @@ class MainActivity : AppCompatActivity() {
             addView(left, LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = dp(28) })
             addView(right, LinearLayout.LayoutParams(0, -2, 1f))
         }
-        val scroll = android.widget.ScrollView(this).apply { addView(content) }
+        // 均衡器入口：与播放界面/主页「调音」里的入口等价，修改即时生效。
+        val eqEntry = TextView(this).apply {
+            text = "均衡器入口  ›"
+            textSize = 17f
+            setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER
+            background = getDrawable(R.drawable.bg_btn_glass)
+            isClickable = true
+            isFocusable = true
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+            setOnClickListener { showEqualizerDialog() }
+            TvFocusStyler.installAction(this)
+        }
+        val body = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(content, LinearLayout.LayoutParams(-1, -2))
+            addView(eqEntry, LinearLayout.LayoutParams(-1, dp(48)).apply {
+                marginStart = dp(28)
+                marginEnd = dp(28)
+            })
+        }
+        val scroll = android.widget.ScrollView(this).apply { addView(body) }
         val dialog = AlertDialog.Builder(this).setTitle("声音设置")
             .setView(scroll)
             .setNegativeButton("关闭", null)
@@ -9717,6 +10142,11 @@ class MainActivity : AppCompatActivity() {
         store.vocalChannelMode = vocalChannelMode
         store.musicVolume = musicVolume
         store.micVolume = micVolume
+        // 均衡器状态同样随设置一起持久化(下次启动自动恢复)。
+        store.eqEnabled = KtvEqualizer.enabled
+        store.eqPreset = KtvEqualizer.preset
+        store.eqLevels = KtvEqualizer.levelsSnapshot().joinToString(",")
+        store.eqGlobalMix = KtvEqualizer.globalMix
         store.tone = tone
         store.atmosphere = atmosphere
         store.singMode = singMode
@@ -9778,6 +10208,14 @@ class MainActivity : AppCompatActivity() {
         originalVocal = store.originalVocal
         vocalChannelMode = store.vocalChannelMode
         musicVolume = store.musicVolume
+        // 均衡器：先恢复保存值，再按本机真实频段数对齐(不同设备频段数/增益范围不同)。
+        KtvEqualizer.restore(
+            enabled = store.eqEnabled,
+            presetName = store.eqPreset,
+            savedLevels = parseEqLevels(store.eqLevels),
+            useGlobalMix = store.eqGlobalMix && KtvEqualizer.globalMixSupported(),
+        )
+        KtvEqualizer.alignToDevice(KtvEqualizer.capabilities(this))
         micVolume = store.micVolume
         tone = store.tone.coerceIn(-5, 5)
         atmosphere = store.atmosphere

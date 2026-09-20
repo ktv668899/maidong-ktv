@@ -58,6 +58,9 @@ class KtvVideoView @JvmOverloads constructor(
     fun setTone(step: Int) = engine?.setTone(step) ?: Unit
     fun selectAudioTrack(original: Boolean): Boolean = engine?.selectAudioTrack(original) == true
     fun audioTrackCount(): Int = engine?.audioTrackCount() ?: 0
+
+    /** 当前播放的音频会话 id（供均衡器等音效挂载）；未知返回 0。 */
+    fun audioSessionId(): Int = engine?.audioSessionId() ?: 0
     fun selectAudioChannel(channel: Int, volume: Float) = engine?.selectAudioChannel(channel, volume) ?: Unit
     val isPlaying: Boolean get() = engine?.isPlaying == true
     val currentPosition: Int get() = engine?.currentPosition ?: 0
@@ -289,6 +292,12 @@ class KtvPlaybackEngine(context: Context) {
     fun audioTrackCount(): Int = runCatching {
         ijkPlayer?.trackInfo?.count { it.trackType == ITrackInfo.MEDIA_TRACK_TYPE_AUDIO } ?: 0
     }.getOrDefault(0)
+
+    /**
+     * IJK 原生返回的真实 AudioTrack 会话 id（`IjkMediaPlayer_getAudioSessionId`）。
+     * 音频均衡器需要它才能把音效挂到本播放器上；播放器尚未建立音轨时返回 0。
+     */
+    fun audioSessionId(): Int = runCatching { ijkPlayer?.audioSessionId ?: 0 }.getOrDefault(0)
 
     fun selectAudioChannel(channel: Int, volume: Float) {
         val safeVolume = volume.coerceIn(0f, 1f)
