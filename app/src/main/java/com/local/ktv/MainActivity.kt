@@ -164,19 +164,24 @@ class MainActivity : AppCompatActivity() {
     }
     private var mobileQrOverlay: View? = null
     private var fullScreenQrOverlay: View? = null
+    /** 播放页面右上角「网络未连接」提示。 */
+    private var fullScreenNetworkBadge: TextView? = null
     private var updateCheckStarted = false
     private var compactUi = false
     private val remoteNetworkMonitor = object : Runnable {
         override fun run() {
             val ip = localIp().takeIf { LocalRemoteServer.isPrivateIpv4(it) }
+            // 无可用局域网 IP(离线/切换中): 不做重启与刷新, 避免每 5s 空转(网络恢复由
+            // KtvNetworkMonitor 的回调负责)。
+            if (ip.isNullOrEmpty()) {
+                main.postDelayed(this, 5000)
+                return
+            }
             if (ip != remoteServer.address()) {
                 remoteServer.stop()
                 startRemoteServer()
-                updateMobileQrOverlay()
-                updateFullScreenQrOverlay()
-                // 网络切换后重新解析当前网卡 MAC，并同步日志上报的 IP/设备标识。
-                DeviceMac.refresh()
-                refreshLogDeviceContext()
+                // 换网/换 IP 后出口 IP 可能变化, 歌曲源会话必须重建(见 refreshNetworkState)。
+                refreshNetworkState("ip-change:$ip", notify = false)
             }
             main.postDelayed(this, 5000)
         }
@@ -498,6 +503,8 @@ class MainActivity : AppCompatActivity() {
         startRemoteServer()
         updateMobileQrOverlay()
         main.postDelayed(remoteNetworkMonitor, 5000)
+        // 网络状态监测: 断网提示 + 恢复后重建歌曲源会话/重试下载。
+        KtvNetworkMonitor.start(applicationContext) { online -> onNetworkStateChanged(online) }
         // 设备心跳:开机立即上报一次(boot=1),之后每 3600s 保活,维持歌曲源合法设备判定。
         sendDeviceHeartbeat(boot = true)
         main.postDelayed(ktvHeartbeatRunnable, HEARTBEAT_INTERVAL_MS)
@@ -682,6 +689,7 @@ class MainActivity : AppCompatActivity() {
         main.removeCallbacks(homeBannerRunnable)
         main.removeCallbacks(autoFullscreenRunnable)
         main.removeCallbacks(remoteNetworkMonitor)
+        KtvNetworkMonitor.stop()
         stopRecording(false)
         unregisterMicInputWatcher()
         micActivator.stop()
@@ -2234,6 +2242,22 @@ class MainActivity : AppCompatActivity() {
         val song = label(currentAndNextText(), 18, Color.WHITE)
         fullScreenSongInfo = song
         header.addView(song, LinearLayout.LayoutParams(0, dp(48), 1f))
+        // 播放页面右上角「网络未连接」提示(仅断网时显示, 网络恢复自动消失)。
+        val networkBadge = label("● 网络未连接", 14, Color.WHITE).apply {
+            gravity = Gravity.CENTER
+            background = GradientDrawable().apply {
+                cornerRadius = dp(11).toFloat()
+                setColor(Color.rgb(198, 40, 74))
+                setStroke(dp(1), Color.argb(140, 255, 255, 255))
+            }
+            includeFontPadding = false
+            visibility = if (KtvNetworkMonitor.online) View.GONE else View.VISIBLE
+        }
+        fullScreenNetworkBadge = networkBadge
+        header.addView(
+            networkBadge,
+            LinearLayout.LayoutParams(dp(if (compactUi) 108 else 124), dp(28)).apply { marginEnd = dp(8) },
+        )
         val back = label("返回", 15, Color.WHITE)
         back.setGravity(Gravity.CENTER)
         back.setBackgroundResource(R.drawable.bg_btn_glass)
@@ -2400,6 +2424,7 @@ class MainActivity : AppCompatActivity() {
         fullScreenControls = null
         fullScreenProgressRow = null
         fullScreenQrOverlay = null
+        fullScreenNetworkBadge = null
         fullScreenChromeVisible = false
         main.removeCallbacks(hideFullScreenChromeRunnable)
         scheduleAutoFullscreen()
@@ -3578,6 +3603,56 @@ class MainActivity : AppCompatActivity() {
 
     /** 当前设备 MAC(12 位小写十六进制): 本机当前在用网卡, 读不到时回退历史抓包值。 */
     private fun deviceMac(): String = DeviceMac.effective()
+
+    /**
+     * 设备网络状态变化处理。
+     *
+     * 断网: 播放页右上角显示「网络未连接」。
+     * 恢复: 刷新对网络敏感的全部状态, 保证歌曲源能重新取址并正常下载/播放 ——
+     *   1. 重新解析当前网卡 MAC 与日志上报 IP；
+     *   2. **重置歌曲源会话**（清 JS 侧 token 与 API 实例）—— 源站按出口 IP 计试用窗口，
+     *      断网/重连后旧 token 失效，若继续复用会出现「地址取到了但下载 403/失败」；
+     *   3. 复位歌曲源窗口守卫，便于下一次到期能再次提示；
+     *   4. 拉起本地点歌服务并刷新二维码；
+     *   5. 自动重试断网期间失败的下载。
+     */
+    private fun onNetworkStateChanged(online: Boolean) {
+        fullScreenNetworkBadge?.visibility = if (online) View.GONE else View.VISIBLE
+        if (!online) {
+            status?.text = "网络未连接"
+            MiliLog.warn("NET-DOWN 设备网络已断开")
+            return
+        }
+        MiliLog.notice("NET-UP 设备网络已恢复, 重建歌曲源会话")
+        if (!remoteServer.isRunning()) startRemoteServer()
+        refreshNetworkState("net-up", notify = true)
+    }
+
+    /**
+     * 网络路径变化后的统一维护（断网恢复 / 换网换 IP 都走这里）。
+     *
+     * 关键在于**重建歌曲源会话**：源站按「出口 IP + device」识别，并把试用窗口记在出口 IP 上，
+     * 断网重连或换网后旧 token 已失效 —— 不重置就会出现「日志提示取址成功、实际下载
+     * 403/失败」。同时复位窗口守卫、刷新二维码与日志上下文，并自动重试断网期间失败的下载。
+     *
+     * @param notify 是否弹提示（断网恢复时提示，换 IP 时静默）
+     */
+    private fun refreshNetworkState(reason: String, notify: Boolean) {
+        DeviceMac.refresh()
+        refreshLogDeviceContext()
+        SongApiClient.resetSourceSession()
+        Eac19WindowGuard.noteUrlOk()
+        updateMobileQrOverlay()
+        updateFullScreenQrOverlay()
+        val retried = SongOkDownloadManager.retryNetworkFailed()
+        MiliLog.notice("NET-REFRESH reason=$reason retried=$retried")
+        if (retried > 0) {
+            status?.text = "网络已恢复，正在重试 $retried 首未完成的下载"
+            if (notify) toast("网络已恢复，正在重试 $retried 首未完成的下载")
+        } else if (notify) {
+            status?.text = "网络已恢复"
+        }
+    }
 
     /** 远程日志: 把设备网卡 IP 与设备标识同步给日志客户端(GlogCenter 的 clientip/user/traceid)。 */
     private fun refreshLogDeviceContext() {

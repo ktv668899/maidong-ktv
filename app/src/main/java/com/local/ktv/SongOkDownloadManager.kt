@@ -8,6 +8,8 @@ import com.liulishuo.okdownload.core.cause.EndCause
 import com.liulishuo.okdownload.core.cause.ResumeFailedCause
 import com.liulishuo.okdownload.core.listener.DownloadListener2
 import java.io.File
+import java.util.Collections
+import java.util.LinkedHashMap
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -16,6 +18,8 @@ import java.util.concurrent.atomic.AtomicLong
 object SongOkDownloadManager {
     private const val TAG = "SongDownload"
     const val MIN_VALID_FILE_SIZE = SongFileValidator.MIN_VALID_FILE_SIZE
+    /** 网络恢复后最多自动重试几首（防止一次拉起过多并发下载）。 */
+    private const val MAX_NETWORK_RETRY = 8
     private const val MAX_RETRY_COUNT = 3
     private const val STALL_TIMEOUT_MS = 25_000L
 
@@ -96,6 +100,8 @@ object SongOkDownloadManager {
                 }
                 if (url.isEmpty()) {
                     pending.remove(key)
+                    // 取不到地址通常也是网络/源站不可达, 记下来供网络恢复后自动重试。
+                    if (isNetworkFailure(null, 0)) networkFailed[key] = song
                     callback?.onDownloadFailed(song, "无法生成下载地址")
                 } else {
                     startDownloadTask(song, url, callback, 0)
@@ -113,6 +119,7 @@ object SongOkDownloadManager {
         pending.remove(key)
         tasks.remove(key)?.let { task ->
             manuallyCanceled.add(key)
+            networkFailed.remove(key)
             task.cancel()
             clearBrokenDownload(task, getLocalFile(song))
         }
@@ -123,6 +130,43 @@ object SongOkDownloadManager {
 
     @JvmStatic
     fun getDownloadProgress(song: Song): Int = progress[songKey(song)] ?: 0
+
+    /**
+     * 网络恢复后自动重试「因网络原因失败」的下载（最多 [MAX_NETWORK_RETRY] 首）。
+     *
+     * 断网期间的失败大多是连不上/超时/HTTP 0，属于可恢复；恢复后重试一次，避免用户
+     * 手动重新点歌。手动取消的歌不会进入这个集合。
+     *
+     * @return 实际发起重试的数量
+     */
+    @JvmStatic
+    fun retryNetworkFailed(): Int {
+        val retry = synchronized(networkFailed) {
+            networkFailed.values.toList().also { networkFailed.clear() }
+        }
+        if (retry.isEmpty()) return 0
+        val limited = retry.take(MAX_NETWORK_RETRY)
+        Log.i(TAG, "network recovered, retrying ${limited.size} failed download(s)")
+        io.execute {
+            limited.forEach { song -> runCatching { download(song, callbacks[songKey(song)]) } }
+        }
+        return limited.size
+    }
+
+    /** 判断一个失败是否属于「网络原因」（断网/超时/连不上/HTTP 0）。 */
+    private fun isNetworkFailure(realCause: Exception?, httpCode: Int): Boolean {
+        if (!KtvNetworkMonitor.online) return true
+        if (httpCode == 0) return true
+        val cause = realCause ?: return false
+        return cause is java.net.UnknownHostException ||
+            cause is java.net.ConnectException ||
+            cause is java.net.SocketTimeoutException ||
+            cause is java.net.NoRouteToHostException ||
+            cause is java.net.SocketException ||
+            cause is javax.net.ssl.SSLException ||
+            cause is java.io.EOFException ||
+            cause is java.io.InterruptedIOException
+    }
 
     private fun buildDownloadUrl(song: Song, forceRefresh: Boolean = false): String {
         if (!forceRefresh) {
@@ -222,6 +266,10 @@ object SongOkDownloadManager {
                     } else {
                         pending.remove(key)
                         progress.remove(key)
+                        if (isNetworkFailure(realCause, httpResponseCode)) {
+                            networkFailed[key] = song
+                            Log.w(TAG, "download failed by network: ${song.title} (${cause.name})")
+                        }
                         cb?.onDownloadFailed(song, cause.name + (realCause?.message?.let { ": $it" } ?: ""))
                     }
                     return
@@ -292,6 +340,7 @@ object SongOkDownloadManager {
             }
             pending.remove(key)
             progress.remove(key)
+            networkFailed.remove(key)
             song.path = target.absolutePath
             callback?.onDownloadProgress(song, 100)
             callback?.onDownloadComplete(song, target.absolutePath)
@@ -370,6 +419,9 @@ object SongOkDownloadManager {
             }
         }
     }
+
+    /** 因网络原因失败的歌曲（网络恢复后自动重试一次）。 */
+    private val networkFailed = Collections.synchronizedMap(LinkedHashMap<String, Song>())
 
     private fun songKey(song: Song): String = song.id?.takeIf(String::isNotEmpty)
         ?: song.filename?.takeIf(String::isNotEmpty)

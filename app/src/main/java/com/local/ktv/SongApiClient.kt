@@ -106,8 +106,22 @@ object SongApiClient {
         return false
     }
 
+    /**
+     * 重置歌曲源会话（清 JS 侧 token / API 实例）。
+     *
+     * 注意：这里原来是**空实现**，导致断网重连后仍复用旧 token —— 现象是
+     * 「日志提示歌曲源获取成功（地址拿到了），但实际下载失败/403」。
+     */
     @JvmStatic
-    fun clearTokenCache() {}
+    fun clearTokenCache() {
+        bridge?.resetApiSession()
+    }
+
+    /** 语义更明确的别名：断网恢复后重建歌曲源会话。 */
+    @JvmStatic
+    fun resetSourceSession() {
+        bridge?.resetApiSession()
+    }
 
     /** 最近一次点歌实际命中的歌曲源 host(由 JS 上报, 用于远程日志)。 */
     @JvmStatic

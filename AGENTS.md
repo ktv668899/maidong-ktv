@@ -108,7 +108,7 @@ $BT/apksigner verify 目标名.apk
 
 ### 版本号
 
-- `app/build.gradle`：`versionName "1.3.9"` / `versionCode 15`
+- `app/build.gradle`：`versionName "1.4.0"` / `versionCode 16`
 - App 内显示统一用纯版本号（不加 `(versionCode)` 括号）
 
 ## 三、关键实现约束（避免踩坑）
@@ -139,6 +139,23 @@ $BT/apksigner verify 目标名.apk
   客户端为 `MiliLog`（有界队列 + 后台线程 + 失败重试），调用点 `MiliLog.info/notice/warn/error`
   保持不变。启动上报（`reportDeviceBootInfo()`）只采集这 10 项：包名、版本号、安装时间、品牌、型号、
   设备名、Android 版本、CPU 架构、内核版本、屏幕分辨率
+- **网络状态与断网恢复**：`KtvNetworkMonitor`（object，走 `ConnectivityManager` 回调、不轮询）
+  维护全局 `online`；`MainActivity.onNetworkStateChanged()` 负责：
+  - 断网 → 播放页右上角 `fullScreenNetworkBadge` 显示「网络未连接」（在全屏控制层 header 内、
+    标题右侧，不遮挡右上角二维码）；
+  - 恢复 → `refreshNetworkState()`：重解析网卡 MAC + 日志上下文、**重建歌曲源会话**、
+    复位 `Eac19WindowGuard`、重启本地点歌服务并刷新二维码、自动重试断网期间失败的下载（最多 8 首）。
+  换网/换 IP 时 `remoteNetworkMonitor` 走同一个 `refreshNetworkState()`（静默，不弹提示）。
+  ⚠️ **「断网重连后再也下载不了、日志却显示歌曲源获取成功」的根因**：
+  `SongApiClient.clearTokenCache()` 原本是**空实现**，JS 侧 `window.api.tokens` 与
+  `_apiInitPromise` 会被一直复用；而歌曲源按「出口 IP + device」识别、试用窗口也记在出口 IP 上，
+  断网/重连（尤其换出口 IP）后旧 token 已失效 —— 取址这一步看起来成功，真正下载却 403/失败。
+  现在 `clearTokenCache()` 会真正下发 `KtvJsBridge.resetApiSession()`
+  （置空 `window.api` 与 `_apiInitPromise`，下次取址重新构造 API 实例、回到默认源顺序并重新登录）。
+  下载层的网络类失败由 `SongOkDownloadManager` 结合 `KtvNetworkMonitor.online` 与异常类型/HTTP 0
+  判定并记入 `networkFailed`，网络恢复后由 `retryNetworkFailed()` 自动重试（手动取消的不入集合）。
+  ⚠️ 顺带修掉一个隐患：离线时 `localIp()` 为空，原 `remoteNetworkMonitor` 会每 5s 误判「IP 变化」
+  而反复重启本地点歌服务（并连带触发刷新）；现已加空值短路，离线只等网络回调。
 - **播放界面右上角二维码**：跟随全屏控制层一起出现/隐藏 —— 在
   `setFullScreenChromeVisible()` 里同步 `fullScreenQrOverlay` 的可见性，`updateFullScreenQrOverlay()`
   新建时按 `fullScreenChromeVisible` 初始化。**不要**再按「手机是否在点歌」自动隐藏

@@ -47,6 +47,22 @@ class KtvJsBridge(context: Context) {
         // sn 沿用抓包注册值, 保证 mac 变化后仍能对上原有账号体系。
         private val DEVICE_MAC: String get() = DeviceMac.effective()
         private const val DEVICE_SN = "2d7bb4a7d7f7"
+
+        /**
+         * 断网重连后重置歌曲源会话。
+         *
+         * 源站按「出口 IP + device」识别，试用窗口也记在出口 IP 上（见 Eac19WindowGuard）。
+         * 断网/重连（尤其换了出口 IP）后旧 token 已失效，继续复用会表现为
+         * **「取址看起来成功、实际下载 403/失败」**。这里把整个 API 实例与初始化 Promise
+         * 都清掉：下一次取址会重新 new KtvApi（回到默认源顺序）并重新登录拿新 token。
+         */
+        private const val RESET_SESSION_JS = """(function(){
+              try {
+                window.api = null;
+                window._apiInitPromise = null;
+              } catch (e) {}
+              return 'ok';
+            })()"""
     }
 
     private val appContext = context.applicationContext
@@ -118,6 +134,23 @@ class KtvJsBridge(context: Context) {
     fun isReady(): Boolean = ready && !destroyed
 
     fun isDestroyed(): Boolean = destroyed
+
+    /**
+     * 重置 JS 侧歌曲源会话（断网恢复 / 下载重试时调用）。
+     *
+     * 置空 `window.api` 与 `window._apiInitPromise`，下一次取址会重新构造 API 实例
+     * （恢复默认源顺序）并重新登录，避免继续使用失效 token。
+     */
+    fun resetApiSession() {
+        val view = webView
+        if (!ready || destroyed || view == null) return
+        mainHandler.post {
+            runCatching {
+                view.evaluateJavascript(RESET_SESSION_JS, null)
+                Log.i(TAG, "reset source api session")
+            }.onFailure { Log.w(TAG, "reset source api session failed", it) }
+        }
+    }
 
     fun getSongUrl(
         musicNo: String,
