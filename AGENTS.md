@@ -108,7 +108,7 @@ $BT/apksigner verify 目标名.apk
 
 ### 版本号
 
-- `app/build.gradle`：`versionName "1.3.6"` / `versionCode 12`
+- `app/build.gradle`：`versionName "1.3.7"` / `versionCode 13`
 - App 内显示统一用纯版本号（不加 `(versionCode)` 括号）
 
 ## 三、关键实现约束（避免踩坑）
@@ -185,5 +185,10 @@ $BT/apksigner verify 目标名.apk
   ScrollView 限制为 `屏幕高*0.92 - 弹窗标题/按钮框架(chromeDp)` —— **不要再用 `WRAP_CONTENT` 作为
   弹窗高度**。内容高度由「屏幕预算 - 固定区高度」反推（调音弹窗的 EQ 频段区就是这样自适应），
   预算不足时弹窗内滚动而不是被裁掉。已应用：调音弹窗、扫码点歌弹窗、声音设置弹窗。
-  新增/改动弹窗时请复用该 helper，别再写死 `setLayout(w, WRAP_CONTENT)`
+  新增/改动弹窗时请复用该 helper，别再写死 `setLayout(w, WRAP_CONTENT)`。
+  ⚠️ **文字行必须 wrap_content**：`label()` 自带 6dp 上下内边距，固定矮行（曾用 18/28/42dp）
+  会把文字裁掉 —— 这是"文字显示不全"的根因。做法是「文字行 wrap_content + 只有无文字区域
+  才用计算高度」：调音弹窗里唯一可伸缩的是 EQ 频段区，采用**两遍 fit**（先 `panel.measure()`
+  实测内容高度，超出预算就把频段区减掉，再调 `fitDialogToScreen`），这样收缩的永远是频段区
+  而不是文字；频段区下限 dp(96)，再放不下才滚动。大字体(系统字体缩放)同理自动兜住
 - **仓库可见性**：Gitea 仓库保持 **public**（若后续把 App 更新/热更新端点迁到 Gitea，非 public 会导致 403）

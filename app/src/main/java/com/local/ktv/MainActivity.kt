@@ -2556,28 +2556,22 @@ class MainActivity : AppCompatActivity() {
         val working = KtvEqualizer.levelsSnapshot().let { saved ->
             FloatArray(caps.bandCount) { saved.getOrElse(it) { 0f } }
         }
-        // 分辨率自适应：按屏幕高度算出「弹窗内容能占多少」，把剩余空间留给 EQ 频段区，
-        // 矮屏自动压缩频段区高度(而不是把弹窗顶出屏幕)，再叠加 fitDialogToScreen 的
-        // 高度上限兜底 —— 任何分辨率下都不会被裁切。
+        // 分辨率自适应：**文字行全部 wrap_content**（高度由文本决定，永不被压扁/裁字），
+        // 只有 EQ 频段区是可伸缩的 —— 屏幕放不下时收缩的是频段区，不是文字。
         val metrics = resources.displayMetrics
         val screenHeightDp = metrics.heightPixels / metrics.density
+        // 矮屏(高度<620dp)只用来收窄竖杆列宽；文字尺寸不随分辨率变化。
         val compact = screenHeightDp < 620f
         val chromeDp = if (compact) 132 else 152
         val contentBudgetDp = (screenHeightDp * 0.92f - chromeDp).coerceAtLeast(240f)
-        // 固定区：面板内边距 30 + 标题 42 + 音量标题 28 + 音量杆 + 开关(含间距) 50 + 预设(含间距)
-        val fixedHeightDp = 30f + 42f + 28f +
-            (if (compact) 38 else 44) + 50f +
-            (if (compact) 44 else 52) + 10f
-        val bandAreaDp = (contentBudgetDp - fixedHeightDp).coerceIn(112f, 216f)
-        val bandAreaHeight = dp(bandAreaDp.toInt())
+        // 文字/控件行占位的保守估计(内边距 + 标题 + 音量标题 + 开关 + 预设)，最终以实测量为准。
+        val textRowsDp = 30f + 34f + 30f + 50f + 58f
+        var bandAreaHeight = dp((contentBudgetDp - textRowsDp).coerceIn(112f, 216f).toInt())
         val barColumnWidth = dp(if (compact) 38 else 46)
-        val barCaptionHeight = dp(if (compact) 18 else 20)
-        val volumeRowHeight = dp(if (compact) 38 else 44)
-        val presetRowHeight = dp(if (compact) 44 else 52)
         Log.i(
             TAG,
             "tuning dialog adaptive: screen=${screenHeightDp}dp compact=$compact " +
-                "budget=${contentBudgetDp}dp bandArea=${bandAreaDp}dp",
+                "budget=${contentBudgetDp}dp band=${bandAreaHeight}px",
         )
 
         val panel = LinearLayout(this).apply {
@@ -2603,8 +2597,11 @@ class MainActivity : AppCompatActivity() {
         // ── 标题 ──
         val titleRow = FrameLayout(this)
         titleRow.addView(
-            label("调音", 23, Color.WHITE).apply { gravity = Gravity.CENTER },
-            FrameLayout.LayoutParams(-1, dp(42)),
+            label("调音", 23, Color.WHITE).apply {
+                gravity = Gravity.CENTER
+                includeFontPadding = false
+            },
+            FrameLayout.LayoutParams(-1, -2),
         )
         val close = label("×", 22, Color.argb(153, 255, 255, 255)).apply {
             gravity = Gravity.CENTER
@@ -2616,11 +2613,11 @@ class MainActivity : AppCompatActivity() {
             close,
             FrameLayout.LayoutParams(dp(44), dp(38), Gravity.END or Gravity.CENTER_VERTICAL),
         )
-        panel.addView(titleRow, LinearLayout.LayoutParams(-1, dp(42)))
+        panel.addView(titleRow, LinearLayout.LayoutParams(-1, -2))
 
         // ── 1. 音量：横向控制杆（即时生效）──
         val volumeTitle = label("音量  $musicVolume%", 16, Color.WHITE)
-        panel.addView(volumeTitle, LinearLayout.LayoutParams(-1, dp(28)))
+        panel.addView(volumeTitle, LinearLayout.LayoutParams(-1, -2))
         var lastVolumeAppliedAt = 0L
         val volumeBar = SeekBar(this).apply {
             max = 100
@@ -2649,7 +2646,7 @@ class MainActivity : AppCompatActivity() {
                 }
             })
         }
-        panel.addView(volumeBar, LinearLayout.LayoutParams(-1, volumeRowHeight))
+        panel.addView(volumeBar, LinearLayout.LayoutParams(-1, -2))
 
         // ── 2. 均衡器开关（默认关闭）──
         lateinit var eqSwitch: TextView
@@ -2666,7 +2663,7 @@ class MainActivity : AppCompatActivity() {
             applyEqualizerSettings()
             toast(if (KtvEqualizer.enabled) "均衡器已开启" else "均衡器已关闭")
         }
-        panel.addView(eqSwitch, LinearLayout.LayoutParams(dp(190), dp(42)).apply { topMargin = dp(8) })
+        panel.addView(eqSwitch, LinearLayout.LayoutParams(dp(200), -2).apply { topMargin = dp(8) })
 
         eqArea = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         panel.addView(eqArea, LinearLayout.LayoutParams(-1, -2))
@@ -2684,9 +2681,18 @@ class MainActivity : AppCompatActivity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
         }
-        eqArea.addView(presetRow, LinearLayout.LayoutParams(-1, presetRowHeight).apply { topMargin = dp(10) })
+        eqArea.addView(presetRow, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(10) })
 
         // ── 4. EQ 频段：竖向控制杆 ──
+        // 刻度文字用无内边距的 caption：高度由文本自身决定, 不会再被固定 dp 裁掉。
+        fun caption(text: String, sp: Int, color: Int): TextView = TextView(this).apply {
+            this.text = text
+            textSize = sp.toFloat()
+            setTextColor(color)
+            gravity = Gravity.CENTER
+            includeFontPadding = false
+            setPadding(0, 0, 0, 0)
+        }
         val bars = ArrayList<VerticalEqBar>(caps.bandCount)
         val valueViews = ArrayList<TextView>(caps.bandCount)
         fun syncBars() {
@@ -2707,13 +2713,13 @@ class MainActivity : AppCompatActivity() {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER_HORIZONTAL
             }
-            val value = label(
+            val value = caption(
                 eqLevelText(working.getOrElse(index) { 0f }),
                 12,
                 Color.argb(170, 255, 255, 255),
-            ).apply { gravity = Gravity.CENTER }
+            )
             valueViews.add(value)
-            column.addView(value, LinearLayout.LayoutParams(-1, barCaptionHeight))
+            column.addView(value, LinearLayout.LayoutParams(-1, -2))
             val bar = VerticalEqBar(this).apply {
                 setRange(caps.minDb, caps.maxDb, eqSliderSteps)
                 setLevel(working.getOrElse(index) { 0f })
@@ -2735,10 +2741,8 @@ class MainActivity : AppCompatActivity() {
             bars.add(bar)
             column.addView(bar, LinearLayout.LayoutParams(barColumnWidth, 0, 1f))
             column.addView(
-                label(bandLabels.getOrElse(index) { "${index + 1}" } + "Hz", 12, Color.WHITE).apply {
-                    gravity = Gravity.CENTER
-                },
-                LinearLayout.LayoutParams(-1, barCaptionHeight),
+                caption(bandLabels.getOrElse(index) { "${index + 1}" } + "Hz", 12, Color.WHITE),
+                LinearLayout.LayoutParams(-1, -2),
             )
             barRow.addView(column, LinearLayout.LayoutParams(0, -1, 1f))
         }
@@ -2752,6 +2756,8 @@ class MainActivity : AppCompatActivity() {
                 isClickable = true
                 isFocusable = true
                 background = getDrawable(R.drawable.bg_tuning_counter)
+                includeFontPadding = false
+                setPadding(dp(6), dp(11), dp(6), dp(11))
                 TvFocusStyler.installAction(this)
                 setOnClickListener {
                     if (name == KtvEqualizer.CUSTOM_PRESET) {
@@ -2768,7 +2774,7 @@ class MainActivity : AppCompatActivity() {
             presetButtons[name] = presetButton
             presetRow.addView(
                 presetButton,
-                LinearLayout.LayoutParams(0, dp(46), 1f).apply {
+                LinearLayout.LayoutParams(0, -2, 1f).apply {
                     marginStart = dp(4)
                     marginEnd = dp(4)
                 },
@@ -2787,7 +2793,29 @@ class MainActivity : AppCompatActivity() {
                 attributes = attributes.apply { dimAmount = 0.72f }
                 addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
             }
-            // 分辨率自适应：宽度上限 + 内容区高度上限（超出时弹窗内滚动，绝不裁切）。
+            // 两遍自适应：先按内容实测高度判断是否超出可用空间，超出就只压缩 EQ 频段区
+            // （文字行 wrap_content 保持不变），最后再收敛窗口尺寸。
+            val availableHeight = (metrics.heightPixels * 0.92f).toInt()
+            val maxContentHeight = (availableHeight - dp(chromeDp)).coerceAtLeast(dp(150))
+            val probeWidth = min(dp(760), (metrics.widthPixels * 0.94f).toInt())
+            panel.measure(
+                View.MeasureSpec.makeMeasureSpec(probeWidth, View.MeasureSpec.AT_MOST),
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+            )
+            val overflow = panel.measuredHeight - maxContentHeight
+            if (overflow > 0) {
+                val shrunk = (bandAreaHeight - overflow).coerceAtLeast(dp(96))
+                Log.i(
+                    TAG,
+                    "tuning dialog shrink band: measured=${panel.measuredHeight}px " +
+                        "max=${maxContentHeight}px band=$bandAreaHeight->$shrunk",
+                )
+                if (shrunk < bandAreaHeight) {
+                    bandAreaHeight = shrunk
+                    barRow.layoutParams = barRow.layoutParams.apply { height = bandAreaHeight }
+                }
+            }
+            // 最终兜底：宽度上限 + 内容区高度上限（仍放不下时弹窗内滚动，绝不裁切）。
             fitDialogToScreen(
                 dialog = dialog,
                 scroll = scroll,
