@@ -275,6 +275,13 @@ $("#musicVolume").addEventListener("change", (event) => updateAudio({ musicVolum
 // 均衡器入口(与设备端弹窗等价): 开关 / 恢复标准
 $("#eqToggle")?.addEventListener("click", () => updateEqualizer({ enabled: !uiState.eqEnabled }));
 $("#eqReset")?.addEventListener("click", () => updateEqualizer({ preset: "标准" }));
+// 均衡器文字栏作为折叠按钮: 默认收起; 展开后在同一次页面会话内保持, 重新加载页面回到收起态。
+$("#eqCollapse")?.addEventListener("click", () => {
+  const body = $("#eqBody");
+  if (!body) return;
+  const collapsed = body.classList.toggle("hidden");
+  $("#eqCollapse").setAttribute("aria-expanded", collapsed ? "false" : "true");
+});
 document.addEventListener("visibilitychange", () => { uiState.visible = !document.hidden; if (uiState.visible) refresh(); });
 window.setInterval(() => { if (uiState.visible) refresh(); }, 1000);
 refresh();

@@ -49,7 +49,7 @@ class KtvStore {
     @JvmField var tableBroadcastText = "欢迎光临"
     // ===== 均衡器（KtvEqualizer）=====
     @JvmField var eqEnabled = false
-    @JvmField var eqPreset = "标准"
+    @JvmField var eqPreset = "自定义"
     /** 各频段增益(dB)，逗号分隔；不同设备频段数可能不同，加载后会按实际频段数对齐。 */
     @JvmField var eqLevels = ""
     @JvmField var eqGlobalMix = false
@@ -103,7 +103,7 @@ class KtvStore {
             tableBroadcastSeconds = root.optInt("tableBroadcastSeconds", 8)
             tableBroadcastText = root.optString("tableBroadcastText", "欢迎光临")
             eqEnabled = root.optBoolean("eqEnabled", false)
-            eqPreset = root.optString("eqPreset", "标准")
+            eqPreset = root.optString("eqPreset", "自定义")
             eqLevels = root.optString("eqLevels", "")
             eqGlobalMix = root.optBoolean("eqGlobalMix", false)
             readSongs(root.optJSONArray("orderQueue"), orderQueue)

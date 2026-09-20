@@ -55,17 +55,22 @@ object KtvEqualizer {
     /**
      * 预设曲线：以「频段在可用范围内的相对位置 0..1」为横轴、以最大增益的比例 -1..1 为纵轴。
      * 这样同一套预设能自适应任意频段数的设备。
+     *
+     * `标准` 不显示在 App 的预设行里（App 用「自定义」表示用户自己调的状态），
+     * 但保留给远程页面的「恢复标准」按钮使用。
      */
     private val PRESETS: LinkedHashMap<String, List<Pair<Float, Float>>> = linkedMapOf(
         "标准" to listOf(0f to 0f),
         "流行" to listOf(0f to 0.35f, 0.25f to -0.15f, 0.6f to 0.1f, 1f to 0.35f),
-        "抒情" to listOf(0f to -0.1f, 0.35f to 0.25f, 0.7f to 0.15f, 1f to -0.05f),
         "摇滚" to listOf(0f to 0.7f, 0.3f to -0.4f, 1f to 0.6f),
-        "唱将" to listOf(0f to -0.2f, 0.5f to 0.55f, 0.8f to 0.3f, 1f to 0.05f),
+        "舞曲" to listOf(0f to 0.85f, 0.22f to 0.2f, 0.5f to -0.35f, 0.78f to 0.25f, 1f to 0.65f),
     )
 
     /** 手动改过频段后使用的预设名。 */
     const val CUSTOM_PRESET = "自定义"
+
+    /** App 内「调音」弹窗预设行的顺序（含「自定义」）。 */
+    fun appPresetNames(): List<String> = listOf(CUSTOM_PRESET, "流行", "摇滚", "舞曲")
 
     @Volatile var enabled: Boolean = false
         private set
@@ -73,7 +78,7 @@ object KtvEqualizer {
     @Volatile var globalMix: Boolean = false
         private set
 
-    @Volatile var preset: String = "标准"
+    @Volatile var preset: String = CUSTOM_PRESET
         private set
 
     private var levels: FloatArray = FloatArray(0)

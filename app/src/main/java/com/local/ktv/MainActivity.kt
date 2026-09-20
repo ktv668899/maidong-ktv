@@ -1004,8 +1004,8 @@ class MainActivity : AppCompatActivity() {
         addTile(
             grid,
             "音量音调",
-            "原伴唱 / 音量 / 升降调",
-            View.OnClickListener { v: View? -> showAudioControlDialog() })
+            "音量 / 均衡器",
+            View.OnClickListener { v: View? -> showTuningDialog() })
         addTile(
             grid,
             "气氛模式",
@@ -1118,7 +1118,7 @@ class MainActivity : AppCompatActivity() {
         controls.addView(
             button(
                 "音控",
-                View.OnClickListener { v: View? -> showAudioControlDialog() }),
+                View.OnClickListener { v: View? -> showTuningDialog() }),
             LinearLayout.LayoutParams(0, dp(50), 1f)
         )
         controls.addView(
@@ -1858,23 +1858,23 @@ class MainActivity : AppCompatActivity() {
             }
 
             1 -> {
-                // 音频控制(链接到调音弹窗)
+                // 音量与均衡器统一走「调音」弹窗（升降调在下一页单独设置）
                 addSettingsTitle(content, "音频控制")
                 addSettingsItem(
                     content,
+                    "音量与均衡器",
+                    "音量 " + musicVolume + "% · 均衡器" + (if (KtvEqualizer.enabled) "开" else "关"),
+                    View.OnClickListener { v: View? -> showTuningDialog() })
+                addSettingsItem(
+                    content,
+                    "均衡器预设",
+                    KtvEqualizer.preset,
+                    View.OnClickListener { v: View? -> showTuningDialog() })
+                addSettingsItem(
+                    content,
                     "麦克风音量",
-                    micVolume.toString() + "%",
-                    View.OnClickListener { v: View? -> showAudioControlDialog() })
-                addSettingsItem(
-                    content,
-                    "音乐音量",
-                    musicVolume.toString() + "%",
-                    View.OnClickListener { v: View? -> showAudioControlDialog() })
-                addSettingsItem(
-                    content,
-                    "音调",
-                    (if (tone > 0) "+" else "") + tone + " 调",
-                    View.OnClickListener { v: View? -> showAudioControlDialog() })
+                    "由功放/混音器硬件调节",
+                    View.OnClickListener { v: View? -> toast("麦克风音量由功放/混音器硬件调节") })
                 addSettingsItem(
                     content,
                     "原唱模式",
@@ -2128,7 +2128,7 @@ class MainActivity : AppCompatActivity() {
      *  * `onPlayPause` → [.togglePlay]
      *  * `onPrev` / `onNext` → [.playPrevSong] / [.playNext]
      *  * `onVocalSwitch` → 使用 [VocalSwitchHelper] 切换原唱/伴唱声道
-     *  * `onVolume` → [.showAudioControlDialog]
+     *  * `onVolume` → [.showTuningDialog]
      *  * `onFullScreen` → [.showFullScreenPlayer]
      * 
      */
@@ -2152,7 +2152,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onVolume() {
-                showAudioControlDialog()
+                showTuningDialog()
             }
 
             override fun onFullScreen() {
@@ -2266,8 +2266,7 @@ class MainActivity : AppCompatActivity() {
             if (playWhenPrepared) "暂停" else "播放"
         ) { togglePlay() }.also { (text, icon) -> fullScreenPauseText = text; fullScreenPauseIcon = icon }
         addControl(R.drawable.ott_ic_ctrl_replay, "重唱") { replay() }
-        addControl(R.drawable.ott_ic_ctrl_volume, "调音") { showFullScreenVolumeDialog() }
-        fullScreenToneControl = controlItems.lastOrNull()
+        addControl(R.drawable.ott_ic_ctrl_volume, "调音") { showTuningDialog() }
 
         controlItems.forEachIndexed { index, item ->
             item.nextFocusLeftId = controlItems.getOrNull(index - 1)?.id ?: item.id
@@ -2359,16 +2358,9 @@ class MainActivity : AppCompatActivity() {
         fullScreenSeeking = false
         fullScreenControls = null
         fullScreenProgressRow = null
-        fullScreenVolumePanel = null
-        fullScreenVolumeIndicator = null
-        fullScreenVolumeMinusButton = null
-        fullScreenVolumePlusButton = null
-        fullScreenVolumeMuteButton = null
-        fullScreenToneControl = null
         fullScreenQrOverlay = null
         fullScreenChromeVisible = false
         main.removeCallbacks(hideFullScreenChromeRunnable)
-        main.removeCallbacks(hideFullScreenVolumeIndicatorRunnable)
         scheduleAutoFullscreen()
     }
 
@@ -2377,11 +2369,10 @@ class MainActivity : AppCompatActivity() {
         fullScreenChromeVisible = visible
         fullScreenControls?.visibility = if (visible) View.VISIBLE else View.GONE
         fullScreenProgressRow?.visibility = if (visible) View.VISIBLE else View.GONE
-        if (!visible) fullScreenVolumePanel?.visibility = View.GONE
         main.removeCallbacks(hideFullScreenChromeRunnable)
         if (visible && isFullScreen) {
             val controls = fullScreenControls
-            if (controls != null && !controls.hasFocus() && fullScreenVolumePanel?.hasFocus() != true) {
+            if (controls != null && !controls.hasFocus()) {
                 controls.getChildAt(0)?.requestFocus()
             }
             main.postDelayed(hideFullScreenChromeRunnable, 5000L)
@@ -2411,140 +2402,9 @@ class MainActivity : AppCompatActivity() {
      * 供 [FullScreenPlayerFragment] 调用打开音量控制面板。
      */
     fun showAudioControlFromFragment() {
-        showAudioControlDialog()
+        showTuningDialog()
     }
 
-    private fun showFullScreenVolumeDialog() {
-        if (!isFullScreen || fullScreenContainer == null) return
-        val existing = fullScreenVolumePanel
-        if (existing != null) {
-            existing.visibility = if (existing.visibility == View.VISIBLE) View.GONE else View.VISIBLE
-            if (existing.visibility == View.VISIBLE) {
-                fullScreenVolumeMinusButton?.requestFocus()
-            } else {
-                fullScreenToneControl?.requestFocus()
-            }
-            return
-        }
-
-        if (musicVolume > 0) fullScreenPreviousVolume = musicVolume
-        val panel = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            // 仅用于吞掉触摸(点击穿透到全屏容器会误切控制层显示), 不是操作项;
-            // 因此禁止焦点/按下填充, 否则触摸时整块面板会变成纯色。
-            isClickable = true
-        }
-        TvFocusStyler.suppressFill(panel)
-        val indicator = CircularVolumeView(this).apply {
-            setVolume(musicVolume)
-            visibility = View.GONE
-            alpha = 1f
-        }
-        panel.addView(indicator, LinearLayout.LayoutParams(dp(154), dp(154)).apply {
-            bottomMargin = dp(22)
-        })
-        panel.addView(label("调音", 26, Color.WHITE).apply {
-            gravity = Gravity.CENTER
-        }, LinearLayout.LayoutParams(dp(420), dp(54)))
-
-        val buttons = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-        }
-        fun volumeButton(text: String): TextView = TextView(this).apply {
-            this.text = text
-            id = View.generateViewId()
-            gravity = Gravity.CENTER
-            textSize = 18f
-            setTextColor(Color.WHITE)
-            setBackgroundResource(R.drawable.ott_bg_volume_ctrl_action_button)
-            isFocusable = true
-            isFocusableInTouchMode = true
-            isClickable = true
-            includeFontPadding = false
-            setPadding(dp(14), 0, dp(14), 0)
-        }
-        val minus = volumeButton("音量 －")
-        val plus = volumeButton("音量 ＋")
-        val mute = volumeButton("静音").apply {
-            compoundDrawablePadding = dp(8)
-        }
-        fun renderMuteButton() {
-            mute.text = if (musicVolume == 0) "放音" else "静音"
-            val drawable = getDrawable(
-                if (musicVolume == 0) R.drawable.ic_ctrl_sound_enable
-                else R.drawable.ic_ctrl_sound_disable
-            )
-            drawable?.setBounds(0, 0, dp(23), dp(23))
-            mute.setCompoundDrawables(null, null, drawable, null)
-        }
-        fun showVolumeResult() {
-            indicator.animate().cancel()
-            indicator.setVolume(musicVolume)
-            indicator.alpha = 1f
-            indicator.visibility = View.VISIBLE
-            renderMuteButton()
-            // 只调 App 内部输出音量, 不改系统音量(见 applyPlaybackMode)。
-            applyPlaybackMode()
-            saveState()
-            main.removeCallbacks(hideFullScreenVolumeIndicatorRunnable)
-            main.postDelayed(hideFullScreenVolumeIndicatorRunnable, 2200L)
-            setFullScreenChromeVisible(true)
-        }
-        minus.setOnClickListener {
-            musicVolume = (musicVolume - 5).coerceAtLeast(0)
-            if (musicVolume > 0) fullScreenPreviousVolume = musicVolume
-            showVolumeResult()
-        }
-        plus.setOnClickListener {
-            musicVolume = (musicVolume + 5).coerceAtMost(100)
-            if (musicVolume > 0) fullScreenPreviousVolume = musicVolume
-            showVolumeResult()
-        }
-        mute.setOnClickListener {
-            if (musicVolume > 0) {
-                fullScreenPreviousVolume = musicVolume
-                musicVolume = 0
-            } else {
-                musicVolume = fullScreenPreviousVolume.coerceAtLeast(5)
-            }
-            showVolumeResult()
-        }
-        // 播放界面「调音」面板里的均衡器入口（与主页顶栏「调音」弹窗里的入口等价）。
-        val equalizer = volumeButton("均衡器")
-        equalizer.setOnClickListener { showEqualizerDialog() }
-        val volumeButtons = listOf(minus, plus, mute, equalizer)
-        volumeButtons.forEachIndexed { index, button ->
-            button.nextFocusLeftId = volumeButtons.getOrNull(index - 1)?.id ?: button.id
-            button.nextFocusRightId = volumeButtons.getOrNull(index + 1)?.id ?: button.id
-            button.nextFocusUpId = fullScreenToneControl?.id ?: button.id
-            button.nextFocusDownId = button.id
-            buttons.addView(button, LinearLayout.LayoutParams(dp(136), dp(58)).apply {
-                leftMargin = dp(6)
-                rightMargin = dp(6)
-            })
-        }
-        panel.addView(buttons, LinearLayout.LayoutParams(-2, dp(70)).apply { topMargin = dp(12) })
-        renderMuteButton()
-
-        fullScreenContainer!!.addView(
-            panel,
-            FrameLayout.LayoutParams(-2, -2, Gravity.CENTER_HORIZONTAL or Gravity.BOTTOM).apply {
-                bottomMargin = dp(86)
-            },
-        )
-        fullScreenVolumePanel = panel
-        fullScreenVolumeIndicator = indicator
-        fullScreenVolumeMinusButton = minus
-        fullScreenVolumePlusButton = plus
-        fullScreenVolumeMuteButton = mute
-        minus.requestFocus()
-    }
-
-    /**
-     * 切换到上一首歌曲(供控制层 onPrev 回调使用)。
-     */
     fun playPrevSong() {
         if (orderQueue!!.isEmpty() || currentSong == null) return
         val index = orderQueue.indexOf(currentSong!!)
@@ -2590,197 +2450,6 @@ class MainActivity : AppCompatActivity() {
         saveState()
         toast("声道模式：" + vocalChannelMode)
     }
-
-    /**
-     * 显示调音/音频控制弹窗(对应"弹窗-调音.jpg")
-     * 使用 dialog_audio_control.xml 实现
-     */
-    private fun showAudioControlDialog() {
-        if (showAlignedTuningDialog()) return
-        val root = getLayoutInflater().inflate(R.layout.dialog_audio_control, null)
-        val btnClose = root.findViewById<TextView>(R.id.btn_audio_close)
-        val btnStereo = root.findViewById<TextView>(R.id.btn_tone_stereo)
-        val btnAccomp = root.findViewById<TextView>(R.id.btn_tone_accomp)
-        val btnOrigin = root.findViewById<TextView>(R.id.btn_tone_origin)
-        val btnMute = root.findViewById<TextView>(R.id.btn_tone_mute)
-        val seekMicVol = root.findViewById<SeekBar>(R.id.seek_mic_volume)
-        val seekMicEffect = root.findViewById<SeekBar>(R.id.seek_mic_effect)
-        val seekMusicVol = root.findViewById<SeekBar>(R.id.seek_music_volume)
-        val tvMicVol = root.findViewById<TextView>(R.id.text_mic_volume_value)
-        val tvMicEffect = root.findViewById<TextView>(R.id.text_mic_effect_value)
-        val tvMusicVol = root.findViewById<TextView>(R.id.text_music_volume_value)
-        val btnDefault = root.findViewById<TextView>(R.id.btn_audio_default)
-        val btnSave = root.findViewById<TextView>(R.id.btn_audio_save)
-
-        // 初始值
-        seekMicVol.setProgress(micVolume)
-        seekMicEffect.setProgress(50)
-        seekMusicVol.setProgress(musicVolume)
-        tvMicVol.setText(micVolume.toString())
-        tvMicEffect.setText("50")
-        tvMusicVol.setText(musicVolume.toString())
-
-        // 4 个切换按钮:伴唱 / 原唱 / 立体声 / 静音
-        updateToggleState(btnAccomp, !originalVocal)
-        updateToggleState(btnOrigin, originalVocal)
-        updateToggleState(btnStereo, "自动" == vocalChannelMode)
-        updateToggleState(btnMute, false)
-        btnAccomp.setOnClickListener(View.OnClickListener { v: View? ->
-            if (originalVocal) toggleOriginalVocal()
-            updateToggleState(btnAccomp, true)
-            updateToggleState(btnOrigin, false)
-        })
-        btnOrigin.setOnClickListener(View.OnClickListener { v: View? ->
-            if (!originalVocal) toggleOriginalVocal()
-            updateToggleState(btnAccomp, false)
-            updateToggleState(btnOrigin, true)
-        })
-        btnStereo.setOnClickListener(View.OnClickListener { v: View? ->
-            setVocalChannelMode("自动")
-            updateToggleState(btnStereo, true)
-        })
-        btnMute.setOnClickListener(View.OnClickListener { v: View? ->
-            if (musicVolume > 0) {
-                muteBeforeVol = musicVolume
-                musicVolume = 0
-            } else {
-                musicVolume = muteBeforeVol
-            }
-            applyPlaybackMode()
-            seekMusicVol.setProgress(musicVolume)
-            tvMusicVol.setText(musicVolume.toString())
-            updateToggleState(btnMute, musicVolume == 0)
-            saveState()
-        })
-
-        // 3 个滑块
-        seekMicVol.setOnSeekBarChangeListener(object : OnSeekBarChangeListener {
-            override fun onProgressChanged(s: SeekBar?, p: Int, u: Boolean) {
-                micVolume = p
-                tvMicVol.setText(p.toString())
-            }
-
-            override fun onStartTrackingTouch(s: SeekBar?) {}
-            override fun onStopTrackingTouch(s: SeekBar?) {
-                saveState()
-            }
-        })
-        seekMicEffect.setOnSeekBarChangeListener(object : OnSeekBarChangeListener {
-            override fun onProgressChanged(s: SeekBar?, p: Int, u: Boolean) {
-                tvMicEffect.setText(p.toString())
-            }
-
-            override fun onStartTrackingTouch(s: SeekBar?) {}
-            override fun onStopTrackingTouch(s: SeekBar?) {}
-        })
-        seekMusicVol.setOnSeekBarChangeListener(object : OnSeekBarChangeListener {
-            override fun onProgressChanged(s: SeekBar?, p: Int, u: Boolean) {
-                musicVolume = p
-                tvMusicVol.setText(p.toString())
-            }
-
-            override fun onStartTrackingTouch(s: SeekBar?) {}
-            override fun onStopTrackingTouch(s: SeekBar?) {
-                applyPlaybackMode()
-                saveState()
-            }
-        })
-
-        // 默认 / 保存
-        btnDefault.setOnClickListener(View.OnClickListener { v: View? ->
-            seekMicVol.setProgress(60)
-            seekMicEffect.setProgress(50)
-            seekMusicVol.setProgress(KtvStore.DEFAULT_MUSIC_VOLUME)
-            micVolume = 60
-            musicVolume = KtvStore.DEFAULT_MUSIC_VOLUME
-            applyPlaybackMode()
-            saveState()
-            tvMicVol.setText("60")
-            tvMicEffect.setText("50")
-            tvMusicVol.setText("80")
-            updateToggleState(btnMute, false)
-        })
-
-        // 创建并显示弹窗
-        val dialog = AlertDialog.Builder(this)
-            .setView(root)
-            .create()
-        // 透明背景显示圆角
-        if (dialog.getWindow() != null) {
-            dialog.getWindow()!!.setBackgroundDrawableResource(android.R.color.transparent)
-        }
-        btnClose.setOnClickListener(View.OnClickListener { v: View? -> dialog.dismiss() })
-        btnSave.setOnClickListener(View.OnClickListener { v: View? ->
-            saveState()
-            dialog.dismiss()
-        })
-        dialog.restoreSourceFocusOnDismiss()
-        dialog.show()
-    }
-
-    private fun showAlignedTuningDialog(): Boolean {
-        val root = getLayoutInflater().inflate(R.layout.dialog_tuning, null)
-        val toneValue = root.findViewById<TextView>(R.id.text_tone_counter)
-        val micValue = root.findViewById<TextView>(R.id.text_mic_counter)
-        toneValue.setText(tone.toString())
-        micValue.setText(micVolume.toString())
-
-        val dialog = AlertDialog.Builder(this).setView(root).create()
-        root.findViewById<View?>(R.id.btn_tuning_close)
-            .setOnClickListener(View.OnClickListener { v: View? -> dialog.dismiss() })
-        root.findViewById<View?>(R.id.btn_tone_down)
-            .setOnClickListener(View.OnClickListener { v: View? ->
-                tone = max(-5, tone - 1)
-                toneValue.setText(tone.toString())
-                player?.setTone(tone)
-                applyPlaybackMode()
-                saveState()
-            })
-        root.findViewById<View?>(R.id.btn_tone_up)
-            .setOnClickListener(View.OnClickListener { v: View? ->
-                tone = min(5, tone + 1)
-                toneValue.setText(tone.toString())
-                player?.setTone(tone)
-                applyPlaybackMode()
-                saveState()
-            })
-        root.findViewById<View?>(R.id.btn_mic_down)
-            .setOnClickListener(View.OnClickListener { v: View? ->
-                toast("麦克风音量由功放/混音器硬件调节")
-            })
-        root.findViewById<View?>(R.id.btn_mic_up)
-            .setOnClickListener(View.OnClickListener { v: View? ->
-                toast("麦克风音量由功放/混音器硬件调节")
-            })
-        bindAtmospherePreset(root, R.id.btn_preset_pop, "流行")
-        bindAtmospherePreset(root, R.id.btn_preset_lyric, "抒情")
-        bindAtmospherePreset(root, R.id.btn_preset_rock, "摇滚")
-        bindAtmospherePreset(root, R.id.btn_preset_singer, "唱将")
-        // 均衡器入口：主页顶栏「调音」/播放界面「调音」/控制层「音量」都走本弹窗。
-        root.findViewById<View?>(R.id.btn_tuning_equalizer)?.setOnClickListener {
-            dialog.dismiss()
-            showEqualizerDialog()
-        }
-
-        dialog.showForTv(afterShow = {
-            dialog.window?.apply {
-                setBackgroundDrawableResource(android.R.color.transparent)
-                attributes = attributes.apply { dimAmount = 0.72f }
-                addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-            }
-            root.findViewById<View>(R.id.btn_tone_down).requestFocus()
-        })
-        return true
-    }
-
-    private fun bindAtmospherePreset(root: View, id: Int, preset: String) {
-        root.findViewById<View?>(id).setOnClickListener(View.OnClickListener { v: View? ->
-            atmosphere = preset
-            saveState()
-            toast("音效: " + preset)
-        })
-    }
-
     // ===== 均衡器 =====
 
     /** 把持久化的 "1.0,-2.0,..." 解析成频段增益数组。 */
@@ -2822,56 +2491,32 @@ class MainActivity : AppCompatActivity() {
         syncEqualizerSessions()
         saveState()
     }
-
     /**
-     * 均衡器弹窗 —— App 内统一入口（主页顶栏「调音」、播放界面「调音」、
-     * 声音设置「均衡器入口」，以及远程点歌页面的同名入口）。
+     * 「调音」弹窗 —— 播放界面与主界面右上角共用的**唯一**调音入口。
      *
-     * 内核见 [KtvEqualizer]：参考开源项目 OpenEQ，直接使用系统 `audiofx.Equalizer`，
-     * 并按设备真实支持的频段数与增益范围自适应，因此频段是动态生成的。
-     * UI 与「调音」弹窗保持一致：深色圆角面板 + 紫色频段卡 + 橙色焦点反馈。
+     * 自上而下（全部即时生效，所以没有「完成 / 确认」按钮）：
+     *   1. 音量：横向控制杆 —— App 内部输出音量，不改动系统音量；
+     *   2. 均衡器开关（默认关闭）；
+     *   3. 均衡器预设：自定义（用户改动频段后自动保存）/ 流行 / 摇滚 / 舞曲；
+     *   4. EQ 频段调节：竖向控制杆（频段数与增益范围取自设备真实能力）。
      */
-    private fun showEqualizerDialog() {
+    private fun showTuningDialog() {
         val caps = KtvEqualizer.capabilities(this)
         val bandLabels = KtvEqualizer.bandLabels(caps)
         val working = KtvEqualizer.levelsSnapshot().let { saved ->
             FloatArray(caps.bandCount) { saved.getOrElse(it) { 0f } }
         }
-        val globalSupported = KtvEqualizer.globalMixSupported()
 
         val panel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             background = getDrawable(R.drawable.bg_tuning_dialog)
-            setPadding(dp(26), dp(16), dp(26), dp(18))
+            setPadding(dp(26), dp(14), dp(26), dp(16))
         }
         TvFocusStyler.suppressFill(panel)
 
-        // ── 标题 ──
-        val titleRow = FrameLayout(this)
-        titleRow.addView(
-            label("均衡器", 24, Color.WHITE).apply { gravity = Gravity.CENTER },
-            FrameLayout.LayoutParams(-1, dp(46)),
-        )
-        val close = label("×", 22, Color.argb(153, 255, 255, 255)).apply {
-            gravity = Gravity.CENTER
-            isClickable = true
-            isFocusable = true
-            TvFocusStyler.installAction(this)
-        }
-        titleRow.addView(
-            close,
-            FrameLayout.LayoutParams(dp(44), dp(40), Gravity.END or Gravity.CENTER_VERTICAL),
-        )
-        panel.addView(titleRow, LinearLayout.LayoutParams(-1, dp(46)))
-
-        // ── 状态行：总开关 / 全局混音 / 重置 ──
-        val switchRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
         fun pill(text: String, action: () -> Unit): TextView = TextView(this).apply {
             this.text = text
-            textSize = 16f
+            textSize = 15f
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
             background = getDrawable(R.drawable.bg_btn_glass)
@@ -2881,66 +2526,79 @@ class MainActivity : AppCompatActivity() {
             setOnClickListener { action() }
             TvFocusStyler.installAction(this)
         }
-        lateinit var enabledPill: TextView
-        lateinit var globalPill: TextView
-        fun renderPills() {
-            enabledPill.text = if (KtvEqualizer.enabled) "均衡器：开启" else "均衡器：关闭"
-            enabledPill.setTextColor(if (KtvEqualizer.enabled) Color.rgb(39, 204, 164) else Color.WHITE)
-            globalPill.text = if (!globalSupported) {
-                "全局混音：不支持"
-            } else if (KtvEqualizer.globalMix) {
-                "全局混音：开"
-            } else {
-                "全局混音：关"
-            }
-            globalPill.alpha = if (globalSupported) 1f else 0.45f
+
+        // ── 标题 ──
+        val titleRow = FrameLayout(this)
+        titleRow.addView(
+            label("调音", 23, Color.WHITE).apply { gravity = Gravity.CENTER },
+            FrameLayout.LayoutParams(-1, dp(42)),
+        )
+        val close = label("×", 22, Color.argb(153, 255, 255, 255)).apply {
+            gravity = Gravity.CENTER
+            isClickable = true
+            isFocusable = true
+            TvFocusStyler.installAction(this)
         }
-        enabledPill = pill(if (KtvEqualizer.enabled) "均衡器：开启" else "均衡器：关闭") {
+        titleRow.addView(
+            close,
+            FrameLayout.LayoutParams(dp(44), dp(38), Gravity.END or Gravity.CENTER_VERTICAL),
+        )
+        panel.addView(titleRow, LinearLayout.LayoutParams(-1, dp(42)))
+
+        // ── 1. 音量：横向控制杆（即时生效）──
+        val volumeTitle = label("音量  $musicVolume%", 16, Color.WHITE)
+        panel.addView(volumeTitle, LinearLayout.LayoutParams(-1, dp(28)))
+        var lastVolumeAppliedAt = 0L
+        val volumeBar = SeekBar(this).apply {
+            max = 100
+            progress = musicVolume
+            isFocusable = true
+            isFocusableInTouchMode = true
+            setPadding(0, 0, 0, 0)
+            TvFocusStyler.installAction(this)
+            setOnSeekBarChangeListener(object : OnSeekBarChangeListener {
+                override fun onProgressChanged(bar: SeekBar?, progress: Int, fromUser: Boolean) {
+                    musicVolume = progress.coerceIn(0, 100)
+                    volumeTitle.text = "音量  $musicVolume%"
+                    // 拖动时按 100ms 节流即时生效，避免每个像素都重建音轨。
+                    val now = System.currentTimeMillis()
+                    if (now - lastVolumeAppliedAt >= 100L) {
+                        lastVolumeAppliedAt = now
+                        applyPlaybackMode()
+                    }
+                }
+
+                override fun onStartTrackingTouch(bar: SeekBar?) = Unit
+
+                override fun onStopTrackingTouch(bar: SeekBar?) {
+                    applyPlaybackMode()
+                    saveState()
+                }
+            })
+        }
+        panel.addView(volumeBar, LinearLayout.LayoutParams(-1, dp(44)))
+
+        // ── 2. 均衡器开关（默认关闭）──
+        lateinit var eqSwitch: TextView
+        lateinit var eqArea: LinearLayout
+        fun renderEqEnabled() {
+            eqSwitch.text = if (KtvEqualizer.enabled) "均衡器：开启" else "均衡器：关闭"
+            eqSwitch.setTextColor(if (KtvEqualizer.enabled) Color.rgb(39, 204, 164) else Color.WHITE)
+            // 关闭时预设/频段整体降透明度，直观表达"当前不生效"。
+            eqArea.alpha = if (KtvEqualizer.enabled) 1f else 0.45f
+        }
+        eqSwitch = pill(if (KtvEqualizer.enabled) "均衡器：开启" else "均衡器：关闭") {
             KtvEqualizer.setEnabled(!KtvEqualizer.enabled)
-            renderPills()
+            renderEqEnabled()
             applyEqualizerSettings()
             toast(if (KtvEqualizer.enabled) "均衡器已开启" else "均衡器已关闭")
         }
-        if (KtvEqualizer.enabled) enabledPill.setTextColor(Color.rgb(39, 204, 164))
-        globalPill = pill("全局混音：关") {
-            if (!globalSupported) {
-                toast("本机不支持全局混音")
-                return@pill
-            }
-            KtvEqualizer.setGlobalMix(!KtvEqualizer.globalMix)
-            renderPills()
-            applyEqualizerSettings()
-            toast(if (KtvEqualizer.globalMix) "均衡器已作用于全局混音" else "均衡器只作用于本 App")
-        }
-        // 「重置」要回到『标准』预设并刷新滑杆，但滑杆此时还没建好，用 lateinit 延后绑定。
-        lateinit var resetEqualizer: () -> Unit
-        val resetPill = pill("重置") { resetEqualizer() }
-        renderPills()
-        switchRow.addView(enabledPill, LinearLayout.LayoutParams(-2, dp(40)).apply { marginEnd = dp(8) })
-        switchRow.addView(globalPill, LinearLayout.LayoutParams(-2, dp(40)).apply { marginEnd = dp(8) })
-        switchRow.addView(resetPill, LinearLayout.LayoutParams(-2, dp(40)))
-        panel.addView(switchRow, LinearLayout.LayoutParams(-1, dp(48)))
+        panel.addView(eqSwitch, LinearLayout.LayoutParams(dp(190), dp(42)).apply { topMargin = dp(8) })
 
-        // ── 设备能力提示 ──
-        val hint = label(
-            "本机支持 ${caps.bandCount} 段 · ${String.format(Locale.ROOT, "%.0f", caps.minDb)} ~ " +
-                "${String.format(Locale.ROOT, "%.0f", caps.maxDb)} dB" +
-                if (globalSupported) "" else " · 本机不支持全局混音",
-            13,
-            Color.argb(150, 255, 255, 255),
-        )
-        panel.addView(hint, LinearLayout.LayoutParams(-1, dp(26)))
+        eqArea = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        panel.addView(eqArea, LinearLayout.LayoutParams(-1, -2))
 
-        // ── 频段滑杆 ──
-        val bars = ArrayList<SeekBar>(caps.bandCount)
-        val valueViews = ArrayList<TextView>(caps.bandCount)
-        // 刻度换算：0 dB 必定落在某个刻度上(见 eqSliderSteps 说明)。
-        val stepDb = (caps.maxDb - caps.minDb) / eqSliderSteps
-        fun toProgress(level: Float): Int =
-            Math.round((level - caps.minDb) / stepDb).coerceIn(0, eqSliderSteps)
-        fun fromProgress(progress: Int): Float =
-            (caps.minDb + progress * stepDb).coerceIn(caps.minDb, caps.maxDb)
-        // 预设按钮与高亮渲染先声明（频段滑杆回调里要用来刷新"自定义"高亮）。
+        // ── 3. 均衡器预设 ──
         val presetButtons = LinkedHashMap<String, TextView>()
         fun renderPresets() {
             presetButtons.forEach { (name, view) ->
@@ -2949,83 +2607,73 @@ class MainActivity : AppCompatActivity() {
                 view.alpha = if (active) 1f else 0.82f
             }
         }
-        /** 把内核当前频段值回灌到滑杆与数值文本。 */
-        fun syncBarsFromEqualizer() {
+        val presetRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+        }
+        eqArea.addView(presetRow, LinearLayout.LayoutParams(-1, dp(52)).apply { topMargin = dp(10) })
+
+        // ── 4. EQ 频段：竖向控制杆 ──
+        val bars = ArrayList<VerticalEqBar>(caps.bandCount)
+        val valueViews = ArrayList<TextView>(caps.bandCount)
+        fun syncBars() {
             val applied = KtvEqualizer.levelsSnapshot()
             for (index in working.indices) {
                 working[index] = applied.getOrElse(index) { 0f }
-                bars[index].progress = toProgress(working[index])
-                valueViews[index].text = eqLevelText(working[index])
-                valueViews[index].setTextColor(
-                    if (working[index] == 0f) Color.argb(170, 255, 255, 255)
-                    else Color.rgb(255, 204, 92),
-                )
+                bars.getOrNull(index)?.setLevel(working[index])
+                valueViews.getOrNull(index)?.text = eqLevelText(working[index])
             }
         }
-        fun applyBandLevels() {
-            KtvEqualizer.setLevels(working.copyOf())
-            KtvEqualizer.markCustomPreset()
-            syncBarsFromEqualizer()
-            applyEqualizerSettings()
+        val barRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
         }
-
+        eqArea.addView(barRow, LinearLayout.LayoutParams(-1, dp(216)).apply { topMargin = dp(6) })
         caps.frequencies.forEachIndexed { index, _ ->
-            val row = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
+            val column = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER_HORIZONTAL
             }
-            row.addView(
-                label(bandLabels.getOrElse(index) { "${index + 1}" } + "Hz", 15, Color.WHITE).apply {
-                    gravity = Gravity.CENTER
-                },
-                LinearLayout.LayoutParams(dp(74), dp(38)),
-            )
-            val seek = SeekBar(this).apply {
-                max = eqSliderSteps
-                isFocusable = true
-                isFocusableInTouchMode = true
-                setPadding(0, 0, 0, 0)
-                TvFocusStyler.installAction(this)
-                setOnSeekBarChangeListener(object : OnSeekBarChangeListener {
-                    override fun onProgressChanged(bar: SeekBar?, progress: Int, fromUser: Boolean) {
-                        if (!fromUser) return
-                        working[index] = fromProgress(progress)
-                        valueViews[index].text = eqLevelText(working[index])
-                        valueViews[index].setTextColor(
-                            if (working[index] == 0f) Color.argb(170, 255, 255, 255)
-                            else Color.rgb(255, 204, 92)
+            val value = label(
+                eqLevelText(working.getOrElse(index) { 0f }),
+                12,
+                Color.argb(170, 255, 255, 255),
+            ).apply { gravity = Gravity.CENTER }
+            valueViews.add(value)
+            column.addView(value, LinearLayout.LayoutParams(-1, dp(20)))
+            val bar = VerticalEqBar(this).apply {
+                setRange(caps.minDb, caps.maxDb, eqSliderSteps)
+                setLevel(working.getOrElse(index) { 0f })
+                onLevelChanged = { level, fromUser ->
+                    if (fromUser) {
+                        working[index] = level
+                        value.text = eqLevelText(level)
+                        value.setTextColor(
+                            if (level == 0f) Color.argb(170, 255, 255, 255) else Color.rgb(255, 204, 92),
                         )
-                    }
-
-                    override fun onStartTrackingTouch(bar: SeekBar?) = Unit
-
-                    override fun onStopTrackingTouch(bar: SeekBar?) {
+                        // 用户手动改动 → 预设转为「自定义」并自动保存。
                         KtvEqualizer.setLevels(working.copyOf())
                         KtvEqualizer.markCustomPreset()
                         renderPresets()
                         applyEqualizerSettings()
                     }
-                })
+                }
             }
-            bars.add(seek)
-            row.addView(seek, LinearLayout.LayoutParams(0, dp(38), 1f))
-            val value = label("0.0", 15, Color.argb(170, 255, 255, 255)).apply {
-                gravity = Gravity.CENTER
-            }
-            valueViews.add(value)
-            row.addView(value, LinearLayout.LayoutParams(dp(76), dp(38)))
-            panel.addView(row, LinearLayout.LayoutParams(-1, dp(42)))
+            bars.add(bar)
+            column.addView(bar, LinearLayout.LayoutParams(dp(46), 0, 1f))
+            column.addView(
+                label(bandLabels.getOrElse(index) { "${index + 1}" } + "Hz", 12, Color.WHITE).apply {
+                    gravity = Gravity.CENTER
+                },
+                LinearLayout.LayoutParams(-1, dp(20)),
+            )
+            barRow.addView(column, LinearLayout.LayoutParams(0, -1, 1f))
         }
 
-        // ── 预设 ──
-        val presetRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-        }
-        KtvEqualizer.presetNames().forEach { name ->
+        KtvEqualizer.appPresetNames().forEach { name ->
             val presetButton = TextView(this).apply {
                 text = name
-                textSize = 16f
+                textSize = 15f
                 setTextColor(Color.WHITE)
                 gravity = Gravity.CENTER
                 isClickable = true
@@ -3033,68 +2681,43 @@ class MainActivity : AppCompatActivity() {
                 background = getDrawable(R.drawable.bg_tuning_counter)
                 TvFocusStyler.installAction(this)
                 setOnClickListener {
-                    KtvEqualizer.applyPreset(name)
-                    syncBarsFromEqualizer()
+                    if (name == KtvEqualizer.CUSTOM_PRESET) {
+                        // 保留当前频段值，仅把预设标记为「自定义」。
+                        KtvEqualizer.markCustomPreset()
+                    } else {
+                        KtvEqualizer.applyPreset(name)
+                        syncBars()
+                    }
                     renderPresets()
                     applyEqualizerSettings()
-                    toast("均衡器预设：" + name)
                 }
             }
             presetButtons[name] = presetButton
             presetRow.addView(
                 presetButton,
-                LinearLayout.LayoutParams(0, dp(56), 1f).apply { marginStart = dp(3); marginEnd = dp(3) },
+                LinearLayout.LayoutParams(0, dp(46), 1f).apply {
+                    marginStart = dp(4)
+                    marginEnd = dp(4)
+                },
             )
         }
-        panel.addView(presetRow, LinearLayout.LayoutParams(-1, dp(64)))
+        renderEqEnabled()
         renderPresets()
-        resetEqualizer = {
-            KtvEqualizer.applyPreset("标准")
-            syncBarsFromEqualizer()
-            renderPresets()
-            applyEqualizerSettings()
-            toast("均衡器已重置为标准")
-        }
-
-        // ── 底部 ──
-        val actions = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.END or Gravity.CENTER_VERTICAL
-        }
-        val done = pill("完成") { }
-        actions.addView(done, LinearLayout.LayoutParams(dp(110), dp(44)))
-        panel.addView(actions, LinearLayout.LayoutParams(-1, dp(52)))
 
         val scroll = android.widget.ScrollView(this).apply { addView(panel) }
-        val dialog = AlertDialog.Builder(this)
-            .setView(scroll)
-            .create()
+        val dialog = AlertDialog.Builder(this).setView(scroll).create()
         close.setOnClickListener { dialog.dismiss() }
-        done.setOnClickListener { dialog.dismiss() }
         dialog.restoreSourceFocusOnDismiss()
         dialog.showForTv(afterShow = {
             dialog.window?.apply {
                 setBackgroundDrawableResource(android.R.color.transparent)
                 attributes = attributes.apply { dimAmount = 0.72f }
                 addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-                val available = (resources.displayMetrics.widthPixels * 0.92f).toInt()
-                setLayout(min(dp(700), available), ViewGroup.LayoutParams.WRAP_CONTENT)
+                val available = (resources.displayMetrics.widthPixels * 0.94f).toInt()
+                setLayout(min(dp(760), available), ViewGroup.LayoutParams.WRAP_CONTENT)
             }
-            // 初始化滑杆位置(不触发 fromUser 回调，避免被当成自定义)。
-            bars.forEachIndexed { index, bar ->
-                bar.progress = toProgress(working.getOrElse(index) { 0f })
-                valueViews[index].text = eqLevelText(working.getOrElse(index) { 0f })
-            }
-            enabledPill.requestFocus()
+            volumeBar.requestFocus()
         })
-    }
-
-    /** 4 个切换按钮的状态切换  */
-    private var muteBeforeVol = 80
-    private fun updateToggleState(btn: TextView?, on: Boolean) {
-        if (btn == null) return
-        btn.setBackgroundResource(if (on) R.drawable.bg_btn_toggle_on else R.drawable.bg_btn_toggle_off)
-        btn.setTextColor(if (on) Color.WHITE else Color.rgb(204, 204, 204))
     }
 
     private fun controlRow(
@@ -5656,7 +5279,14 @@ class MainActivity : AppCompatActivity() {
                 playRandomLocalSong()
                 return
             }
-            // 用户主动切歌/停止:取消挂起的随机续播,进入空闲态。
+            // 公放(随机)歌曲播放中按「切歌」：不该停下来，接着播公放清单里的下一首。
+            // 注意这里不调用 markFinished —— 用户是跳过而不是播完，不该 +1；
+            // 但它已在 markStarted 时计入本轮已播，所以本轮不会再重复。
+            if (!fromCompletion && currentSong?.let { RandomPlayQueue.isCurrentTrack(it) } == true) {
+                playRandomLocalSong(skipped = true)
+                return
+            }
+            // 其它情况(没有公放曲目在播 / 用户主动停止):取消挂起的随机续播,进入空闲态。
             randomLocalRequestSerial++
             playbackPreparing = false
             playWhenPrepared = false
@@ -5702,10 +5332,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * 从本机所有有效歌曲中随机续播(启动自动播放 / 点歌列表播放完毕均走此逻辑)。
+     * 从本机所有有效歌曲中随机续播(启动自动播放 / 点歌列表播放完毕 / 公放中切歌均走此逻辑)。
      * 随机歌曲不写入已点列表；用户此时点歌会立即取消本次随机请求并优先播放已点歌曲。
+     *
+     * @param startup 是否开机自动随机播放
+     * @param skipped 是否是用户在公放歌曲上按了「切歌」(仅影响提示文案)
      */
-    private fun playRandomLocalSong(startup: Boolean = false) {
+    private fun playRandomLocalSong(startup: Boolean = false, skipped: Boolean = false) {
         val previousSongId = currentSong?.let(::stableId) ?: lastRandomLocalSongId
         val requestSerial = ++randomLocalRequestSerial
         playbackPreparing = true
@@ -5714,7 +5347,11 @@ class MainActivity : AppCompatActivity() {
         currentSong = null
         clearLyrics()
         updateBottomBar(null, false)
-        status?.text = if (startup) "正在随机播放本地歌曲..." else "已点播放完成，正在随机本地歌曲..."
+        status?.text = when {
+            startup -> "正在随机播放本地歌曲..."
+            skipped -> "切歌：正在播放下一首公放歌曲..."
+            else -> "已点播放完成，正在随机本地歌曲..."
+        }
         persistRuntimeState()
 
         io.execute {
@@ -6809,13 +6446,6 @@ class MainActivity : AppCompatActivity() {
     private var fullScreenSeeking = false
     private var fullScreenControls: LinearLayout? = null
     private var fullScreenProgressRow: View? = null
-    private var fullScreenToneControl: View? = null
-    private var fullScreenVolumePanel: View? = null
-    private var fullScreenVolumeIndicator: CircularVolumeView? = null
-    private var fullScreenVolumeMinusButton: TextView? = null
-    private var fullScreenVolumePlusButton: TextView? = null
-    private var fullScreenVolumeMuteButton: TextView? = null
-    private var fullScreenPreviousVolume = 70
     private var randomLocalRequestSerial = 0L
     private var lastRandomLocalSongId: String? = null
     /** 启动时无恢复播放/空队列: 曲库就绪后自动随机播放本地已下载歌曲(仅触发一次)。 */
@@ -6823,14 +6453,8 @@ class MainActivity : AppCompatActivity() {
     private var advancingPlayback = false
     private var lastAutoAdvanceAtMs = 0L
     private var fullScreenChromeVisible = false
-    private val hideFullScreenVolumeIndicatorRunnable = Runnable {
-        fullScreenVolumeIndicator?.animate()?.alpha(0f)?.setDuration(220L)?.withEndAction {
-            fullScreenVolumeIndicator?.visibility = View.GONE
-            fullScreenVolumeIndicator?.alpha = 1f
-        }?.start()
-    }
     private val hideFullScreenChromeRunnable = Runnable {
-        if (isFullScreen && fullScreenVolumePanel?.visibility != View.VISIBLE) {
+        if (isFullScreen) {
             setFullScreenChromeVisible(false)
         }
     }
@@ -7052,7 +6676,7 @@ class MainActivity : AppCompatActivity() {
         if (btnTopNext != null) btnTopNext!!.setOnClickListener(View.OnClickListener { v: View? -> playNext() })
         if (btnTopPause != null) btnTopPause!!.setOnClickListener(View.OnClickListener { v: View? -> togglePlay() })
         if (btnTopReplay != null) btnTopReplay!!.setOnClickListener(View.OnClickListener { v: View? -> replay() })
-        if (btnTopTone != null) btnTopTone!!.setOnClickListener(View.OnClickListener { v: View? -> showAudioControlDialog() })
+        if (btnTopTone != null) btnTopTone!!.setOnClickListener(View.OnClickListener { v: View? -> showTuningDialog() })
 
         // 设置底栏按钮事件
         if (btnBottomGuess != null) btnBottomGuess!!.setOnClickListener(View.OnClickListener { v: View? -> showGuessPage() })
@@ -9273,7 +8897,7 @@ class MainActivity : AppCompatActivity() {
             isClickable = true
             isFocusable = true
             setPadding(dp(12), dp(10), dp(12), dp(10))
-            setOnClickListener { showEqualizerDialog() }
+            setOnClickListener { showTuningDialog() }
             TvFocusStyler.installAction(this)
         }
         val body = LinearLayout(this).apply {
@@ -10299,27 +9923,11 @@ class MainActivity : AppCompatActivity() {
                 code == KeyEvent.KEYCODE_NUMPAD_ENTER
             val direction = code == KeyEvent.KEYCODE_DPAD_LEFT || code == KeyEvent.KEYCODE_DPAD_RIGHT ||
                 code == KeyEvent.KEYCODE_DPAD_UP || code == KeyEvent.KEYCODE_DPAD_DOWN
-            val volumePanelVisible = fullScreenVolumePanel?.visibility == View.VISIBLE
-            val volumePanelHasFocus = volumePanelVisible && fullScreenVolumePanel?.hasFocus() == true
-            if (code == KeyEvent.KEYCODE_BACK && volumePanelVisible) {
-                main.removeCallbacks(hideFullScreenVolumeIndicatorRunnable)
-                fullScreenVolumePanel?.visibility = View.GONE
-                fullScreenToneControl?.requestFocus()
-                setFullScreenChromeVisible(true)
-                return true
-            }
             if (center && !fullScreenChromeVisible) {
                 setFullScreenChromeVisible(true)
                 return true
             }
-            if (volumePanelVisible && (center || direction) && !volumePanelHasFocus &&
-                fullScreenControls?.hasFocus() != true
-            ) {
-                setFullScreenChromeVisible(true)
-                fullScreenVolumeMinusButton?.requestFocus()
-                return true
-            }
-            if (center && fullScreenControls?.hasFocus() != true && !volumePanelHasFocus) {
+            if (center && fullScreenControls?.hasFocus() != true) {
                 setFullScreenChromeVisible(true)
                 fullScreenControls?.getChildAt(0)?.requestFocus()
                 return true
@@ -10331,19 +9939,6 @@ class MainActivity : AppCompatActivity() {
             if ((center || direction) && fullScreenChromeVisible) {
                 main.removeCallbacks(hideFullScreenChromeRunnable)
                 main.postDelayed(hideFullScreenChromeRunnable, 5000L)
-            }
-            if (volumePanelHasFocus && code == KeyEvent.KEYCODE_DPAD_UP) {
-                fullScreenToneControl?.requestFocus()
-                return true
-            }
-            if (volumePanelHasFocus && code == KeyEvent.KEYCODE_DPAD_DOWN) {
-                return true
-            }
-            if (volumePanelVisible && window.decorView.findFocus() === fullScreenToneControl &&
-                code == KeyEvent.KEYCODE_DPAD_DOWN
-            ) {
-                fullScreenVolumeMinusButton?.requestFocus()
-                return true
             }
         }
         if (code == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || code == KeyEvent.KEYCODE_SPACE) {

@@ -41,14 +41,19 @@
         </article>
 
         <article class="glass-card eq-panel">
-          <div class="panel-title"><div><span class="tiny-icon">≡</span><b>均衡器</b></div><small id="eqState">已关闭</small></div>
-          <div class="seg eq-switch">
-            <button type="button" id="eqToggle">开启均衡器</button>
-            <button type="button" id="eqReset">恢复标准</button>
+          <button type="button" class="panel-title eq-title" id="eqCollapse" aria-expanded="false">
+            <div><span class="tiny-icon">≡</span><b>均衡器</b></div>
+            <span class="eq-title-right"><small id="eqState">已关闭</small><i class="eq-chevron">▾</i></span>
+          </button>
+          <div id="eqBody" class="eq-body hidden">
+            <div class="seg eq-switch">
+              <button type="button" id="eqToggle">开启均衡器</button>
+              <button type="button" id="eqReset">恢复标准</button>
+            </div>
+            <div id="eqBands" class="eq-bands"></div>
+            <div id="eqPresets" class="eq-presets"></div>
+            <p class="eq-hint" id="eqHint">均衡器作用于本机播放输出，不改动系统音量</p>
           </div>
-          <div id="eqBands" class="eq-bands"></div>
-          <div id="eqPresets" class="eq-presets"></div>
-          <p class="eq-hint" id="eqHint">均衡器作用于本机播放输出，不改动系统音量</p>
         </article>
 
         <article class="next-card"><div class="next-number">02</div><div><small>下一首</small><b id="nextSong">队列为空</b></div><button data-page="queue">查看队列 <span>›</span></button></article>
