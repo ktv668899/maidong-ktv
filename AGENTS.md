@@ -31,14 +31,14 @@
    > 三者的触发条件只有一个 —— **收到明确的人工发布指令**。若不确定是否已发布，
    > 用 `GET /repos/{owner}/{repo}/releases` 与 `/tags` 核对，不要凭"打过包"推断。
 
-- 凭据：Gitea 访问令牌 `dsh-sync`（可在 Gitea「设置 → 应用 → 访问令牌」随时吊销），
-  存放于 `~/.git-credentials-gitea`（权限 600），由本仓库级 `credential.helper` 引用；
-  账号密码不写入仓库配置。
+- 凭据：Gitea 访问令牌 `dsh-sync-20260926`（2026-09-26 数据迁移后重建；可在 Gitea
+  「设置 → 应用 → 访问令牌」随时吊销），存放于 `~/.git-credentials-gitea`（权限 600），
+  由本仓库级 `credential.helper` 引用；账号密码不写入仓库配置。
 
 ### 推送方式
 
 ```bash
-cd /home/zijun/dsh/maidongktv/maidong-ktv
+cd /home/zijun/dsh_data/maidongktv/maidong-ktv
 git push origin master              # origin = Gitea（唯一的代码同步目标）
 ```
 
@@ -84,26 +84,48 @@ curl -X POST -u "zijunchiang:$TOKEN" \
 ### 构建（release，双 ABI）
 
 ```bash
-cd /home/zijun/dsh/maidongktv/maidong-ktv
-export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
-export ANDROID_HOME=/home/zijun/Android/Sdk
-export ANDROID_SDK_ROOT=/home/zijun/Android/Sdk
+cd /home/zijun/dsh_data/maidongktv/maidong-ktv
+. /home/zijun/dsh_data/maidongktv/env.sh    # 导入 JAVA_HOME / ANDROID_HOME / PATH
 ./gradlew assembleRelease
 ```
 
 产物：`app/build/outputs/apk/release/app-release.apk`（已由 `app/build.gradle` 的 signingConfig 签名）
 
+### 本机工具链（2026-09-26 数据迁移后重建）
+
+数据迁移后的本机是**纯净环境且当前用户无 sudo**，因此工具链全部装在用户态，
+不要再用系统路径（`/usr/lib/jvm/...` 不存在）。统一入口：
+
+```bash
+. /home/zijun/dsh_data/maidongktv/env.sh    # 已加入 ~/.bashrc，新开 shell 自动生效
+```
+
+| 组件 | 路径 | 来源 |
+|---|---|---|
+| JDK 17 | `/home/zijun/tools/jdk-17`（Temurin 17.0.20.1） | Adoptium tarball 解包 |
+| git | `/home/zijun/tools/bin/git`（包装脚本 → `/home/zijun/tools/gitroot/usr/bin/git`） | `apt-get download git` + `dpkg -x` |
+| Android SDK | `/home/zijun/Android/Sdk`（与 `local.properties` 的 `sdk.dir` 一致） | `cmdline-tools` + `sdkmanager` |
+| 已装 SDK 包 | `platforms;android-35`、`build-tools;34.0.0`、`build-tools;36.0.0`、`platform-tools` | sdkmanager |
+| 签名密钥 | `/home/zijun/dsh_data/maidongktv/ktv_keystore.jks`（仓库外，勿入库） | 数据迁移 |
+
+- `git` 包装脚本是必需的：deb 内 git 的编译期 `exec-path` 写死为 `/usr/lib/git-core`
+  （无 root 无法创建），包装脚本显式设置 `GIT_EXEC_PATH`/`GIT_TEMPLATE_DIR` 后才找得到
+  `git-remote-https` 等子命令。
+- 迁移会把仓库文件权限改成 744（git 记为 1288 个纯 mode change、0 行内容变化）。
+  遇到大量 `mode change 100644 => 100755` 时，按索引恢复权限即可，不要当成内容改动：
+  `git ls-files -s -z | ... chmod`（或临时 `git config core.fileMode false`）。
+
 ### 签名与校验（单独签名/改名时）
 
 ```bash
 BT=/home/zijun/Android/Sdk/build-tools/36.0.0
-$BT/apksigner sign --ks /home/zijun/dsh/maidongktv/ktv_keystore.jks \
+$BT/apksigner sign --ks /home/zijun/dsh_data/maidongktv/ktv_keystore.jks \
   --ks-key-alias ktv --ks-pass pass:123456 --key-pass pass:123456 \
   --out 目标名.apk app/build/outputs/apk/release/app-release.apk
 $BT/apksigner verify 目标名.apk
 ```
 
-- 密钥：`/home/zijun/dsh/maidongktv/ktv_keystore.jks`（仓库外，勿入库）
+- 密钥：`/home/zijun/dsh_data/maidongktv/ktv_keystore.jks`（仓库外，勿入库）
 - APK 命名约定：`麦动KTV-V<版本号>-release.apk`（对外发布）/ `maidong-ktv-<版本>-<改动说明>-双ABI-release.apk`（内部测试）
 
 ### 版本号
