@@ -257,6 +257,21 @@ $BT/apksigner verify 目标名.apk
   点歌失败时先搜远程日志里的 **`JS `** 与 **`点歌失败`** 两行：前者给
   「Try source / Token OK/FAIL / do.php code=」的逐步过程，后者给 JS 汇总的失败原因。
 - **歌曲源**：`app/src/main/assets/mobile/ktv_api.js` 的 `CONFIG.HOSTS`（多源自动排序，失败源沉底）
+- **⚠️ 取址有两条实现，改协议必须同时改**：JS 主路径（`ktv_api.js`）+ 原生兜底
+  （`SongUrlResolver.kt`，供 **WebView 不可用**的老盒子使用 —— 实测极米 H1S/GMUI2.0 上
+  WebView 导不出 `window.KtvApi`，桥永远 not ready，只靠 JS 时表现为
+  **「无法生成下载地址」且远程日志里一条 `JS ...` 都没有**）。
+  - `SongUrlResolver` 镜像了 `ktv_api.js` 的 `APP_ID/APP_KEY/SDK_KEY/HOSTS` 与
+    **桥注入的** `VER=2.0/VN=4.1.3.03281430`（注意不是 JS 文件里的原始值）、
+    以及 `isDemoUrl` 校验（wb66/demo/纯 IP/r2.dev/ts 编号与 musicno 不一致）。
+    源站配置若变更，JS 能热更新而它必须发版 —— 所以它**只做兜底**：
+    `SongApiClient.getSongDownloadUrl` 在「桥未就绪 / JS 未取到地址 / 主线程调用」
+    三个回退点先试原生、再回退 DB 的 `cloud_url`。
+  - 它必须走 `KtvJsBridge.rawCleanGet()`（与 JS 完全相同的裸 Socket 干净请求），
+    否则会被源站风控拒绝。
+  - 自查远程日志：成功是 `NATIVE-SONG 取址成功 编号=... 源=...`，失败是
+    `NATIVE-SONG 全部源失败 编号=... 详情=token-fail|no-url|demo-or-mismatch`；
+    桥侧另有 `JS-BRIDGE ...`（ready / KtvApi 未导出 / WebView 初始化失败 / 15s 未就绪）。
 - **JS 热更新**：改动 `ktv_api.js` 必须同步提升 `KTV_BRIDGE_API: N` 标记（JS 与 `KtvJsBridge.kt` 两处校验），否则设备仍用缓存旧脚本
 - **曲库**：只走官方 Muse 同步（`MuseDbSync`），不再依赖代码仓库数据库文件
 - **曲库同步时效**：默认 **30 天**（`DatabaseBootstrapper.SYNC_TTL_DAYS`）。未到期启动**不联网**、直接用本地曲库；到期后才查询服务器版本，有更新才下载。时效起点记录在 `db_sync_at.txt`，由 `DatabaseBootstrapper.markSynced()` 写入（下载成功或校验为最新时）。设置页「曲库 → 更新」为手动强制检查（绕过时效，仅在服务器版本更新时下载）
