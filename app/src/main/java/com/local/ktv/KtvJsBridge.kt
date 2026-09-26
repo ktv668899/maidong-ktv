@@ -271,7 +271,7 @@ class KtvJsBridge(context: Context) {
                     if (connection.responseCode != HttpURLConnection.HTTP_OK) {
                         throw IllegalStateException("HTTP ${connection.responseCode}")
                     }
-                    val declaredLength = connection.contentLengthLong
+                    val declaredLength = connection.contentLengthCompat()
                     require(declaredLength < 0 || declaredLength <= MAX_RESPONSE_BYTES) { "JS file is too large" }
                     val bytes = connection.inputStream.use { it.readBytes() }
                     require(bytes.size <= MAX_RESPONSE_BYTES) { "JS file is too large" }
@@ -508,7 +508,8 @@ class KtvJsBridge(context: Context) {
                 out.write(readExact(input, size.toLong()))
                 readAsciiLine(input) // 吃掉 chunk 尾部 CRLF
             }
-            return out.toString(Charsets.UTF_8)
+            // ByteArrayOutputStream.toString(Charset) 是 API 33+；低版本用 String(bytes, charset)。
+            return String(out.toByteArray(), Charsets.UTF_8)
         }
     }
 

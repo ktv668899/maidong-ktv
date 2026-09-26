@@ -32,12 +32,16 @@ object SongOkDownloadManager {
     }
 
     private val tasks = ConcurrentHashMap<String, OkDownloadTask>()
-    private val pending = ConcurrentHashMap.newKeySet<String>()
+    // ConcurrentHashMap.newKeySet() 是 API 24+（低版本 NoSuchMethodError）；
+    // Collections.newSetFromMap 自 API 9 起可用，且返回普通 Set，add/remove/contains 均成立于 API 1。
+    private val pending: MutableSet<String> =
+        Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
     private val callbacks = ConcurrentHashMap<String, DownloadCallback>()
     private val progress = ConcurrentHashMap<String, Int>()
     private val totalLengths = ConcurrentHashMap<String, Long>()
     private val forcedRetryReasons = ConcurrentHashMap<String, String>()
-    private val manuallyCanceled = ConcurrentHashMap.newKeySet<String>()
+    private val manuallyCanceled: MutableSet<String> =
+        Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
     private val io = Executors.newFixedThreadPool(4)
     private val watchdog = Executors.newSingleThreadScheduledExecutor()
 

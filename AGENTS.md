@@ -160,11 +160,34 @@ $BT/apksigner verify 目标名.apk
 
 ### 版本号
 
-- `app/build.gradle`：`versionName "1.4.0"` / `versionCode 16`
+- `app/build.gradle`：`versionName "1.4.1"` / `versionCode 17`
 - App 内显示统一用纯版本号（不加 `(versionCode)` 括号）
+- ⚠️ **发布构建已开启 NewApi 闸门**（`lint { checkReleaseBuilds true; fatal += ['NewApi'] }`）：
+  任何「调用了高于 `minSdk 21` 且未做版本守卫的 API」都会让 `assembleRelease` 直接失败。
+  被阻断时按报错位置补版本判断或改用兼容写法，**不要**把 `checkReleaseBuilds` 改回 `false`
+  来绕过 —— 这道闸门专为「低版本设备一打开就闪退」而设（见第三节同名条目）
 
 ## 三、关键实现约束（避免踩坑）
 
+- **⚠️ 低版本设备闪退（API 守卫）**：`minSdk 21`，但**实际客户里有 Android 5.1.1 的机器**
+  （极米 H1S / MStar 6A928 / GMUI2.0）。以下三类写法会让 app 在 API 22 上**一打开就闪退**，
+  必须避免：
+  1. **把高版本 API 的类写在 `Activity`/`Fragment`/`object` 的字段初始化器里** ——
+     字段初始化在**构造期**执行，早于 `onCreate` 里的 `SDK_INT` 判断，因此守卫形同虚设。
+     v1.4.0 的闪退根因就是 `private val micDeviceCallback = object : android.media.AudioDeviceCallback() {...}`
+     （`AudioDeviceCallback` 是 API 23）→ 构造 `MainActivity` 时 `NoClassDefFoundError`。
+     正确写法：字段声明为可空、在 `SDK_INT >= 23` 分支里**按需创建**（见 `ensureMicDeviceCallback()`）。
+  2. **Java 8 的集合默认方法**：`Map.getOrDefault` / `Map.putIfAbsent` / `ConcurrentHashMap.newKeySet`
+     / `computeIfAbsent` / `Comparator.comparing` / `List.sort` 等都是 **API 24+**，
+     API 21~23 上抛 `NoSuchMethodError`。替代：`getOrPut`、
+     `Collections.newSetFromMap(ConcurrentHashMap())`、`ConcurrentHashMap.putIfAbsent`（API 1）、
+     Kotlin `compareBy`。
+  3. 其它漏网的：`URLConnection.getContentLengthLong()`（API 24，用 `Compat.kt` 的
+     `contentLengthCompat()`）、`ByteArrayOutputStream.toString(Charset)`（API 33）。
+  - 自查命令（必须为 0 条）：`./gradlew :app:lintRelease` 后
+    在 `app/build/reports/lint-results-release.txt` 里搜 `NewApi`。
+  - 根因扫描捷径：`grep -n "private val .* = object : android\." app/src/main/java/com/local/ktv/*.kt`
+    —— 字段初始化器里出现 `android.*` 的高版本类就是要闪退。
 - **歌曲源**：`app/src/main/assets/mobile/ktv_api.js` 的 `CONFIG.HOSTS`（多源自动排序，失败源沉底）
 - **JS 热更新**：改动 `ktv_api.js` 必须同步提升 `KTV_BRIDGE_API: N` 标记（JS 与 `KtvJsBridge.kt` 两处校验），否则设备仍用缓存旧脚本
 - **曲库**：只走官方 Muse 同步（`MuseDbSync`），不再依赖代码仓库数据库文件

@@ -1,6 +1,7 @@
 package com.local.ktv
 
 import android.Manifest
+import android.annotation.TargetApi
 import android.app.AlertDialog
 import android.content.DialogInterface
 import android.content.DialogInterface.OnShowListener
@@ -106,8 +107,6 @@ import java.util.LinkedHashMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import java.util.function.Function
-import java.util.function.ToIntFunction
 import kotlin.Any
 import kotlin.Array
 import kotlin.Boolean
@@ -534,7 +533,7 @@ class MainActivity : AppCompatActivity() {
     private fun registerMicInputWatcher() {
         val manager = audioManager ?: return
         if (Build.VERSION.SDK_INT >= 23) {
-            manager.registerAudioDeviceCallback(micDeviceCallback, null)
+            manager.registerAudioDeviceCallback(ensureMicDeviceCallback(), null)
         } else {
             runCatching {
                 val filter = IntentFilter(Intent.ACTION_HEADSET_PLUG)
@@ -546,20 +545,37 @@ class MainActivity : AppCompatActivity() {
     private fun unregisterMicInputWatcher() {
         val manager = audioManager ?: return
         if (Build.VERSION.SDK_INT >= 23) {
-            manager.unregisterAudioDeviceCallback(micDeviceCallback)
+            micDeviceCallback?.let { manager.unregisterAudioDeviceCallback(it) }
+            micDeviceCallback = null
         } else {
             runCatching { unregisterReceiver(micHotplugReceiver) }
         }
     }
 
-    private val micDeviceCallback = object : android.media.AudioDeviceCallback() {
-        override fun onAudioDevicesAdded(addedDevices: Array<out android.media.AudioDeviceInfo>) {
-            handleMicInputDevicesChanged(addedDevices.any { isMicInputDevice(it) })
-        }
+    /**
+     * 输入设备变化回调(`android.media.AudioDeviceCallback`, API 23+)。
+     *
+     * ⚠️ **必须按需创建，不能写成字段初始化器**：字段初始化在 Activity 构造时执行，
+     * 早于 `onCreate`，而 `Build.VERSION.SDK_INT` 判断发生在 `onCreate` 之后。
+     * Android 5.x(API 22) 没有 `AudioDeviceCallback` 这个类 —— 对象在构造期被实例化会直接
+     * `NoClassDefFoundError` 闪退（极米 H1S / GMUI2.0 / Android 5.1.1 的闪退根因）。
+     */
+    private var micDeviceCallback: android.media.AudioDeviceCallback? = null
 
-        override fun onAudioDevicesRemoved(removedDevices: Array<out android.media.AudioDeviceInfo>) {
-            handleMicInputDevicesChanged(removedDevices.any { isMicInputDevice(it) })
+    @TargetApi(23)
+    private fun ensureMicDeviceCallback(): android.media.AudioDeviceCallback {
+        micDeviceCallback?.let { return it }
+        val created = object : android.media.AudioDeviceCallback() {
+            override fun onAudioDevicesAdded(addedDevices: Array<out android.media.AudioDeviceInfo>) {
+                handleMicInputDevicesChanged(addedDevices.any { isMicInputDevice(it) })
+            }
+
+            override fun onAudioDevicesRemoved(removedDevices: Array<out android.media.AudioDeviceInfo>) {
+                handleMicInputDevicesChanged(removedDevices.any { isMicInputDevice(it) })
+            }
         }
+        micDeviceCallback = created
+        return created
     }
 
     private val micHotplugReceiver = object : BroadcastReceiver() {
@@ -568,7 +584,8 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** 是否为可用的麦克风输入设备(内置/耳机/USB 等)。 */
+    /** 是否为可用的麦克风输入设备(内置/耳机/USB 等)。仅由 API 23+ 的输入设备回调调用。 */
+    @TargetApi(23)
     private fun isMicInputDevice(device: android.media.AudioDeviceInfo): Boolean {
         if (!device.isSource) return false
         return when (device.type) {
@@ -4635,10 +4652,7 @@ class MainActivity : AppCompatActivity() {
                 song
             )
         }
-        Collections.sort<Song?>(
-            visibleSongs,
-            Comparator.comparing<Song?, String?>(Function { song: Song? -> song!!.title!!.lowercase() })
-        )
+        Collections.sort(visibleSongs, compareBy { it.title!!.lowercase() })
         renderSongs()
     }
 
@@ -4652,10 +4666,7 @@ class MainActivity : AppCompatActivity() {
                 ))
             ) visibleSongs.add(song)
         }
-        Collections.sort<Song?>(
-            visibleSongs,
-            Comparator.comparing<Song?, String?>(Function { song: Song? -> song!!.title!!.lowercase() })
-        )
+        Collections.sort(visibleSongs, compareBy { it.title!!.lowercase() })
         renderSongs()
     }
 
@@ -4710,10 +4721,7 @@ class MainActivity : AppCompatActivity() {
                 song
             )
         }
-        Collections.sort<Song?>(
-            visibleSongs,
-            Comparator.comparing<Song?, String?>(Function { song: Song? -> song!!.title!!.lowercase() })
-        )
+        Collections.sort(visibleSongs, compareBy { it.title!!.lowercase() })
         renderSongs()
         if (pageInfo != null) pageInfo!!.setText("本地 " + visibleSongs.size + " 首")
     }
@@ -5563,7 +5571,7 @@ class MainActivity : AppCompatActivity() {
                         SongFileValidator.requiresTransportStream(file),
                     ).valid
                 ) {
-                    localSongs.putIfAbsent(stableId(song), song)
+                    localSongs.getOrPut(stableId(song)) { song }
                 }
             }
             val allLocalSongs = localSongs.values.toList()
@@ -5971,10 +5979,7 @@ class MainActivity : AppCompatActivity() {
             BufferedReader(InputStreamReader(FileInputStream(file), "UTF-8")).use { reader ->
                 var line: String?
                 while ((reader.readLine().also { line = it }) != null) parseLyricLine(line)
-                Collections.sort<LyricLine?>(
-                    lyricLines, Comparator.comparingInt<LyricLine?>(
-                        ToIntFunction { item: LyricLine? -> item!!.timeMs })
-                )
+                Collections.sort(lyricLines, compareBy { it!!.timeMs })
                 updateLyricView()
             }
         } catch (e: Exception) {
@@ -8415,7 +8420,7 @@ class MainActivity : AppCompatActivity() {
                 .plus(library.allSongs().asSequence())
                 .forEach { song ->
                 if (song.hasLocalFile() || isDownloaded(song)) {
-                    localSongs.putIfAbsent(stableId(song), song)
+                    localSongs.getOrPut(stableId(song)) { song }
                 }
             }
             val filtered = localSongs.values.filter {
@@ -8686,7 +8691,7 @@ class MainActivity : AppCompatActivity() {
                 ).valid
             ) {
                 song.path = resolved.absolutePath
-                result.putIfAbsent(stableId(song), song)
+                result.getOrPut(stableId(song)) { song }
             }
         }
 
@@ -8711,13 +8716,13 @@ class MainActivity : AppCompatActivity() {
         val databaseSongs = library.muse.songsByFilenames(filesByName.keys)
         databaseSongs.forEach { song ->
             filesByName[song.filename]?.let { song.path = it.absolutePath }
-            result.putIfAbsent(stableId(song), song)
+            result.getOrPut(stableId(song)) { song }
         }
         val matchedNames = databaseSongs.mapNotNullTo(HashSet()) { it.filename }
         validFiles.filter { it.name !in matchedNames }.forEach { file ->
             val song = Song.local(file.absolutePath, file.name)
             song.filename = file.name
-            result.putIfAbsent(stableId(song), song)
+            result.getOrPut(stableId(song)) { song }
         }
         return result
     }

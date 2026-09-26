@@ -11,8 +11,8 @@ android {
         applicationId "com.local.ktv"
         minSdk 21
         targetSdk 25
-        versionCode 16
-        versionName "1.4.0"
+        versionCode 17
+        versionName "1.4.1"
         ndk {
             // 双 ABI 打包:兼容 64 位(Exynos 1580 等 arm64-v8a)与 32 位设备(极米 Play 超越版
             // 的 Amlogic 950X2/S905X2 采用 32 位 Android 用户态,必须包含 armeabi-v7a,否则
@@ -52,10 +52,19 @@ android {
         noCompress 'ts', 'mp3', 'mp4', 'aac', 'm4a', 'flac', 'wav'
     }
 
-    // 关闭发布构建的 lint vital 检查(本地分发的 APK 不需要 Google Play 上架要求)
+    // lint 策略:
+    //   - 「调用了高于 minSdk 且未做版本守卫的 API」(NewApi) 必须**阻断发布构建**:
+    //     这类问题在 Android 5.x / 6.x 上直接 NoSuchMethodError / NoClassDefFoundError 闪退,
+    //     而本地打包测试用的都是较新设备, 极容易漏出去(v1.4.0 在极米 H1S / Android 5.1.1
+    //     一打开就闪退, 根因就是 AudioDeviceCallback(API 23) 被写进了 Activity 的字段初始化器)。
+    //   - ExpiredTargetSdkVersion 默认也是 fatal 级, 但本地分发的 APK 不上架 Google Play,
+    //     显式关掉, 否则会挤占下面这道闸门。
+    //   - abortOnError 必须为 true: 设为 false 会把 lintVital 的失败一并吞掉, 闸门会失效。
     lint {
-        checkReleaseBuilds false
-        abortOnError false
+        fatal += ['NewApi']
+        disable += ['ExpiredTargetSdkVersion']
+        checkReleaseBuilds true
+        abortOnError true
     }
 
     // 启用 BuildConfig 生成,供 AboutFragment 读取版本号/版本Code等信息

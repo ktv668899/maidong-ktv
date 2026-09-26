@@ -39,7 +39,9 @@ object SingerAvatarLoader {
             return
         }
 
-        val waiters = waiting.computeIfAbsent(key) { CopyOnWriteArrayList() }
+        // ConcurrentHashMap.computeIfAbsent 是 API 24+；putIfAbsent 自 API 1 起可用，语义等价。
+        val created = CopyOnWriteArrayList<WeakReference<ImageView>>()
+        val waiters = waiting.putIfAbsent(key, created) ?: created
         waiters += WeakReference(view)
         if (waiters.size > 1) return
         val cacheDir = File(view.context.applicationContext.cacheDir, "singer_avatars").apply { mkdirs() }
@@ -70,7 +72,7 @@ object SingerAvatarLoader {
             connection.instanceFollowRedirects = true
             connection.setRequestProperty("User-Agent", "MaidongKTV/${BuildConfig.VERSION_NAME}")
             require(connection.responseCode in 200..299)
-            require(connection.contentLengthLong <= 0 || connection.contentLengthLong <= MAX_DOWNLOAD_BYTES)
+            require(connection.contentLengthCompat() <= 0 || connection.contentLengthCompat() <= MAX_DOWNLOAD_BYTES)
             var total = 0L
             connection.inputStream.buffered().use { input ->
                 FileOutputStream(temporary).buffered().use { output ->

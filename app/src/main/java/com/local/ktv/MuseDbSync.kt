@@ -194,7 +194,7 @@ object MuseDbSync {
             }
             val code = conn.responseCode
             check(code in 200..299) { "HTTP $code" }
-            val total = conn.contentLengthLong
+            val total = conn.contentLengthCompat()
             conn.inputStream.buffered(256 * 1024).use { input ->
                 dest.outputStream().buffered(256 * 1024).use { out ->
                     val buffer = ByteArray(256 * 1024)
