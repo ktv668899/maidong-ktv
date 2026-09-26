@@ -34,11 +34,16 @@
 - 凭据：
   - **Gitea**（代码主仓库）：访问令牌 `dsh-sync-20260926`（2026-09-26 数据迁移后重建；可在 Gitea
     「设置 → 应用 → 访问令牌」随时吊销），存放于 `~/.git-credentials-gitea`（权限 600），
-    由本仓库级 `credential.helper` 引用；
+    由**按主机限定**的仓库级 `credential.https://gitea.kasugano.cn.helper` 引用；
   - **Gitee**（仅发布 Release，按规则 2 不推代码）：访问令牌存放于 `~/.git-credentials-gitee`
     （权限 600），由全局 `credential.https://gitee.com.helper` 引用；**只用于 API 建 Release /
     传附件**，不得用于推送源码。
   - 账号密码不写入仓库配置。
+  - ⚠️ **两个 helper 都必须按主机限定作用域**（`credential.https://<host>.helper`，不要用无主机限定的
+    `credential.helper`）：git 认证成功后会调用**每个** helper 的 `store`，无主机限定会把 Gitee 凭据
+    追加写进 Gitea 的凭据文件（一个文件两行），此后「取第一行」式的令牌提取会拿到错误令牌、API 报 401。
+  - ⚠️ **提取令牌必须按主机过滤**：用 `sed -nE 's|https://[^:]+:([^@]+)@<host>.*|\1|p'`，
+    不要用不带主机锚点的 `sed -E 's|https://[^:]+:([^@]+)@.*|\1|'`（多行文件会输出多行、拼成错令牌）。
 
 ### 推送方式
 
@@ -63,7 +68,7 @@ App 内部两处端点已指向 Gitea（随本版 APK 生效）：
 ### 发布新版本（Gitea Release）
 
 ```bash
-TOKEN=$(sed -E 's|https://zijunchiang:([^@]+)@.*|\1|' ~/.git-credentials-gitea)
+TOKEN=$(sed -nE 's|https://[^:]+:([^@]+)@gitea\.kasugano\.cn.*|\1|p' ~/.git-credentials-gitea)
 
 # 1) 创建 Release（tag 需高于当前 versionName 才会提示更新）
 curl -X POST -u "zijunchiang:$TOKEN" -H "Content-Type: application/json" \
@@ -83,6 +88,26 @@ curl -X POST -u "zijunchiang:$TOKEN" \
 > `麦动KTV-V1.2.x-release.apk`。
 >
 > 上传 22MB APK 约需 70s，注意命令超时设置。
+
+### 发布新版本（Gitee Release）
+
+```bash
+GT=$(sed -nE 's|https://[^:]+:([^@]+)@gitee\.com.*|\1|p' ~/.git-credentials-gitee)
+
+# 1) 创建 Release（Gitee 会自动创建同名 tag）
+curl -X POST -H "Authorization: token $GT" -H "Content-Type: application/json" \
+  -d '{"tag_name":"v1.4.0","name":"麦动KTV V1.4.0","body":"更新说明","target_commitish":"master"}' \
+  https://gitee.com/api/v5/repos/zijunchiang/maidong-ktv/releases
+
+# 2) 上传 APK 附件（表单字段名是 file，不是 attachment；用返回的 release id）
+curl -X POST -H "Authorization: token $GT" \
+  -F "file=@麦动KTV-V1.4.0-release.apk" \
+  "https://gitee.com/api/v5/repos/zijunchiang/maidong-ktv/releases/<id>/attach_files"
+```
+
+> Gitee 附件名**可用中文**（ASCII 限制只针对 Gitea 1.27），上传 22MB 约 4s。
+> 发布后务必校验下载：`curl -sL <browser_download_url> | md5sum` 应与本地发布包一致
+> （Gitea 侧同样要校验 `/releases/download/<tag>/<文件>` 规范路径返回 200）。
 
 ## 二、构建与产物
 
