@@ -241,6 +241,21 @@ $BT/apksigner verify 目标名.apk
   4. 下载速率会按每 10% 上报一次 `MUSE-DB progress 30% 129MB/430MB 1.85MB/s`，
      判断"是网络慢还是磁盘慢"直接看这几行；
   5. 新增任何"周期性/高频"回调（进度、心跳、轮询）时都要按同样标准评估主线程开销。
+- **⚠️ 裸 Socket 通道（`KtvJsBridge.rawRequest`）的三个坑**：点歌取址走的正是这条通道
+  （为了贴近原版风控要求的"干净请求"），它**不受** `HttpsURLConnection` 默认工厂与
+  `network_security_config` 的任何影响：
+  1. **HTTPS 必须用 `TlsCompat.sslSocketFactory()`**，不能用 `SSLSocketFactory.getDefault()`——
+     后者是系统信任库，老设备（及 Android 7.0）没有 ISRG 新根，握手直接失败；
+  2. **连接必须显式给超时**：`Socket(host, port)` 的连接阶段**不受** `soTimeout` 约束，
+     遇路由黑洞会按系统 TCP 超时（约 2 分钟）干等；多源叠加会耗光 JS 侧
+     `JS_REQUEST_TIMEOUT_MS`(180s) 预算，表现为**「无法生成下载地址」且日志里什么都没有**。
+     正确写法：`Socket().connect(InetSocketAddress(host, port), connectTimeout)`；
+  3. **失败必须上报**：裸通道失败打 `RAW-ERR`、HttpURLConnection 回退失败打 `NET-ERR` 到远程日志。
+- **JS 侧日志必须能进远程日志**：`ktv_api.js` 的 `_log()` 走 `console.log`（桥以 `debug:true` 实例化），
+  默认只进 WebView 控制台、现场无法取证。`KtvJsBridge.wrapHtml()` 已注入 console 桥把
+  `console.log` 转发到 `android.log` → `MiliLog.info("JS ...")`。
+  点歌失败时先搜远程日志里的 **`JS `** 与 **`点歌失败`** 两行：前者给
+  「Try source / Token OK/FAIL / do.php code=」的逐步过程，后者给 JS 汇总的失败原因。
 - **歌曲源**：`app/src/main/assets/mobile/ktv_api.js` 的 `CONFIG.HOSTS`（多源自动排序，失败源沉底）
 - **JS 热更新**：改动 `ktv_api.js` 必须同步提升 `KTV_BRIDGE_API: N` 标记（JS 与 `KtvJsBridge.kt` 两处校验），否则设备仍用缓存旧脚本
 - **曲库**：只走官方 Muse 同步（`MuseDbSync`），不再依赖代码仓库数据库文件
