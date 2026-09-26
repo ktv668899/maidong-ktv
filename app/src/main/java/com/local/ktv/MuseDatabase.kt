@@ -584,11 +584,14 @@ class MuseDatabase @JvmOverloads constructor(initialSourceFile: File? = null) {
     companion object {
         private const val TAG = "MuseDatabase"
         private const val DEFAULT_CDN_PATH = "https://pub.mcdn.cherryonline.cn/"
-        private const val DEFAULT_DB_PATH = "${AppPaths.ROOT_PATH}/database/muse.db"
         const val PAGE_SIZE = 10
         /** 搜索结果条数统计上限:达到该值即视为“足够多”,终止 COUNT 扫描以加速检索。 */
         const val SEARCH_COUNT_CAP = 2000
-        const val VIDEO_ROOT = AppPaths.VIDEO_PATH
+        /**
+         * 视频根目录。**必须是运行时取值**：存储根由 [AppPaths.init] 在启动时解析，
+         * 不能再像以前那样用 `const val` 把 `/storage/emulated/0/...` 编译期内联进去。
+         */
+        val VIDEO_ROOT: String get() = AppPaths.videoDir.absolutePath
         const val CLOUD_SONG_DIR = "cloud-song"
         const val LOCAL_SONG_DIR = "local"
 
@@ -623,10 +626,10 @@ class MuseDatabase @JvmOverloads constructor(initialSourceFile: File? = null) {
         fun songDirectories(): List<File> = listOf(AppPaths.cloudSongsDir)
 
         @JvmStatic
-        fun defaultDbFile(): File = File(DEFAULT_DB_PATH)
+        fun defaultDbFile(): File = AppPaths.databaseFile
 
         private fun findDatabaseFile(): File? {
-            return File(DEFAULT_DB_PATH).takeIf { it.exists() && it.canRead() }
+            return AppPaths.databaseFile.takeIf { it.exists() && it.canRead() }
         }
 
         private fun pageArgs(limit: Int, offset: Int) = arrayOf(limit.toString(), offset.toString())

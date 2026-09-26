@@ -160,7 +160,7 @@ $BT/apksigner verify 目标名.apk
 
 ### 版本号
 
-- `app/build.gradle`：`versionName "1.4.1"` / `versionCode 17`
+- `app/build.gradle`：`versionName "1.4.2"` / `versionCode 22`（18~21 被本机临时诊断包占用过）
 - App 内显示统一用纯版本号（不加 `(versionCode)` 括号）
 - ⚠️ **发布构建已开启 NewApi 闸门**（`lint { checkReleaseBuilds true; fatal += ['NewApi'] }`）：
   任何「调用了高于 `minSdk 21` 且未做版本守卫的 API」都会让 `assembleRelease` 直接失败。
@@ -188,6 +188,24 @@ $BT/apksigner verify 目标名.apk
     在 `app/build/reports/lint-results-release.txt` 里搜 `NewApi`。
   - 根因扫描捷径：`grep -n "private val .* = object : android\." app/src/main/java/com/local/ktv/*.kt`
     —— 字段初始化器里出现 `android.*` 的高版本类就是要闪退。
+- **⚠️ 存储根目录必须运行时解析（不要再写死 `/storage/emulated/0`）**：
+  `AppPaths` 曾把根目录写死成 `/storage/emulated/0/MaidongKTV`，在**极米 H1S（GMUI2.0 / Android 5.1.1）**
+  上该路径不可写 → `ensureDirectories()` 的 `check(it.exists() || it.mkdirs())` 抛异常 →
+  **App 一打开就闪退**（这台机器历来所有版本都打不开的真正原因，2026-09-26 定位）。
+  现在的约定：
+  1. `AppPaths.init(context)` 在 `KtvApplication.attachBaseContext` **最前面**调用，按
+     「`Environment.getExternalStorageDirectory()` → 历史硬编码路径 → `getExternalFilesDir()`
+     → `filesDir`」顺序挑**第一个真正可建且可写**的目录（幂等）；
+  2. 所有用到根路径的地方必须走 `AppPaths.*` 的 **getter**，**绝不能用 `const val` 把路径编译期内联**
+     （`MuseDatabase.VIDEO_ROOT`、`MuseDatabase.defaultDbFile()` 曾经就是 `const val` 内联的，
+     改存储根后必须一起改成运行时取值）；
+  3. 目录创建**不许抛异常**：`AppPaths.ensureDirectories()` 返回 `Boolean`，失败只记日志，
+     `MainActivity` 拿到 false 也只是告警继续，绝不能让存储问题变成闪退；
+  4. 用户可见的目录提示文案也要用 `AppPaths.*Dir.absolutePath` 拼，不要写死 `/sdcard/...`；
+  5. 启动时会往远程日志打一行 `STORAGE root=... by=... envState=... probe=[...]`，
+     换盒子/换 ROM 时先看这行就能确认存储根落在哪。
+  - 自查：`grep -rn "/storage/emulated\|/sdcard/MaidongKTV" app/src/main/java --include='*.kt'`
+    除 `AppPaths` 的候选清单外不应再有硬编码。
 - **歌曲源**：`app/src/main/assets/mobile/ktv_api.js` 的 `CONFIG.HOSTS`（多源自动排序，失败源沉底）
 - **JS 热更新**：改动 `ktv_api.js` 必须同步提升 `KTV_BRIDGE_API: N` 标记（JS 与 `KtvJsBridge.kt` 两处校验），否则设备仍用缓存旧脚本
 - **曲库**：只走官方 Muse 同步（`MuseDbSync`），不再依赖代码仓库数据库文件

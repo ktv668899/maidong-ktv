@@ -425,7 +425,11 @@ class MainActivity : AppCompatActivity() {
             requestStorage()
             return
         }
-        AppPaths.ensureDirectories()
+        // 存储目录建不出来时**不再闪退**（极米 H1S / Android 5.1.1 的历史崩溃点），
+        // AppPaths.init 已在 Application.attachBaseContext 里挑好可写根目录。
+        if (!AppPaths.ensureDirectories()) {
+            Log.w(TAG, "存储目录创建失败: ${AppPaths.storageFacts(this)}")
+        }
         store.load()
         loadStateFromStore()
         stateDatabase = KtvStateDatabase(applicationContext)
@@ -466,6 +470,8 @@ class MainActivity : AppCompatActivity() {
         playbackEngine = KtvPlaybackEngine(applicationContext)
         // 远程日志系统(GlogCenter): 启动即上报设备/网络信息。
         MiliLog.init(applicationContext)
+        // 存储根目录探测结果（排查不同盒子存储差异用；单行便于按 STORAGE 检索）。
+        MiliLog.info("STORAGE ${AppPaths.storageFacts(this)}")
         refreshLogDeviceContext()
         reportDeviceBootInfo()
         // 歌曲源窗口/风控到期守卫: 源对陌生出口 IP 可能在短暂窗口后返回 403,
@@ -1705,7 +1711,7 @@ class MainActivity : AppCompatActivity() {
         panel.addView(sectionTitle("本地导入"))
         panel.addView(
             label(
-                "请把歌曲放入 /sdcard/MaidongKTV/import、/sdcard/MaidongKTV/songs、U盘/KTV 或 U盘/songs，支持 mp4/mkv/avi/mp3/flac/wav。",
+                "请把歌曲放入 ${AppPaths.importDir.absolutePath}、${AppPaths.songsDir.absolutePath}、U盘/KTV 或 U盘/songs，支持 mp4/mkv/avi/mp3/flac/wav。",
                 20,
                 Color.LTGRAY
             )
@@ -2995,7 +3001,7 @@ class MainActivity : AppCompatActivity() {
         val adapter = tvAdapter()
         val apks = localApks()
         for (apk in apks) adapter.add(apk.getName() + "    " + formatSize(apk.length()))
-        if (adapter.isEmpty()) adapter.add("暂无 APK，请放入 /sdcard/MaidongKTV/apps 或 U盘/apps")
+        if (adapter.isEmpty()) adapter.add("暂无 APK，请放入 ${AppPaths.appsDir.absolutePath} 或 U盘/apps")
         list.setAdapter(adapter)
         list.setOnItemClickListener(OnItemClickListener { p: AdapterView<*>?, v: View?, pos: Int, id: Long ->
             if (pos >= 0 && pos < apks.size) installApk(apks.get(pos))
@@ -4196,7 +4202,7 @@ class MainActivity : AppCompatActivity() {
         content!!.addView(left, LinearLayout.LayoutParams(dp(300), -1))
         left.addView(sectionTitle("影片操作"))
         left.addView(button("扫描影片目录", View.OnClickListener { v: View? -> showLocalMovies() }))
-        left.addView(label("目录：/sdcard/MaidongKTV/movies 或 U盘/movies", 18, Color.LTGRAY))
+        left.addView(label("目录：${AppPaths.moviesDir.absolutePath} 或 U盘/movies", 18, Color.LTGRAY))
 
         val right = panel()
         content!!.addView(right, LinearLayout.LayoutParams(0, -1, 1f))
