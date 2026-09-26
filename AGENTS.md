@@ -160,7 +160,7 @@ $BT/apksigner verify 目标名.apk
 
 ### 版本号
 
-- `app/build.gradle`：`versionName "1.4.2"` / `versionCode 22`（18~21 被本机临时诊断包占用过）
+- `app/build.gradle`：`versionName "1.4.3"` / `versionCode 23`（18~21 被本机临时诊断包占用过）
 - App 内显示统一用纯版本号（不加 `(versionCode)` 括号）
 - ⚠️ **发布构建已开启 NewApi 闸门**（`lint { checkReleaseBuilds true; fatal += ['NewApi'] }`）：
   任何「调用了高于 `minSdk 21` 且未做版本守卫的 API」都会让 `assembleRelease` 直接失败。
@@ -206,6 +206,26 @@ $BT/apksigner verify 目标名.apk
      换盒子/换 ROM 时先看这行就能确认存储根落在哪。
   - 自查：`grep -rn "/storage/emulated\|/sdcard/MaidongKTV" app/src/main/java --include='*.kt'`
     除 `AppPaths` 的候选清单外不应再有硬编码。
+- **⚠️ 老系统（API < 24）的 TLS 根证书**：`*.cherryonline.cn`（曲库同步 `mconn` / 点歌登录 `mws`）
+  与 `gitea.kasugano.cn` 都用 **Let's Encrypt 新链**（`leaf ← YR2 ← Root YR ← ISRG Root X1`）。
+  `res/xml/network_security_config.xml` 里的三个内置根证书**只在 Android 7.0(API 24)+ 生效**，
+  Android 5.1.1 上被完全忽略、系统信任库又没有 ISRG 新根 →
+  `SSLHandshakeException: Trust anchor for certification path not found` →
+  曲库登录失败 →**「不能下载曲库」**（这就是极米 H1S 上第二个卡点的根因，2026-09-26 定位）。
+  约定：
+  1. `TlsCompat.install(context)`（在 `KtvApplication.attachBaseContext`）在 API<24 上把
+     「系统默认信任 ∪ 内置根证书」的复合 `X509TrustManager` 装到全局
+     `HttpsURLConnection.setDefaultSSLSocketFactory`，一次覆盖 App 内所有 `HttpsURLConnection`
+     （曲库同步、JS 热更新下载、更新检查、头像下载）。**主机名校验保持系统默认，绝不放行任意证书**；
+  2. WebView 的 TLS 信任**无法**用 SSLContext 覆盖，而 JS（`ktv_api.js`）会直连
+     `https://mws.cherryonline.cn`。因此在 `KtvJsBridge` 的 `onReceivedSslError` 里**绝不盲目
+     `proceed()`**：先用 `TlsCompat.isHostTrustedByOurStore(host)` 对同一主机独立做一次 TLS 校验，
+     通过才放行，否则 `cancel()`；
+  3. 以后替换/新增内置根证书时，`TlsCompat.BUNDLED_CERTS` 与 `network_security_config.xml`
+     两处要同步改（一个管 API<24、一个管 API>=24）；
+  4. 曲库同步每一步失败都会 `MiliLog.warn("MUSE-DB ..." / "DB-SYNC ...")` 上报。
+     老设备上「不能下载曲库」先看远程日志这几行 —— 以前只写 logcat，界面只剩
+     「未找到可用曲库」兜底文案，排查极其困难。
 - **歌曲源**：`app/src/main/assets/mobile/ktv_api.js` 的 `CONFIG.HOSTS`（多源自动排序，失败源沉底）
 - **JS 热更新**：改动 `ktv_api.js` 必须同步提升 `KTV_BRIDGE_API: N` 标记（JS 与 `KtvJsBridge.kt` 两处校验），否则设备仍用缓存旧脚本
 - **曲库**：只走官方 Muse 同步（`MuseDbSync`），不再依赖代码仓库数据库文件

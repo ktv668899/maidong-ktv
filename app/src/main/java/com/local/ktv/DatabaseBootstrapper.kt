@@ -72,6 +72,7 @@ object DatabaseBootstrapper {
             val file = MuseDbSync.download(onProgress)
             // MuseDbSync 内部已保存版本文件；这里记录同步时间作为时效起点。
             markSynced()
+            MiliLog.info("DB-SYNC download OK: ${file.absolutePath} size=${formatSize(file.length())}")
             file
         }.mapError(::readableError)
     }
@@ -89,14 +90,20 @@ object DatabaseBootstrapper {
     private fun readableError(error: Throwable): Throwable {
         if (isNoSpaceError(error)) {
             val target = MuseDatabase.defaultDbFile()
+            val free = target.parentFile?.usableSpace ?: 0L
+            MiliLog.warn(
+                "DB-SYNC 空间不足: free=${formatSize(free)} target=${target.absolutePath} " +
+                    "err=${error.message}",
+            )
             return IllegalStateException(
-                "曲库分区空间不足（当前可用 ${formatSize(target.parentFile?.usableSpace ?: 0L)}），" +
+                "曲库分区空间不足（当前可用 ${formatSize(free)}），" +
                     "已清理下载临时文件，请释放空间后重试",
                 error,
             )
         }
         val message = error.message?.takeIf { it.isNotBlank() } ?: "曲库下载失败"
         Log.w(TAG, "Database download failed: $message")
+        MiliLog.warn("DB-SYNC download failed: ${error.javaClass.simpleName}: $message")
         return IllegalStateException(message, error)
     }
 }

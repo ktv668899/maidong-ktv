@@ -143,13 +143,18 @@ object MuseDbSync {
                 setRequestProperty("User-Agent", "MaidongKTV/1.2")
             }
             conn.outputStream.use { it.write(jsonBody.toByteArray(Charsets.UTF_8)) }
-            if (conn.responseCode !in 200..299) return null
+            if (conn.responseCode !in 200..299) {
+                MiliLog.warn("MUSE-DB login HTTP ${conn.responseCode} (url=$url)")
+                return null
+            }
             conn.inputStream.use { it.readBytes() }
             conn.getHeaderField("Set-Cookie")
                 ?.substringBefore(';')
                 ?.takeIf { it.startsWith("muse-portal-connector=") }
         } catch (error: Throwable) {
             Log.w(TAG, "login failed: ${error.message}")
+            // 老设备上最常见的就是证书链校验失败（SSLHandshakeException），必须上报。
+            MiliLog.warn("MUSE-DB login error: ${error.javaClass.simpleName}: ${error.message}")
             null
         } finally {
             conn?.disconnect()
@@ -171,11 +176,15 @@ object MuseDbSync {
                 setRequestProperty("User-Agent", "MaidongKTV/1.2")
             }
             conn.outputStream.use { it.write(jsonBody.toByteArray(Charsets.UTF_8)) }
-            if (conn.responseCode !in 200..299) return null
+            if (conn.responseCode !in 200..299) {
+                MiliLog.warn("MUSE-DB sync HTTP ${conn.responseCode} (url=$url)")
+                return null
+            }
             val text = conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
             JSONObject(text)
         } catch (error: Throwable) {
             Log.w(TAG, "sync failed: ${error.message}")
+            MiliLog.warn("MUSE-DB sync error: ${error.javaClass.simpleName}: ${error.message}")
             null
         } finally {
             conn?.disconnect()

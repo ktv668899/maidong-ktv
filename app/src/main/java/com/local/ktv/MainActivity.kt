@@ -644,7 +644,15 @@ class MainActivity : AppCompatActivity() {
                         DatabaseBootstrapper.markSynced()
                     }
                 } else {
+                    // 取远端版本失败 = 登录/同步没成功（老设备常见于 TLS 根证书缺失）。
+                    // 以前这里只写 logcat 且不设 bootstrapError，界面只会显示兜底的
+                    // 「未找到可用曲库」，远程日志里也什么都看不到 —— 排查非常困难。
+                    bootstrapError = IllegalStateException("无法连接曲库服务器（获取远端版本失败）")
                     Log.w(TAG, "曲库同步到期，但获取远端版本失败，本次继续使用本地曲库")
+                    MiliLog.warn(
+                        "DB-SYNC fetchRemoteVersion=null localDbOk=$ok syncDue=$syncDue " +
+                            "sdk=${android.os.Build.VERSION.SDK_INT} root=${AppPaths.root.absolutePath}",
+                    )
                 }
             } else {
                 Log.i(TAG, "曲库未到期(${DatabaseBootstrapper.syncStatusText()})，跳过服务器同步")

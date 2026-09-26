@@ -1,11 +1,14 @@
 package com.local.ktv
 
 import android.content.Context
+import android.net.Uri
+import android.net.http.SslError
 import android.os.Handler
 import android.os.Looper
 import android.util.Base64
 import android.util.Log
 import android.webkit.JavascriptInterface
+import android.webkit.SslErrorHandler
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import org.json.JSONObject
@@ -108,6 +111,28 @@ class KtvJsBridge(context: Context) {
             settings.domStorageEnabled = true
             addJavascriptInterface(NativeBridge(), "android")
             webViewClient = object : WebViewClient() {
+                /**
+                 * 老系统（API < 24）的 WebView 不读 network_security_config，
+                 * 系统信任库也没有 Let's Encrypt 新根 → 访问 mws.cherryonline.cn 会直接握手失败。
+                 * 这里**不做盲目放行**：用 [TlsCompat] 增强后的信任库对同一主机独立校验一次，
+                 * 只有校验通过（证书链合法且主机名匹配）才继续。
+                 */
+                override fun onReceivedSslError(
+                    view: WebView?,
+                    handler: SslErrorHandler?,
+                    error: SslError?,
+                ) {
+                    val host = runCatching { Uri.parse(view?.url)?.host }.getOrNull()
+                    val onlyUntrusted = error?.primaryError == SslError.SSL_UNTRUSTED
+                    if (onlyUntrusted && host != null && TlsCompat.isHostTrustedByOurStore(host)) {
+                        Log.w(TAG, "legacy TLS: $host 已用增强信任库复核通过，放行 WebView")
+                        handler?.proceed()
+                    } else {
+                        Log.e(TAG, "SSL error NOT overridden: host=$host primary=${error?.primaryError}")
+                        handler?.cancel()
+                    }
+                }
+
                 override fun onPageFinished(view: WebView, url: String) {
                     view.evaluateJavascript("typeof window.KtvApi === 'function'") { result ->
                         if (result == "true") {

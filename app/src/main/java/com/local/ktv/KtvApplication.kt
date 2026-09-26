@@ -16,6 +16,10 @@ class KtvApplication : Application() {
         base?.let {
             runCatching { AppPaths.init(it) }
                 .onFailure { error -> Log.e(TAG, "AppPaths.init failed", error) }
+            // 老系统(API<24)不读 network_security_config，需要代码补上内置根证书的信任，
+            // 否则 Let's Encrypt 新链的接口（曲库同步/点歌登录/JS 热更新）全部握手失败。
+            runCatching { TlsCompat.install(it) }
+                .onFailure { error -> Log.e(TAG, "TlsCompat.install failed", error) }
         }
     }
 
