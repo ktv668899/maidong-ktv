@@ -24,9 +24,13 @@ object SongApiClient {
     fun init(context: Context) {
         if (bridge != null) return
         bridge = KtvJsBridge(context)
+        // 原生兜底取址通道：复用桥的「干净请求」裸 Socket（与 JS 同一条路，风控表现一致），
+        // 但**不依赖 WebView 是否可用** —— 老盒子上 WebView 不可用时唯一能取到地址的路径。
+        SongUrlResolver.install { url -> bridge?.rawCleanGet(url) }
         bridge?.init { ok ->
             ready = ok
             Log.i(TAG, "JS Bridge init: $ok")
+            if (!ok) MiliLog.error("JS-BRIDGE 初始化返回 false，取址将走原生兜底")
         }
     }
 
@@ -47,10 +51,10 @@ object SongApiClient {
     fun getSongDownloadUrl(musicno: String, resolution: String, h265: Boolean): String? {
         // 主线程同步等待 WebView 回调会死锁；当前播放/下载流程会在 IO 线程调用这里。
         if (Looper.myLooper() == Looper.getMainLooper()) {
-            Log.w(TAG, "Synchronous JS request on main thread; using DB fallback")
-            return fetchFromDb(musicno)
+            Log.w(TAG, "Synchronous JS request on main thread; using native/DB fallback")
+            return resolveNatively(musicno, resolution, h265) ?: fetchFromDb(musicno)
         }
-        val bridge = bridge ?: return fetchFromDb(musicno)
+        val bridge = bridge ?: return resolveNatively(musicno, resolution, h265) ?: fetchFromDb(musicno)
         // 等待 JS 桥"当前"真正就绪。首次冷启动时隐藏 WebView 的初始化在低性能设备
         // (极米投影等)上可能超过 3 秒；桥热更新重载期间 isReady() 也会短暂为 false。
         // 这里放宽到 15 秒，避免第一首歌因撞上就绪窗口而回退到不可靠的 DB cloud_url。
@@ -62,8 +66,11 @@ object SongApiClient {
             }
         }
         if (!bridge.isReady()) {
-            Log.w(TAG, "Bridge not ready after wait, DB fallback")
-            return fetchFromDb(musicno)
+            // ⚠️ 老盒子（WebView 不可用）会一直走到这里。以前直接回退 DB，结果就是
+            // 「无法生成下载地址」且远程日志里连一条 JS 日志都没有。现在改走原生解析器。
+            Log.w(TAG, "Bridge not ready after wait, native resolver")
+            MiliLog.warn("JS-BRIDGE 15s 未就绪，改用原生取址通道")
+            return resolveNatively(musicno, resolution, h265) ?: fetchFromDb(musicno)
         }
         val result = AtomicReference<String?>()
         val latch = CountDownLatch(1)
@@ -74,7 +81,9 @@ object SongApiClient {
         } catch (_: InterruptedException) {
             Thread.currentThread().interrupt()
         }
-        val url = result.get() ?: fetchFromDb(musicno)
+        // 桥可用但 JS 没取到地址（或超时）时，同样再给原生解析器一次机会，
+        // 避免 JS 侧偶发失败直接把第一首歌判死。
+        val url = result.get() ?: resolveNatively(musicno, resolution, h265) ?: fetchFromDb(musicno)
         if (url != null) {
             // 成功取到歌曲 URL → 歌曲源窗口已恢复/未到期, 复位到期提示状态。
             Eac19WindowGuard.noteUrlOk()
@@ -82,9 +91,17 @@ object SongApiClient {
         return url
     }
 
+    /**
+     * 原生兜底取址：WebView 不可用（老盒子）或 JS 没取到地址时使用。
+     * 走的是与 JS 完全相同的裸 Socket 干净请求通道，见 [SongUrlResolver]。
+     */
+    private fun resolveNatively(musicno: String, resolution: String, h265: Boolean): String? =
+        runCatching { SongUrlResolver.resolve(musicno, resolution, h265) }
+            .onFailure { Log.w(TAG, "native resolver failed", it) }
+            .getOrNull()
+
     /** DB cloud_url fallback — 必须通过 demo 检测才能使用 */
-    private fun fetchFromDb(musicno: String): String? {
-        try {
+    private fun fetchFromDb(musicno: String): String? {        try {
             val db = MuseDatabase()
             if (db.open()) {
                 val url = db.getCloudUrl(musicno)

@@ -49,7 +49,7 @@ class KtvJsBridge(context: Context) {
         // mac 取本机「当前在用网卡」的硬件地址(读不到时回退历史抓包值, 见 DeviceMac);
         // sn 沿用抓包注册值, 保证 mac 变化后仍能对上原有账号体系。
         private val DEVICE_MAC: String get() = DeviceMac.effective()
-        private const val DEVICE_SN = "2d7bb4a7d7f7"
+        internal const val DEVICE_SN = "2d7bb4a7d7f7"
 
         /**
          * 断网重连后重置歌曲源会话。
@@ -98,6 +98,7 @@ class KtvJsBridge(context: Context) {
                 updateCache(cached)
             } catch (error: Throwable) {
                 Log.e(TAG, "WebView init failed", error)
+                MiliLog.error("JS-BRIDGE WebView 初始化失败: ${error.javaClass.simpleName}: ${error.message}")
                 callback(false)
             }
         }
@@ -138,6 +139,7 @@ class KtvJsBridge(context: Context) {
                         if (result == "true") {
                             ready = true
                             Log.i(TAG, "JS runtime ready (${if (loadedFromCache) "cache" else "asset"})")
+                            MiliLog.info("JS-BRIDGE ready (${if (loadedFromCache) "cache" else "asset"})")
                             callback(true)
                         } else if (loadedFromCache && !assetRetryAttempted) {
                             Log.w(TAG, "Cached JS failed to load; falling back to packaged asset")
@@ -146,6 +148,9 @@ class KtvJsBridge(context: Context) {
                             createWebView(readAssetScript(), callback)
                         } else {
                             Log.e(TAG, "KtvApi was not exported by JS")
+                            // 老电视盒子上 WebView 不可用/被裁剪时常走这里：桥永远不就绪，
+                            // 取址只能回退 DB → 「无法生成下载地址」。必须能远程看到。
+                            MiliLog.error("JS-BRIDGE KtvApi 未导出，WebView 不可用")
                             callback(false)
                         }
                     }
@@ -157,6 +162,18 @@ class KtvJsBridge(context: Context) {
 
     /** 桥当前是否可用。热更新重载期间会短暂为 false，调用方应据此等待而非立即回退。 */
     fun isReady(): Boolean = ready && !destroyed
+
+    /**
+     * 供**原生兜底取址解析器**（[SongUrlResolver]）复用的「干净请求」通道。
+     *
+     * 与 JS 的 `android.httpGet` 走的是**完全同一条**裸 Socket 路径（只发 Host + Accept，
+     * 不带 UA/Connection/Accept-Encoding），因此请求特征与风控表现一致；
+     * 且**不依赖 WebView 是否就绪** —— 正是 WebView 不可用的老设备所需要的。
+     */
+    fun rawCleanGet(url: String, timeoutMs: Int = 8_000): String {
+        val headers = JSONObject().put("Accept", "*/*").toString()
+        return NativeBridge().request("GET", url, null, headers, timeoutMs)
+    }
 
     fun isDestroyed(): Boolean = destroyed
 
@@ -396,7 +413,8 @@ class KtvJsBridge(context: Context) {
             }
         }
 
-        private fun request(method: String, url: String, body: String?, headersJson: String, timeoutMs: Int): String {
+        /** 供 [rawCleanGet] 与 [NativeBridge.httpGet]/[httpPost] 共用的请求入口。 */
+        internal fun request(method: String, url: String, body: String?, headersJson: String, timeoutMs: Int): String {
             // 歌曲源(如 w.w345.my)的 do.php 风控只放行"干净"请求(原版仅 Host+Accept;
             // 带任何 UA/Connection/Accept-Encoding 头都会被拒)。裸 Socket 只发 Host+JS 头。
             // 任何 HTTP 状态(200/403 等)都直接用裸 Socket 结果,不再用 HttpURLConnection
