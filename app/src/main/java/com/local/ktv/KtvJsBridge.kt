@@ -45,6 +45,8 @@ class KtvJsBridge(context: Context) {
             "https://gitea.kasugano.cn/zijunchiang/maidong-ktv/raw/branch/master/app/src/main/assets/mobile/ktv_api.js"
         private const val MAX_RESPONSE_BYTES = 2 * 1024 * 1024
         private const val JS_REQUEST_TIMEOUT_MS = 180_000
+        /** WebView 初始化看门狗：超过这个时间还没就绪就判定本机 WebView 不可用。 */
+        private const val BRIDGE_INIT_TIMEOUT_MS = 20_000L
         // 歌曲源(w.w345.my 与 e.ac19.cn 同后台)按 device 识别; 随机/变化的 device 会被风控。
         // mac 取本机「当前在用网卡」的硬件地址(读不到时回退历史抓包值, 见 DeviceMac);
         // sn 沿用抓包注册值, 保证 mac 变化后仍能对上原有账号体系。
@@ -75,6 +77,17 @@ class KtvJsBridge(context: Context) {
     @Volatile private var webView: WebView? = null
     @Volatile private var ready = false
     @Volatile private var destroyed = false
+
+    /**
+     * 已判定「本机 WebView 不可用」。
+     *
+     * 一旦置位，`SongApiClient` 就不再为取址白等 15 秒，直接走原生通道
+     * （极米 H1S 实测每次点歌都要等满 15 秒，日志里表现为每首歌前一条
+     * 「JS-BRIDGE 15s 未就绪」）。桥万一后来就绪（热更新重载等）会自动清除。
+     */
+    @Volatile private var unavailable = false
+    private var unavailableReason: String = ""
+
     private var loadedFromCache = false
     private var assetRetryAttempted = false
 
@@ -96,9 +109,17 @@ class KtvJsBridge(context: Context) {
                 loadedFromCache = cachedScript != null
                 createWebView(cachedScript ?: readAssetScript(), callback)
                 updateCache(cached)
+                // 看门狗：onPageFinished 一直不回调（WebView 静默失效）时给出**明确原因**。
+                // 否则远程日志里只会看到反复的「15s 未就绪」，不知道卡在哪一步。
+                mainHandler.postDelayed({
+                    if (!ready && !destroyed && !unavailable) {
+                        markUnavailable("初始化超时：onPageFinished 未回调或 KtvApi 未导出")
+                        callback(false)
+                    }
+                }, BRIDGE_INIT_TIMEOUT_MS)
             } catch (error: Throwable) {
                 Log.e(TAG, "WebView init failed", error)
-                MiliLog.error("JS-BRIDGE WebView 初始化失败: ${error.javaClass.simpleName}: ${error.message}")
+                markUnavailable("WebView 初始化失败: ${error.javaClass.simpleName}: ${error.message}")
                 callback(false)
             }
         }
@@ -138,6 +159,12 @@ class KtvJsBridge(context: Context) {
                     view.evaluateJavascript("typeof window.KtvApi === 'function'") { result ->
                         if (result == "true") {
                             ready = true
+                            // 桥后来就绪（例如热更新重载成功）→ 清除"不可用"标记，恢复 JS 主路径。
+                            if (unavailable) {
+                                unavailable = false
+                                MiliLog.info("JS-BRIDGE 已恢复可用（${unavailableReason.ifEmpty { "?" }} 已解除）")
+                                unavailableReason = ""
+                            }
                             Log.i(TAG, "JS runtime ready (${if (loadedFromCache) "cache" else "asset"})")
                             MiliLog.info("JS-BRIDGE ready (${if (loadedFromCache) "cache" else "asset"})")
                             callback(true)
@@ -150,7 +177,7 @@ class KtvJsBridge(context: Context) {
                             Log.e(TAG, "KtvApi was not exported by JS")
                             // 老电视盒子上 WebView 不可用/被裁剪时常走这里：桥永远不就绪，
                             // 取址只能回退 DB → 「无法生成下载地址」。必须能远程看到。
-                            MiliLog.error("JS-BRIDGE KtvApi 未导出，WebView 不可用")
+                            markUnavailable("KtvApi 未导出")
                             callback(false)
                         }
                     }
@@ -162,6 +189,20 @@ class KtvJsBridge(context: Context) {
 
     /** 桥当前是否可用。热更新重载期间会短暂为 false，调用方应据此等待而非立即回退。 */
     fun isReady(): Boolean = ready && !destroyed
+
+    /** 是否已判定本机 WebView 不可用（用于跳过必然失败的等待）。 */
+    fun isUnavailable(): Boolean = unavailable && !destroyed && !ready
+
+    /**
+     * 标记桥在本机不可用。**只在状态首次变化时上报一次**：
+     * 这是持久状态，若每次点歌都记一条会把远程日志刷满（实测每首歌一条）。
+     */
+    fun markUnavailable(reason: String) {
+        if (unavailable) return
+        unavailable = true
+        unavailableReason = reason
+        MiliLog.error("JS-BRIDGE 判定本机 WebView 不可用（$reason），后续点歌直接走原生取址通道")
+    }
 
     /**
      * 供**原生兜底取址解析器**（[SongUrlResolver]）复用的「干净请求」通道。

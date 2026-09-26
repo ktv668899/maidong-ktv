@@ -57,6 +57,15 @@ object SongUrlResolver {
     @Volatile private var sn: String = KtvJsBridge.DEVICE_SN
 
     /**
+     * 最近一次取址命中的源 host。
+     * 供 `SongApiClient.lastSongSourceHost()` 使用 —— 走原生兜底时 JS 的
+     * `reportSongResult` 不会触发，否则日志里「请求源=」永远是空的。
+     */
+    @Volatile
+    var lastHost: String = ""
+        private set
+
+    /**
      * 安装取址通道。
      * @param fetch 干净的 HTTP GET（应传 [KtvJsBridge.rawCleanGet]）；
      *              入参 url，返回 `{"status":..,"body":..,"error":..}` 的 JSON 字符串。
@@ -115,6 +124,7 @@ object SongUrlResolver {
                 }
             if (!url.isNullOrEmpty() && isValidSongUrl(url, musicno)) {
                 promote(host)
+                lastHost = host
                 val elapsed = System.currentTimeMillis() - startedAt
                 val urlHost = runCatching { java.net.URI(url).host }.getOrNull() ?: "?"
                 MiliLog.info(

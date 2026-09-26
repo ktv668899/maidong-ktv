@@ -160,7 +160,7 @@ $BT/apksigner verify 目标名.apk
 
 ### 版本号
 
-- `app/build.gradle`：`versionName "1.4.7"` / `versionCode 27`（18~21 被本机临时诊断包占用过）
+- `app/build.gradle`：`versionName "1.4.8"` / `versionCode 28`（18~21 被本机临时诊断包占用过）
 - App 内显示统一用纯版本号（不加 `(versionCode)` 括号）
 - ⚠️ **发布构建已开启 NewApi 闸门**（`lint { checkReleaseBuilds true; fatal += ['NewApi'] }`）：
   任何「调用了高于 `minSdk 21` 且未做版本守卫的 API」都会让 `assembleRelease` 直接失败。
@@ -297,6 +297,23 @@ $BT/apksigner verify 目标名.apk
   客户端为 `MiliLog`（有界队列 + 后台线程 + 失败重试），调用点 `MiliLog.info/notice/warn/error`
   保持不变。启动上报（`reportDeviceBootInfo()`）只采集这 10 项：包名、版本号、安装时间、品牌、型号、
   设备名、Android 版本、CPU 架构、内核版本、屏幕分辨率
+  - **写日志的五条约定**（2026-09-26 依据现场日志复盘补充）：
+    1. **持久状态只记一次**，不要每次事件都记。反例：桥不可用曾按「每次点歌一条 WARN」输出，
+       一台机器一天几百条、把日志刷满且毫无新增信息。现在由 `KtvJsBridge.markUnavailable()`
+       在**状态首次变化**时记一条。
+    2. **关键行必须带全上下文**：`STORAGE`/`BOOT` 这类启动行要放在 `reportDeviceBootInfo()` 的
+       后台线程里、`refreshLogDeviceContext()` 与 `MiliLog.awaitServerIp()` **之后**，
+       否则 `serverip`/`clientip`/`user`/`traceid` 全是 `undefined`（旧日志按设备检索不到）。
+    3. **不要在日志行里做重活**：`AppPaths.storageFacts()`/`diagnose()` 会真实建目录、写探针、
+       读 `/proc/mounts`，**绝不能放在主线程**（启动时曾如此）。
+    4. **日志要能自我定位**：失败行写清"哪一步/哪个源/耗时/原因"，例如
+       `NATIVE-SONG 全部源失败 编号=... 详情=token-fail|no-url|demo-or-mismatch 用时=...ms`；
+       桥侧由 `JS-BRIDGE ...` 说明 WebView 到底卡在哪一步（初始化失败/KtvApi 未导出/20s 超时）。
+    5. **状态样本 + 事件**缺一不可：事件（点歌/失败）说明"发生了什么"，但排查"随时间变化"的
+       问题（空间变少、曲库丢失、长期离线）需要状态样本 —— 现由 6 小时一条 `HEALTH ...`
+       （版本/在线/可用空间/曲库大小/根目录）提供。
+  - 一段典型现场日志应为：`BOOT` → `STORAGE` → (点歌)`点歌编号=... 请求源=... 状态=成功 urlHost=...`
+    → `PLAY ... src=local` → 每 6h `HEALTH ...`；异常时才有 `RAW-ERR`/`NET-ERR`/`NATIVE-SONG ...失败`。
 - **网络状态与断网恢复**：`KtvNetworkMonitor`（object，走 `ConnectivityManager` 回调、不轮询）
   维护全局 `online`；`MainActivity.onNetworkStateChanged()` 负责：
   - 断网 → 播放页右上角 `fullScreenNetworkBadge` 显示「网络未连接」（在全屏控制层 header 内、

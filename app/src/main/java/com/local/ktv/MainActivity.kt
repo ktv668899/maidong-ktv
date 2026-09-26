@@ -187,10 +187,30 @@ class MainActivity : AppCompatActivity() {
     }
 
     /** 周期向 hbeat.ktvsky.com 上报设备身份,维持歌曲源对"合法设备"的判定。 */
+    private var heartbeatTicks = 0
+
     private val ktvHeartbeatRunnable = object : Runnable {
         override fun run() {
             sendDeviceHeartbeat(boot = false)
+            // 每 6 小时留一条健康快照：日志此前只有"事件"(点歌/失败/升级)，
+            // 没有"状态样本"，现场排查空间/曲库/网络随时间的变化时缺参照。
+            heartbeatTicks++
+            if (heartbeatTicks % 6 == 0) logHealthSnapshot()
             main.postDelayed(this, HEARTBEAT_INTERVAL_MS)
+        }
+    }
+
+    /** 健康快照：版本 / 在线 / 可用空间 / 曲库文件 —— 单行，便于按 HEALTH 检索。 */
+    private fun logHealthSnapshot() {
+        runCatching {
+            val db = AppPaths.databaseFile
+            val freeGb = AppPaths.databaseDir.usableSpace / 1024.0 / 1024.0 / 1024.0
+            MiliLog.notice(
+                "HEALTH ver=${BuildConfig.VERSION_NAME} online=${KtvNetworkMonitor.online}" +
+                    " free=${String.format(Locale.ROOT, "%.2f", freeGb)}GB" +
+                    " dbExist=${db.exists()} dbMB=${db.length() / 1024 / 1024}" +
+                    " root=${AppPaths.root.absolutePath}",
+            )
         }
     }
     private val visibleSongs: MutableList<Song> = ArrayList<Song>()
@@ -470,8 +490,10 @@ class MainActivity : AppCompatActivity() {
         playbackEngine = KtvPlaybackEngine(applicationContext)
         // 远程日志系统(GlogCenter): 启动即上报设备/网络信息。
         MiliLog.init(applicationContext)
-        // 存储根目录探测结果（排查不同盒子存储差异用；单行便于按 STORAGE 检索）。
-        MiliLog.info("STORAGE ${AppPaths.storageFacts(this)}")
+        // ⚠️ STORAGE 探测含真实建目录/写盘与 /proc/mounts 读取，**不能放在主线程**，
+        // 而且必须在 refreshLogDeviceContext() 之后，否则这一行的
+        // serverip/clientip/user/traceid 全是 undefined（旧日志就是这样，无法按设备检索）。
+        // 现在统一在 reportDeviceBootInfo() 的后台线程里、awaitServerIp() 之后上报。
         refreshLogDeviceContext()
         reportDeviceBootInfo()
         // 歌曲源窗口/风控到期守卫: 源对陌生出口 IP 可能在短暂窗口后返回 403,
@@ -3725,6 +3747,9 @@ class MainActivity : AppCompatActivity() {
                 // 等主机 IP(公网出口 IP)就绪，避免启动这条日志的 serverip 为空。
                 MiliLog.awaitServerIp()
                 MiliLog.notice(sb.toString())
+                // 存储根目录探测结果（排查不同盒子存储差异用；单行便于按 STORAGE 检索）。
+                // 放在这里而不是启动主线程：既有完整上下文，又避免了主线程磁盘探测。
+                runCatching { MiliLog.notice("STORAGE ${AppPaths.storageFacts(this@MainActivity)}") }
             } catch (ignored: Exception) {
             }
         }, "ktv-boot-log").start()

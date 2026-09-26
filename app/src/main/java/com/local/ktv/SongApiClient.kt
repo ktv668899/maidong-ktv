@@ -55,6 +55,11 @@ object SongApiClient {
             return resolveNatively(musicno, resolution, h265) ?: fetchFromDb(musicno)
         }
         val bridge = bridge ?: return resolveNatively(musicno, resolution, h265) ?: fetchFromDb(musicno)
+        // 已判定本机 WebView 不可用 → 不再每次白等 15 秒，直接用原生通道。
+        // （极米 H1S 实测：每次都等满 15 秒，远程日志里每首歌前都有一条「15s 未就绪」。）
+        if (bridge.isUnavailable()) {
+            return resolveNatively(musicno, resolution, h265) ?: fetchFromDb(musicno)
+        }
         // 等待 JS 桥"当前"真正就绪。首次冷启动时隐藏 WebView 的初始化在低性能设备
         // (极米投影等)上可能超过 3 秒；桥热更新重载期间 isReady() 也会短暂为 false。
         // 这里放宽到 15 秒，避免第一首歌因撞上就绪窗口而回退到不可靠的 DB cloud_url。
@@ -67,9 +72,10 @@ object SongApiClient {
         }
         if (!bridge.isReady()) {
             // ⚠️ 老盒子（WebView 不可用）会一直走到这里。以前直接回退 DB，结果就是
-            // 「无法生成下载地址」且远程日志里连一条 JS 日志都没有。现在改走原生解析器。
+            // 「无法生成下载地址」且远程日志里连一条 JS 日志都没有。现在改走原生解析器，
+            // 并把"不可用"记成持久状态（只上报一次），后续点歌不再等这 15 秒。
             Log.w(TAG, "Bridge not ready after wait, native resolver")
-            MiliLog.warn("JS-BRIDGE 15s 未就绪，改用原生取址通道")
+            bridge.markUnavailable("15s 未就绪")
             return resolveNatively(musicno, resolution, h265) ?: fetchFromDb(musicno)
         }
         val result = AtomicReference<String?>()
@@ -140,7 +146,8 @@ object SongApiClient {
         bridge?.resetApiSession()
     }
 
-    /** 最近一次点歌实际命中的歌曲源 host(由 JS 上报, 用于远程日志)。 */
+    /** 最近一次取址命中的源：优先 JS 上报，其次原生兜底记录（供远程日志的「请求源=」）。 */
     @JvmStatic
-    fun lastSongSourceHost(): String = bridge?.lastSongSourceHost.orEmpty()
+    fun lastSongSourceHost(): String =
+        bridge?.lastSongSourceHost?.takeIf { it.isNotEmpty() } ?: SongUrlResolver.lastHost
 }
