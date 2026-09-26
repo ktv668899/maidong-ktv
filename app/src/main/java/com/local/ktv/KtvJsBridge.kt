@@ -551,8 +551,16 @@ class KtvJsBridge(context: Context) {
                     // 用 TlsCompat 的工厂（系统信任 ∪ 内置根证书）：裸 socket 走的是
                     // SSLSocketFactory.getDefault()，不受 HttpsURLConnection 的默认工厂影响，
                     // network_security_config 也管不到它 —— 老设备上会因缺 ISRG 新根握手失败。
-                    (TlsCompat.sslSocketFactory().createSocket() as SSLSocket).apply {
+                    //
+                    // ⚠️ 必须用「先连接、再包装」的写法：`createSocket()`（无主机参数）拿到的
+                    // SSLSocket **不会带上主机名**，SNI 与证书主机名校验都会受影响（共享 CDN /
+                    // 反代多证书时直接握手失败）。`createSocket(plain, host, port, true)` 既补上
+                    // 主机名，又保住了上面显式设置的连接超时。
+                    val plain = Socket().apply {
                         connect(java.net.InetSocketAddress(uri.host, port), connectTimeout)
+                    }
+                    (TlsCompat.sslSocketFactory()
+                        .createSocket(plain, uri.host, port, true) as SSLSocket).apply {
                         startHandshake()
                     }
                 } else {

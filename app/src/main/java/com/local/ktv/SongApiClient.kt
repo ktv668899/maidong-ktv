@@ -50,9 +50,12 @@ object SongApiClient {
     @JvmStatic
     fun getSongDownloadUrl(musicno: String, resolution: String, h265: Boolean): String? {
         // 主线程同步等待 WebView 回调会死锁；当前播放/下载流程会在 IO 线程调用这里。
+        // ⚠️ 主线程**绝不能**走网络路径：原生兜底最多 7 个源 × 8 秒超时，会把 UI 线程
+        // 卡死到 ANR（1.4.7 曾把这里改成先 resolveNatively 再回退，属于隐患）。
+        // 主线程只做本地的 DB 兜底，网络取址一律留给后台线程。
         if (Looper.myLooper() == Looper.getMainLooper()) {
-            Log.w(TAG, "Synchronous JS request on main thread; using native/DB fallback")
-            return resolveNatively(musicno, resolution, h265) ?: fetchFromDb(musicno)
+            Log.w(TAG, "Synchronous request on main thread; using DB fallback only")
+            return fetchFromDb(musicno)
         }
         val bridge = bridge ?: return resolveNatively(musicno, resolution, h265) ?: fetchFromDb(musicno)
         // 已判定本机 WebView 不可用 → 不再每次白等 15 秒，直接用原生通道。

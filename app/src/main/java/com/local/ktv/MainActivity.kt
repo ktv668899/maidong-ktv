@@ -529,10 +529,10 @@ class MainActivity : AppCompatActivity() {
         initializeDatabase()
         startRemoteServer()
         updateMobileQrOverlay()
-        // 一次性清理历史遗留的可疑歌曲缓存：1.4.9 及以前 JS 取址的地址没做广告校验，
-        // 广告视频会被当成歌曲落盘，且能通过内容校验被 isDownloaded() 一直复用（广告反复播）。
-        // 清理只是让歌曲重新下载，不影响用户数据；之后由「取址即校验」保证不再产生。
-        io.execute { SongOkDownloadManager.purgeLegacySongCacheOnce(applicationContext) }
+        // 一次性清理"同一段视频被当成多首不同歌曲"的注入广告副本。
+        // ⚠️ 只删可证明是广告的文件（多首歌内容完全相同）；**绝不能清空整个歌曲目录** ——
+        // 1.4.10 那样做过，等于删掉公放曲库，导致「切歌」选不出下一首（新设备回归）。
+        io.execute { SongOkDownloadManager.purgeInjectedAdDuplicatesOnce(applicationContext) }
         main.postDelayed(remoteNetworkMonitor, 5000)
         // 网络状态监测: 断网提示 + 恢复后重建歌曲源会话/重试下载。
         KtvNetworkMonitor.start(applicationContext) { online, initial ->

@@ -19,8 +19,13 @@
    把积压的 commit 一并推上即可。
 2. **Gitee 不再同步代码，只发布版本**：Gitee 仓库保持「仅 README 文档 + Releases 附件」状态，
    **禁止推送源码**（`pre-push` 钩子会拦截 `gitee.com`）。Gitee 上只做一件事：创建 Release 并上传 APK 附件。
-3. **每次更新版本号 +1**：完成一次修改就把版本号递增（`versionName` 与 `versionCode` 同步递增），
-   例如 `1.3.0` → `1.3.1` → `1.3.2`。不要在同一个版本号下反复改动交付。
+3. **版本号递增规则（2026-09-26 更新）**：`versionName` 形如 `<major>.<minor>.<patch>`，
+   **patch 取值 0~10、minor 取值 1~10**，每次修改先用掉一个 patch：
+   - 常规递增：`1.5.0` → `1.5.1` → … → `1.5.10`；
+   - patch 到 10 后再改 → **进位到 minor、patch 归 0**：`1.4.10` → `1.5.0`；
+   - minor 到 10 后再进位 → **major +1、minor 归 1、patch 归 0**：`1.10.1` → `2.1.0`。
+   `versionCode` 始终同步 +1（单调递增，供系统与更新检查判断新旧）。
+   不要在同一个版本号下反复改动交付。
 4. **发布是手动操作**：**未收到明确的「发布新版本」指令时，默认只在本地打包测试**——
    产物按内部测试约定命名 `maidong-ktv-<版本>-<改动说明>-双ABI-release.apk`，
    **不创建 Release、不上传附件、不推送 tag、不在 Gitee 建 Release**。
@@ -160,7 +165,7 @@ $BT/apksigner verify 目标名.apk
 
 ### 版本号
 
-- `app/build.gradle`：`versionName "1.4.10"` / `versionCode 30`（18~21 被本机临时诊断包占用过）
+- `app/build.gradle`：`versionName "1.5.0"` / `versionCode 31`（18~21 被本机临时诊断包占用过）
 - App 内显示统一用纯版本号（不加 `(versionCode)` 括号）
 - ⚠️ **发布构建已开启 NewApi 闸门**（`lint { checkReleaseBuilds true; fatal += ['NewApi'] }`）：
   任何「调用了高于 `minSdk 21` 且未做版本守卫的 API」都会让 `assembleRelease` 直接失败。
@@ -287,10 +292,32 @@ $BT/apksigner verify 目标名.apk
   3. **内容校验挡不住广告**：广告视频能通过 `SongFileValidator`（≥6MB / ≥60s / TS 包完整），
      所以"取址即校验"是唯一有效防线。一旦判定地址不可信，必须**同时删除已落盘的歌曲文件**
      （`purgeCachedSongFile`），否则 `isDownloaded()` 会一直复用那个广告文件，广告反复播；
-  4. 历史遗留由 `SongOkDownloadManager.purgeLegacySongCacheOnce()` 在升级后清一次
-     （marker：`filesDir/song_cache_purged_v1`）。清掉只是让歌曲重新下载，不影响用户数据；
+  4. 历史遗留由 `SongOkDownloadManager.purgeInjectedAdDuplicatesOnce()` 在升级后清一次
+     （marker：`filesDir/ad_dup_purge_v1`），**只删「多首不同歌曲内容完全相同」的文件**：
+     广告对每首歌都下发同一个视频，所以它的特征是"多首歌共用同一段视频"；
+     **绝不能图省事直接清空整个歌曲目录**（1.4.10 这么干过，见下条）；
   5. 回归测试 `app/src/test/java/com/local/ktv/AdVideoFilterTest.java` 用日志里的**真实 URL 形态**
      锁住行为（含两个真源 CDN 域），改这块逻辑必须先让它通过。
+  - ⚠️ **文件名比对只在编号可信时启用**：`buildDownloadUrl` 里只有"从 `song.filename` 推出"的
+    点歌编号才传给 `isTrustedSongUrl`；`song.id` 可能是数据库主键，拿它比对会把**正常地址误杀**
+    （表现为真源被判"文件名不符"→ 永远下不到歌）。
+- **⚠️ 本地歌曲缓存 = 公放曲库，绝不能整目录清空**（2026-09-26 新设备回归）：
+  `MuseDatabase.songDirectories()` **只有 `cloudSongsDir` 一个目录**，
+  `SongOkDownloadManager.getLocalFile()` 也落在那里 —— 所以"清理歌曲缓存"就等于**删掉公放曲库**。
+  1.4.10 在启动时做过一次整目录清理，结果：库里没歌 → `playRandomLocalSong()` 选不出候选
+  → `currentSong` 保持 null → 按「切歌」时 `advancePlayback` 落进
+  「取消随机续播、进入空闲态」分支 → **按钮按了完全没反应**（用户报「公放时切歌失效」）。
+  约定：**任何"清理缓存"的改动都必须先确认它会删掉哪些目录**；要清理就只删**能证明有问题**的
+  文件（见上条），**永远不要动用户已下载的正常歌曲**。
+- **⚠️ 主线程禁止网络 I/O**：`SongApiClient.getSongDownloadUrl` 的主线程分支只允许走
+  本地 DB 兜底（`fetchFromDb`）。1.4.7 曾在该分支先调 `resolveNatively()` ——
+  原生兜底最多 7 个源 × 8 秒超时，一旦有主线程调用者就会**卡死 UI 到 ANR**。
+  取址（JS 桥 / 原生兜底）一律只允许在后台线程发起。
+- **⚠️ 裸 Socket 的 HTTPS 必须带主机名**：用 `TlsCompat.sslSocketFactory()` 时必须
+  `createSocket(plainSocket, host, port, true)`（**先连接、再按主机名包装**），
+  不能用无参 `createSocket()` —— 后者拿到的 `SSLSocket` **不带主机名**，
+  会被 SNI 与证书主机名校验影响（共享 CDN / 反代多证书时直接握手失败）。
+  这样既保住显式连接超时，又补上 SNI。
 - **曲库**：只走官方 Muse 同步（`MuseDbSync`），不再依赖代码仓库数据库文件
 - **曲库同步时效**：默认 **30 天**（`DatabaseBootstrapper.SYNC_TTL_DAYS`）。未到期启动**不联网**、直接用本地曲库；到期后才查询服务器版本，有更新才下载。时效起点记录在 `db_sync_at.txt`，由 `DatabaseBootstrapper.markSynced()` 写入（下载成功或校验为最新时）。设置页「曲库 → 更新」为手动强制检查（绕过时效，仅在服务器版本更新时下载）
 - **麦克风**：`MicActivator` 常驻占用输入通道（TV/投影需占用后才有演唱声音输出），外接设备热插拔会自动重建
