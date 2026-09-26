@@ -88,22 +88,26 @@ object DatabaseBootstrapper {
         .any { "enospc" in it || "no space left" in it }
 
     private fun readableError(error: Throwable): Throwable {
+        val target = MuseDatabase.defaultDbFile()
+        val free = target.parentFile?.usableSpace ?: 0L
+        // 完整异常链：老设备上「表面原因」常常误导（例如 ENOSPC 其实不是块空间不足）。
+        val chain = generateSequence(error) { it.cause }
+            .take(5)
+            .joinToString(" <- ") { "${it.javaClass.simpleName}: ${it.message}" }
+        val diagnose = runCatching { AppPaths.diagnose() }.getOrDefault("(diagnose failed)")
+        MiliLog.warn("DB-SYNC download failed | $chain | $diagnose")
+        Log.w(TAG, "Database download failed: $chain | $diagnose")
+
         if (isNoSpaceError(error)) {
-            val target = MuseDatabase.defaultDbFile()
-            val free = target.parentFile?.usableSpace ?: 0L
-            MiliLog.warn(
-                "DB-SYNC 空间不足: free=${formatSize(free)} target=${target.absolutePath} " +
-                    "err=${error.message}",
-            )
+            // ⚠️ 不能只看异常消息就断言"空间不足"：inode 耗尽 / 配额 / ROM 限制同样报 ENOSPC，
+            // 而 usableSpace 可能还显示好几 GB（本机实测：报空间不足时可用 6.04GB）。
+            // 用真实写入探针区分"真的写不进去" vs "其实能写"。
+            val probe = runCatching { AppPaths.probeWrite(target.parentFile!!) }.getOrDefault("?")
             return IllegalStateException(
-                "曲库分区空间不足（当前可用 ${formatSize(free)}），" +
-                    "已清理下载临时文件，请释放空间后重试",
+                "曲库写入被系统拒绝（探针 $probe，可用 ${formatSize(free)}）\n原始错误：$chain",
                 error,
             )
         }
-        val message = error.message?.takeIf { it.isNotBlank() } ?: "曲库下载失败"
-        Log.w(TAG, "Database download failed: $message")
-        MiliLog.warn("DB-SYNC download failed: ${error.javaClass.simpleName}: $message")
-        return IllegalStateException(message, error)
+        return IllegalStateException("曲库下载失败：$chain（可用 ${formatSize(free)}）", error)
     }
 }

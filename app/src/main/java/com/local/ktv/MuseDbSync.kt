@@ -101,7 +101,11 @@ object MuseDbSync {
             onProgress(100, "曲库就绪")
             return target
         } finally {
-            gzFile.delete()
+            // 失败时两个临时文件都要清掉：残留的 .gz.download(430MB) + .download(965MB)
+            // 白占约 1.4GB，反复重试时正是"空间不足"的常见来源。
+            // 成功路径上 tmpDb 已 rename 成正式库，这里的 delete 是空操作。
+            runCatching { gzFile.delete() }
+            runCatching { tmpDb.delete() }
         }
     }
 

@@ -160,7 +160,7 @@ $BT/apksigner verify 目标名.apk
 
 ### 版本号
 
-- `app/build.gradle`：`versionName "1.4.4"` / `versionCode 24`（18~21 被本机临时诊断包占用过）
+- `app/build.gradle`：`versionName "1.4.5"` / `versionCode 25`（18~21 被本机临时诊断包占用过）
 - App 内显示统一用纯版本号（不加 `(versionCode)` 括号）
 - ⚠️ **发布构建已开启 NewApi 闸门**（`lint { checkReleaseBuilds true; fatal += ['NewApi'] }`）：
   任何「调用了高于 `minSdk 21` 且未做版本守卫的 API」都会让 `assembleRelease` 直接失败。
