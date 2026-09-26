@@ -165,7 +165,7 @@ $BT/apksigner verify 目标名.apk
 
 ### 版本号
 
-- `app/build.gradle`：`versionName "1.5.0"` / `versionCode 31`（18~21 被本机临时诊断包占用过）
+- `app/build.gradle`：`versionName "1.5.1"` / `versionCode 32`（18~21 被本机临时诊断包占用过）
 - App 内显示统一用纯版本号（不加 `(versionCode)` 括号）
 - ⚠️ **发布构建已开启 NewApi 闸门**（`lint { checkReleaseBuilds true; fatal += ['NewApi'] }`）：
   任何「调用了高于 `minSdk 21` 且未做版本守卫的 API」都会让 `assembleRelease` 直接失败。
@@ -453,6 +453,23 @@ $BT/apksigner verify 目标名.apk
   `next()` 每次都重新比对曲库，**自动吸纳新增歌曲**、剔除已删除歌曲；一轮播完自动开新一轮。
   **不显示**（界面不展示）、**不关联已点清单**（`orderQueue` 完全独立，随机歌曲不入队）、
   **App 退出即清理**（`onDestroy` 里 `isFinishing` 时 `clear()`，不落盘）
+- **⚠️ 切歌/续播的状态机（`MainActivity.advancePlayback`）**：`orderQueue` 是"已点清单"，
+  正在播的那首**仍在队列里**，切歌时才移除。四条出口，改动前先对齐语义：
+  1. **显式切歌**且队列还有歌 → 播下一首；
+  2. **自然播完** + `autoNext` + 队列已空 → 进公放（随机本地歌曲）；
+  3. **显式切歌**且队列已空（= 在点歌清单**最后一首**上按切歌）→ **进公放**。
+     这是 2026-09-26 用户明确要求的行为：公放清单与点歌清单互不影响
+     （随机歌曲不入 `orderQueue`；用户一点歌，挂起的随机请求就会被
+     `orderQueue.isNotEmpty()` 守卫取消）；
+  4. 手动模式（`autoNext=false`）自然播完 → 停在空闲态等待点歌（保持旧逻辑）。
+  ⚠️ **凡是要清空 `currentSong`/播放状态的出口，都必须同时停播放器**
+  （`player.stopPlayback()` + `currentMediaPlayer = null`，参考「清空已点」处理）。
+  原因：`onCompletion` 第一行是
+  `if (generation != playbackGeneration || currentSong?.equals(song) != true) return`，
+  所以只要出现"**播放器还在跑、`currentSong` 已被置空**"，那首歌播完时回调被直接吞掉：
+  不再推进、状态却是"无歌可播"，之后按切歌/播放都没有反应 ——
+  2026-09-26「点歌最后一首按切歌 → 播完卡死」就是这个僵尸态。
+  唯一例外是"马上要 `play()` 下一首"的路径（可以不停，避免切歌瞬间静音）。
 - **弹窗分辨率自适应**：TV/投影/盒子的分辨率与 density 差异很大（1280x720、1920x1080，
   density 1.0~2.5），固定 dp 尺寸在矮屏上会被屏幕裁切。统一用 `fitDialogToScreen(dialog, scroll,
   content, preferredWidthDp, …)`：宽度取 `min(preferredWidthDp, 屏幕宽*0.94)`，高度把内容所在的

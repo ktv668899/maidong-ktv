@@ -5566,6 +5566,11 @@ class MainActivity : AppCompatActivity() {
                 return
             }
             // 其它情况(没有公放曲目在播 / 用户主动停止):取消挂起的随机续播,进入空闲态。
+            // 一并停掉播放器并清空播放器状态：只要出现"音频在跑但 currentSong 已空"，
+            // 那首歌播完时 onCompletion 就会因 currentSong 不匹配而直接 return，
+            // 之后按切歌/播放都没有反应（僵尸态）。
+            if (player != null) runCatching { player!!.stopPlayback() }
+            currentMediaPlayer = null
             randomLocalRequestSerial++
             playbackPreparing = false
             playWhenPrepared = false
@@ -5590,11 +5595,23 @@ class MainActivity : AppCompatActivity() {
         } else if (fromCompletion && autoNext && orderQueue.isEmpty()) {
             // 点歌清单播放完毕 → 自动续播本地已下载歌曲
             playRandomLocalSong()
+        } else if (!fromCompletion) {
+            // 点歌清单**最后一首**还在播时按「切歌」→ 直接进入公放（随机本地歌曲）。
+            // ⚠️ 旧逻辑在这里只把 currentSong 置空、**没有停播放器**：那首歌会继续播完，
+            // 而 onCompletion 的第一行是 `currentSong?.equals(song) != true → return`，
+            // 于是再也不会推进 —— 形成"音频已结束 / currentSong 为空 / playWhenPrepared=false"
+            // 的僵尸态，之后按「切歌」「播放」都毫无反应（用户报的卡死）。
+            // 公放清单与点歌清单互不影响：随机歌曲不入 orderQueue，点歌时又会立即取消随机请求。
+            MiliLog.info("点歌清单已空，切歌转入公放（随机本地歌曲）")
+            playRandomLocalSong(skipped = true)
         } else {
-            // 显式切歌但队列已空:同样取消挂起的随机续播,避免用户停歌后又被随机歌打断。
+            // 手动切歌模式（autoNext=false）下自然播完：保持原逻辑，停在空闲态等待点歌。
+            // 这里把播放器一并停掉并清空状态，避免出现上面那种"音频在跑、状态已清"的僵尸态。
+            if (player != null) runCatching { player!!.stopPlayback() }
             randomLocalRequestSerial++
             playbackPreparing = false
             playWhenPrepared = false
+            currentMediaPlayer = null
             releaseVocalPlayer()
             currentSong = null
             clearLyrics()
@@ -5622,6 +5639,9 @@ class MainActivity : AppCompatActivity() {
         val requestSerial = ++randomLocalRequestSerial
         playbackPreparing = true
         playWhenPrepared = true
+        // 这里**不立刻停播放器**：本地曲库扫描（含文件校验）要花一点时间，
+        // 让当前这首歌继续放到下一首真正开始时再停，避免"切歌后一段静音"。
+        // 僵尸态的防范放在"确实没歌可播"的分支里（见下面 selected == null 的处理）。
         releaseVocalPlayer()
         currentSong = null
         clearLyrics()
@@ -5662,6 +5682,12 @@ class MainActivity : AppCompatActivity() {
                     )
                     play(selected)
                 } else {
+                    // ⚠️ 本地确实没有可播歌曲：必须**停掉播放器**再进入空闲态。
+                    // 否则会出现"歌曲还在放、currentSong 却已置空"的僵尸态 —— 那首歌播完时
+                    // onCompletion 因 `currentSong?.equals(song) != true` 直接 return，
+                    // 之后按切歌/播放都没反应（本轮用户报的卡死正是这一类状态）。
+                    if (player != null) runCatching { player!!.stopPlayback() }
+                    currentMediaPlayer = null
                     playbackPreparing = false
                     playWhenPrepared = false
                     updateBottomBar(null, false)
