@@ -330,12 +330,32 @@ class KtvJsBridge(context: Context) {
 
     private fun wrapHtml(script: String): String {
         val escaped = script.replace("</script", "<\\/script", ignoreCase = true)
-        return "<!doctype html><html><head><meta charset=\"utf-8\"></head><body><script>$escaped</script></body></html>"
+        // console.log 桥接：ktv_api.js 的 _log()/_log 细节（Try source / Token FAIL / do.php code=
+        // 等）原本只进 WebView 控制台，远程日志里完全看不到，点歌失败无从定位。
+        // 这里把它转发到 android.log → MiliLog，并保留原始 console 行为。
+        val consoleBridge = """
+            (function(){
+              try {
+                var orig = console.log;
+                console.log = function(){
+                  try { android.log(Array.prototype.map.call(arguments, String).join(' ')); } catch(e) {}
+                  if (orig) { try { orig.apply(console, arguments); } catch(e) {} }
+                };
+              } catch(e) {}
+            })();
+        """.trimIndent()
+        return "<!doctype html><html><head><meta charset=\"utf-8\"></head><body><script>$consoleBridge</script>" +
+            "<script>$escaped</script></body></html>"
     }
 
     inner class NativeBridge {
         @JavascriptInterface
-        fun log(message: String) = Log.d(TAG, message)
+        fun log(message: String) {
+            Log.d(TAG, message)
+            // 把 JS 侧日志接进远程日志：歌曲源解析（token/do.php/多源排序）的失败原因
+            // 以前只走 console.log，现场完全看不到。加上前缀便于检索与过滤。
+            runCatching { MiliLog.info("JS ${message.take(180)}") }
+        }
 
         @JavascriptInterface
         fun onUrl(requestId: String, url: String) {
@@ -450,10 +470,22 @@ class KtvJsBridge(context: Context) {
                 val isHttps = url.startsWith("https://")
                 val uri = URL(url).toURI()
                 val port = if (uri.port > 0) uri.port else if (isHttps) 443 else 80
+                val connectTimeout = timeoutMs.coerceIn(1_000, 30_000)
                 socket = if (isHttps) {
-                    (SSLSocketFactory.getDefault().createSocket(uri.host, port) as SSLSocket).apply { startHandshake() }
+                    // 用 TlsCompat 的工厂（系统信任 ∪ 内置根证书）：裸 socket 走的是
+                    // SSLSocketFactory.getDefault()，不受 HttpsURLConnection 的默认工厂影响，
+                    // network_security_config 也管不到它 —— 老设备上会因缺 ISRG 新根握手失败。
+                    (TlsCompat.sslSocketFactory().createSocket() as SSLSocket).apply {
+                        connect(java.net.InetSocketAddress(uri.host, port), connectTimeout)
+                        startHandshake()
+                    }
                 } else {
-                    Socket(uri.host, port)
+                    // ⚠️ 必须显式给连接超时：原写法 `Socket(host, port)` 的连接阶段**不受**
+                    // soTimeout 约束，遇到路由黑洞会按系统 TCP 超时(约 2 分钟)干等，
+                    // 多个源叠加会把 JS 的 3 分钟预算耗光，表现为「无法生成下载地址」。
+                    Socket().apply {
+                        connect(java.net.InetSocketAddress(uri.host, port), connectTimeout)
+                    }
                 }
                 socket.soTimeout = timeoutMs.coerceIn(1_000, 30_000)
                 val path = if (uri.rawQuery != null) "${uri.rawPath}?${uri.rawQuery}" else uri.rawPath
@@ -494,6 +526,11 @@ class KtvJsBridge(context: Context) {
                 JSONObject().put("status", status).put("body", responseBody).toString()
             } catch (error: Throwable) {
                 Log.w(TAG, "raw request failed: ${error.message}")
+                // 裸 Socket 失败原因以前只在 logcat：点歌失败时远程日志里什么都看不到。
+                MiliLog.warn(
+                    "RAW-ERR $method ${runCatching { java.net.URI(url).host }.getOrNull() ?: url} " +
+                        "${error.javaClass.simpleName}: ${error.message}",
+                )
                 JSONObject().put("status", 0).put("body", "").put("error", error.message.orEmpty()).toString()
             } finally {
                 try { socket?.close() } catch (ignored: Exception) {}

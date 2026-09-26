@@ -11,6 +11,7 @@ import java.util.concurrent.ConcurrentHashMap
 import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLException
+import javax.net.ssl.SSLSocketFactory
 import javax.net.ssl.TrustManager
 import javax.net.ssl.TrustManagerFactory
 import javax.net.ssl.X509TrustManager
@@ -47,6 +48,20 @@ object TlsCompat {
 
     @Volatile private var installed = false
 
+    /** 「系统信任 ∪ 内置根证书」的 SSLSocketFactory，供裸 Socket 通道复用。 */
+    @Volatile private var patchedFactory: SSLSocketFactory? = null
+
+    /**
+     * 给**裸 Socket** 通道用的 SSLSocketFactory。
+     *
+     * ⚠️ 必须单独提供：`HttpsURLConnection.setDefaultSSLSocketFactory` **不会**影响
+     * `SSLSocketFactory.getDefault()`，而 `KtvJsBridge.rawRequest()` 的 HTTPS 分支正是用后者
+     * （`network_security_config` 也只作用于 HttpsURLConnection / WebView，管不到裸 socket）。
+     * 未初始化时回退系统默认。
+     */
+    fun sslSocketFactory(): SSLSocketFactory =
+        patchedFactory ?: (SSLSocketFactory.getDefault() as SSLSocketFactory)
+
     /** 主机 → 是否已被增强信任库校验通过（只缓存肯定结果）。 */
     private val trustedHosts = ConcurrentHashMap<String, Boolean>()
 
@@ -63,15 +78,18 @@ object TlsCompat {
                 Log.w(TAG, "no bundled certs loaded; keep system trust only")
                 return
             }
-            if (android.os.Build.VERSION.SDK_INT >= 24) {
-                // 新系统由 network_security_config 负责，无需接管（避免多此一举）。
-                Log.i(TAG, "API>=24, network-security-config handles bundled roots")
-                return
-            }
             val composite = CompositeTrustManager(system, bundled)
             val sslContext = SSLContext.getInstance("TLS")
             sslContext.init(null, arrayOf<TrustManager>(composite), null)
-            HttpsURLConnection.setDefaultSSLSocketFactory(sslContext.socketFactory)
+            val factory = sslContext.socketFactory as SSLSocketFactory
+            // 裸 Socket 通道始终使用它（系统信任 + 内置根证书，二者取并集）。
+            patchedFactory = factory
+            if (android.os.Build.VERSION.SDK_INT >= 24) {
+                // 新系统由 network_security_config 负责 HttpsURLConnection，无需接管默认工厂。
+                Log.i(TAG, "API>=24, keep system default for HttpsURLConnection")
+                return
+            }
+            HttpsURLConnection.setDefaultSSLSocketFactory(factory)
             Log.i(
                 TAG,
                 "legacy TLS trust installed: system(${system?.acceptedIssuers?.size ?: 0} CAs) " +
