@@ -50,8 +50,12 @@ object MuseDbSync {
         file.version
     }.getOrNull()
 
-    /** 下载并安装曲库。失败抛异常，由调用方决定是否回退到其它源。 */
-    fun download(onProgress: (Int) -> Unit): File {
+    /**
+     * 下载并安装曲库。
+     * @param onProgress (百分比, 明细文案)；明细非空时优先显示（如「正在解压曲库 512MB」），
+     *        因为解压/校验阶段很慢，只给百分比会让界面长时间不动、看着像卡死。
+     */
+    fun download(onProgress: (Int, String?) -> Unit): File {
         val cookie = login() ?: error("登录曲库服务失败")
         val file = sync(cookie) ?: error("曲库同步失败或无可用文件")
         val version = file.version
@@ -59,23 +63,32 @@ object MuseDbSync {
         val gzFile = File(target.parentFile, "${target.name}.gz.download")
         val tmpDb = File(target.parentFile, "${target.name}.download")
         try {
-            downloadFile(file.url, gzFile) { pct -> onProgress((pct * 80 / 100).coerceIn(0, 80)) }
-            onProgress(80)
+            downloadFile(file.url, gzFile) { pct -> onProgress((pct * 80 / 100).coerceIn(0, 80), null) }
+            onProgress(80, "正在校验曲库文件")
             if (file.md5.isNotEmpty()) {
                 check(md5(gzFile).equals(file.md5, ignoreCase = true)) { "曲库文件校验失败" }
             }
-            onProgress(84)
+            onProgress(84, "正在解压曲库 0MB")
             GZIPInputStream(gzFile.inputStream().buffered(256 * 1024)).use { gz ->
                 BufferedOutputStream(FileOutputStream(tmpDb)).use { out ->
                     val buffer = ByteArray(256 * 1024)
+                    var written = 0L
+                    var lastStep = -1
                     while (true) {
                         val count = gz.read(buffer)
                         if (count < 0) break
                         out.write(buffer, 0, count)
+                        written += count
+                        // 解压约 1GB、在该设备上要几分钟：每 64MB 报一次，界面才不会像是卡死。
+                        val step = (written / (64L * 1024 * 1024)).toInt()
+                        if (step != lastStep) {
+                            lastStep = step
+                            onProgress(84, "正在解压曲库 ${written / 1048576}MB")
+                        }
                     }
                 }
             }
-            onProgress(96)
+            onProgress(96, "正在安装曲库")
             val backup = File(target.parentFile, "${target.name}.backup")
             backup.delete()
             if (target.exists()) check(target.renameTo(backup)) { "无法备份旧曲库" }
@@ -85,7 +98,7 @@ object MuseDbSync {
             }
             backup.delete()
             saveVersion(version)
-            onProgress(100)
+            onProgress(100, "曲库就绪")
             return target
         } finally {
             gzFile.delete()
@@ -204,6 +217,8 @@ object MuseDbSync {
             val code = conn.responseCode
             check(code in 200..299) { "HTTP $code" }
             val total = conn.contentLengthCompat()
+            val startedAt = System.currentTimeMillis()
+            var lastPercent = -1
             conn.inputStream.buffered(256 * 1024).use { input ->
                 dest.outputStream().buffered(256 * 1024).use { out ->
                     val buffer = ByteArray(256 * 1024)
@@ -213,7 +228,26 @@ object MuseDbSync {
                         if (count < 0) break
                         out.write(buffer, 0, count)
                         read += count
-                        if (total > 0) onProgress(((read * 100) / total).toInt().coerceIn(0, 99))
+                        if (total > 0) {
+                            val percent = ((read * 100) / total).toInt().coerceIn(0, 99)
+                            // ⚠️ 必须按百分比去重：430MB 会读约 1700 个 256KB 分块，
+                            // 每块都回调一次会把主线程 Looper 队列压满（界面卡死、整机 CPU 被
+                            // 布局任务吃掉，下载本身也跟着变慢）。
+                            if (percent != lastPercent) {
+                                lastPercent = percent
+                                onProgress(percent)
+                                if (percent % 10 == 0) {
+                                    val seconds = ((System.currentTimeMillis() - startedAt) / 1000.0)
+                                        .coerceAtLeast(0.001)
+                                    val mbps = read / 1048576.0 / seconds
+                                    MiliLog.info(
+                                        "MUSE-DB progress $percent% " +
+                                            "${read / 1048576}MB/${total / 1048576}MB " +
+                                            "${String.format(Locale.ROOT, "%.2f", mbps)}MB/s",
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }

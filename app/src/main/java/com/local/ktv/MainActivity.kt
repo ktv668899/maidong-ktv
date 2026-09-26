@@ -615,6 +615,7 @@ class MainActivity : AppCompatActivity() {
     private fun initializeDatabase() {
         if (databaseBootstrapRunning) return
         databaseBootstrapRunning = true
+        lastDatabaseProgressText = ""
         showDatabaseLoading(true, "正在初始化曲库...", null)
         io.execute {
             var bootstrapError: Throwable? = null
@@ -684,14 +685,28 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun showDatabaseDownloadProgress(value: Int) {
+    /**
+     * 最近一次真正刷到界面上的曲库进度文案。
+     *
+     * ⚠️ 曲库下载是 430MB，会回调约 1700 次；每次都在主线程做「改文本 + 改进度 + 置顶视图」
+     * 会把 UI 线程压死（表现为界面卡死、进度停滞，整机 CPU 被布局任务吃掉后下载本身也变慢）。
+     * 因此这里按**最终显示文案**去重：既能挡掉高频分块回调，又能让「正在解压曲库 xxxMB」
+     * 这类明细正常刷新。
+     */
+    @Volatile private var lastDatabaseProgressText = ""
+
+    private fun showDatabaseDownloadProgress(value: Int, detail: String?) {
+        val percent = value.coerceIn(0, 100)
         val phase = when {
-            value < 80 -> "正在下载并解压曲库"
-            value < 90 -> "正在完成解压"
-            value < 100 -> "正在校验数据库"
-            else -> "完成"
+            percent < 80 -> "正在下载曲库"
+            percent < 90 -> "正在解压曲库"
+            percent < 100 -> "正在校验曲库"
+            else -> "曲库就绪"
         }
-        main.post { showDatabaseLoading(true, "$phase ${value}%", value) }
+        val text = detail ?: "$phase $percent%"
+        if (text == lastDatabaseProgressText) return
+        lastDatabaseProgressText = text
+        main.post { showDatabaseLoading(true, text, percent) }
     }
 
     private fun warmRemoteBrowseCache(count: Int) {
@@ -8883,18 +8898,31 @@ class MainActivity : AppCompatActivity() {
             root.addView(overlay, FrameLayout.LayoutParams(-1, -1))
             databaseLoadingOverlay = overlay
         }
-        databaseLoadingOverlay?.visibility = View.VISIBLE
-        databaseLoadingText?.text = message
-        databaseLoadingProgress?.apply {
-            visibility = if (progressValue == null) View.INVISIBLE else View.VISIBLE
-            progress = progressValue ?: 0
+        // ⚠️ 这里是**每次进度刷新都会走**的路径（曲库下载 430MB）。必须做到「只在真正变化时
+        // 才改 View、且不做重排」：早先的实现每次都 setText + 改 progress + setOnClickListener(null)
+        // + bringToFront()（整棵视图树 requestLayout），把主线程压死 → 界面卡死、下载也变慢。
+        val overlay = databaseLoadingOverlay ?: return
+        if (overlay.visibility != View.VISIBLE) {
+            overlay.visibility = View.VISIBLE
+            overlay.bringToFront()
         }
-        databaseRetryButton?.apply {
-            visibility = View.GONE
-            isEnabled = true
-            setOnClickListener(null)
+        val textView = databaseLoadingText
+        if (textView != null && textView.text?.toString() != message) {
+            textView.text = message
         }
-        databaseLoadingOverlay?.bringToFront()
+        val bar = databaseLoadingProgress
+        if (bar != null) {
+            val wanted = if (progressValue == null) View.INVISIBLE else View.VISIBLE
+            if (bar.visibility != wanted) bar.visibility = wanted
+            val percent = progressValue ?: 0
+            if (bar.progress != percent) bar.progress = percent
+        }
+        val retry = databaseRetryButton
+        if (retry != null && retry.visibility == View.VISIBLE) {
+            retry.visibility = View.GONE
+            retry.isEnabled = true
+            retry.setOnClickListener(null)
+        }
     }
 
     private fun showDatabaseLoadingFailure(message: String) {

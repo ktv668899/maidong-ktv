@@ -160,7 +160,7 @@ $BT/apksigner verify 目标名.apk
 
 ### 版本号
 
-- `app/build.gradle`：`versionName "1.4.3"` / `versionCode 23`（18~21 被本机临时诊断包占用过）
+- `app/build.gradle`：`versionName "1.4.4"` / `versionCode 24`（18~21 被本机临时诊断包占用过）
 - App 内显示统一用纯版本号（不加 `(versionCode)` 括号）
 - ⚠️ **发布构建已开启 NewApi 闸门**（`lint { checkReleaseBuilds true; fatal += ['NewApi'] }`）：
   任何「调用了高于 `minSdk 21` 且未做版本守卫的 API」都会让 `assembleRelease` 直接失败。
@@ -226,6 +226,21 @@ $BT/apksigner verify 目标名.apk
   4. 曲库同步每一步失败都会 `MiliLog.warn("MUSE-DB ..." / "DB-SYNC ...")` 上报。
      老设备上「不能下载曲库」先看远程日志这几行 —— 以前只写 logcat，界面只剩
      「未找到可用曲库」兜底文案，排查极其困难。
+- **⚠️ 高频回调不能直接刷 UI（曲库下载 = 430MB）**：`MuseDbSync.downloadFile` 每读一个
+  256KB 分块回调一次进度，430MB 就是 **约 1700 次**。若每次回调都 `main.post { 改文本 +
+  改进度 + bringToFront() }`，主线程 Looper 队列会被压满 —— 实测表现为**界面卡死、进度停滞**，
+  而且整机 CPU 被布局任务吃掉后**下载本身也变慢**（极米 H1S 上就是这个现象）。
+  约定：
+  1. 进度回调必须**按最终显示文案去重**（`MuseDbSync` 侧按百分比去重、
+     `showDatabaseDownloadProgress` 侧按文本去重），刷新次数上限 ~100 次；
+  2. `showDatabaseLoading()` 的更新路径**只做真正变化的事**：文本不同才 `setText`、
+     进度不同才 `progress=`、**不要每次 `bringToFront()`**（整棵树 `requestLayout`）、
+     不要每次重设 `setOnClickListener`；
+  3. 解压（约 1GB）与 md5 校验（430MB）阶段**也要报进度**（回调带明细文案，
+     如「正在解压曲库 512MB」），否则界面会长时间停在某个百分比、看着像卡死；
+  4. 下载速率会按每 10% 上报一次 `MUSE-DB progress 30% 129MB/430MB 1.85MB/s`，
+     判断"是网络慢还是磁盘慢"直接看这几行；
+  5. 新增任何"周期性/高频"回调（进度、心跳、轮询）时都要按同样标准评估主线程开销。
 - **歌曲源**：`app/src/main/assets/mobile/ktv_api.js` 的 `CONFIG.HOSTS`（多源自动排序，失败源沉底）
 - **JS 热更新**：改动 `ktv_api.js` 必须同步提升 `KTV_BRIDGE_API: N` 标记（JS 与 `KtvJsBridge.kt` 两处校验），否则设备仍用缓存旧脚本
 - **曲库**：只走官方 Muse 同步（`MuseDbSync`），不再依赖代码仓库数据库文件

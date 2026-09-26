@@ -67,7 +67,7 @@ object DatabaseBootstrapper {
     }.getOrNull()
 
     /** 下载曲库：仅官方 Muse 同步源；成功后记录同步时间(重置 30 天时效)。 */
-    fun download(onProgress: (Int) -> Unit): Result<File> {
+    fun download(onProgress: (Int, String?) -> Unit): Result<File> {
         return runCatching {
             val file = MuseDbSync.download(onProgress)
             // MuseDbSync 内部已保存版本文件；这里记录同步时间作为时效起点。
