@@ -31,9 +31,14 @@
    > 三者的触发条件只有一个 —— **收到明确的人工发布指令**。若不确定是否已发布，
    > 用 `GET /repos/{owner}/{repo}/releases` 与 `/tags` 核对，不要凭"打过包"推断。
 
-- 凭据：Gitea 访问令牌 `dsh-sync-20260926`（2026-09-26 数据迁移后重建；可在 Gitea
-  「设置 → 应用 → 访问令牌」随时吊销），存放于 `~/.git-credentials-gitea`（权限 600），
-  由本仓库级 `credential.helper` 引用；账号密码不写入仓库配置。
+- 凭据：
+  - **Gitea**（代码主仓库）：访问令牌 `dsh-sync-20260926`（2026-09-26 数据迁移后重建；可在 Gitea
+    「设置 → 应用 → 访问令牌」随时吊销），存放于 `~/.git-credentials-gitea`（权限 600），
+    由本仓库级 `credential.helper` 引用；
+  - **Gitee**（仅发布 Release，按规则 2 不推代码）：访问令牌存放于 `~/.git-credentials-gitee`
+    （权限 600），由全局 `credential.https://gitee.com.helper` 引用；**只用于 API 建 Release /
+    传附件**，不得用于推送源码。
+  - 账号密码不写入仓库配置。
 
 ### 推送方式
 
