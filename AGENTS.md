@@ -165,7 +165,7 @@ $BT/apksigner verify 目标名.apk
 
 ### 版本号
 
-- `app/build.gradle`：`versionName "1.5.1"` / `versionCode 32`（18~21 被本机临时诊断包占用过）
+- `app/build.gradle`：`versionName "1.5.1"` / `versionCode 33`（18~21 被本机临时诊断包占用过）
 - App 内显示统一用纯版本号（不加 `(versionCode)` 括号）
 - ⚠️ **发布构建已开启 NewApi 闸门**（`lint { checkReleaseBuilds true; fatal += ['NewApi'] }`）：
   任何「调用了高于 `minSdk 21` 且未做版本守卫的 API」都会让 `assembleRelease` 直接失败。
@@ -470,6 +470,25 @@ $BT/apksigner verify 目标名.apk
   不再推进、状态却是"无歌可播"，之后按切歌/播放都没有反应 ——
   2026-09-26「点歌最后一首按切歌 → 播完卡死」就是这个僵尸态。
   唯一例外是"马上要 `play()` 下一首"的路径（可以不停，避免切歌瞬间静音）。
+- **⚠️ 「切歌 → 公放」在老盒子上卡死（2026-09-26，极米 H1S）**：新设备正常、老设备卡死，
+  排查出**三个叠加原因**，都已修掉，改动这块时必须同时守住：
+  1. **不能共用 `io` 线程池**：`io` 只有 4 个线程，且"点歌即下即播"（`streamDownloadAndPlay`）
+     这类几十秒的长任务也在里面。老设备网速慢，并发点几首歌就把池占满，切歌任务一直排队。
+     → 切歌/随机续播改用 `randomPlayExecutor`（专用单线程守护线程）。
+  2. **不能现扫目录找候选**：候选来自 `localSongInventory()` + `library.scanLocal()`，
+     代价是"每个文件在头尾各读约 4.3MB 做 TS 校验" + "遍历 `/storage/ 各挂载点`
+     （老 ROM 的失效挂载点会让 `File.listFiles()` **永久阻塞**）"。
+     → 改为启动时后台**预热候选缓存**（`primeRandomCandidates()`：独立守护线程 + 
+     `scanWithTimeout` 超时保护），下载完成即时补进缓存，切歌直接读缓存（零 I/O）。
+  3. **主线程不能做深度文件校验**：`Song.hasLocalFile()` 内部是 `SongFileValidator.inspect`
+     （头尾各读 4.3MB）。它曾被用在 `play()`、播放错误回调、`switchToLocalPlayback`，
+     以及**逐行渲染**的 `songRowState()` 里 —— 慢存储上每次都是秒级，直接 ANR。
+     → 播放/渲染路径统一改用**廉价检查** `MainActivity.hasPlayableLocalFile()`
+     （只看存在与大小），深度校验只留在后台（`localSongInventory()` / `isDownloaded()`）。
+- **⚠️ Kotlin 块注释会嵌套，注释里不能出现 `/*`**：写 `` `/storage/*` `` 时那个 `/*` 会开启一个
+  **嵌套注释**，导致 KDoc 永远不闭合，后面的代码全被吞进注释里（报错是
+  "Unclosed comment" + 一堆 "Missing '}'"，很难一眼看出）。注释里要写路径通配就写
+  `/storage/ 各挂载点` 这种不含 `/*` 的说法。
 - **弹窗分辨率自适应**：TV/投影/盒子的分辨率与 density 差异很大（1280x720、1920x1080，
   density 1.0~2.5），固定 dp 尺寸在矮屏上会被屏幕裁切。统一用 `fitDialogToScreen(dialog, scroll,
   content, preferredWidthDp, …)`：宽度取 `min(preferredWidthDp, 屏幕宽*0.94)`，高度把内容所在的

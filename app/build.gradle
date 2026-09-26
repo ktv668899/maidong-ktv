@@ -11,7 +11,7 @@ android {
         applicationId "com.local.ktv"
         minSdk 21
         targetSdk 25
-        versionCode 32
+        versionCode 33
         versionName "1.5.1"
         ndk {
             // 双 ABI 打包:兼容 64 位(Exynos 1580 等 arm64-v8a)与 32 位设备(极米 Play 超越版

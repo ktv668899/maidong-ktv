@@ -136,6 +136,29 @@ class MainActivity : AppCompatActivity() {
     private val keyboardSearchRunnable = Runnable { performSearch() }
     private val io: ExecutorService = Executors.newFixedThreadPool(4)
     private val stateIo: ExecutorService = Executors.newSingleThreadExecutor()
+
+    /**
+     * 「切歌 → 公放」专用单线程执行器。
+     *
+     * ⚠️ **绝不能用 [io] 池**：它只有 4 个线程，"点歌即下即播"（`streamDownloadAndPlay`）这类
+     * 几十秒的长任务也在里面。极米 H1S 上并发点几首歌就能把池占满，切歌任务于是一直排队 ——
+     * 旧歌播完后彻底没声、按什么都没反应（用户报的"老设备卡死"，新设备因下载快而看不出来）。
+     */
+    private val randomPlayExecutor: ExecutorService = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "ktv-random-play").apply { isDaemon = true }
+    }
+
+    /**
+     * 公放候选缓存（本机可播放歌曲）：启动时后台预热一次，下载完成后增量更新。
+     *
+     * ⚠️ **切歌时不能现扫**：候选来自 `localSongInventory()` + `library.scanLocal()`，
+     * 代价是「每个文件在头尾各读约 4.3MB 做 TS 校验」+「遍历 `/storage/ 各挂载点`
+     * （老 ROM 上的失效挂载点会让 `File.listFiles()` 永久阻塞）」。新设备上很快，
+     * 极米 H1S 上足以让切歌看起来卡死。
+     */
+    private val randomCandidates = java.util.concurrent.ConcurrentHashMap<String, Song>()
+    @Volatile private var randomCandidatesPrimed = false
+    @Volatile private var randomCandidatesPriming = false
     private val library = SongLibrary()
     private lateinit var stateDatabase: KtvStateDatabase
     private lateinit var playbackEngine: KtvPlaybackEngine
@@ -533,6 +556,9 @@ class MainActivity : AppCompatActivity() {
         // ⚠️ 只删可证明是广告的文件（多首歌内容完全相同）；**绝不能清空整个歌曲目录** ——
         // 1.4.10 那样做过，等于删掉公放曲库，导致「切歌」选不出下一首（新设备回归）。
         io.execute { SongOkDownloadManager.purgeInjectedAdDuplicatesOnce(applicationContext) }
+        // 预热公放候选缓存（独立守护线程 + 内部超时），让之后的「切歌 → 公放」零 I/O。
+        // 延后一点避开曲库加载/启动高峰，但不影响正确性：预热完成前切歌会走安全兜底路径。
+        main.postDelayed({ primeRandomCandidates() }, 5_000L)
         main.postDelayed(remoteNetworkMonitor, 5000)
         // 网络状态监测: 断网提示 + 恢复后重建歌曲源会话/重试下载。
         KtvNetworkMonitor.start(applicationContext) { online, initial ->
@@ -5026,6 +5052,20 @@ class MainActivity : AppCompatActivity() {
         showDownloads()
     }
 
+    /**
+     * 判断歌曲是否已有可播放的本地文件（**廉价**检查：只看存在与大小）。
+     *
+     * ⚠️ 播放路径上不要用 `Song.hasLocalFile()`：它内部是 `SongFileValidator.inspect`，
+     * 会在文件**头尾各读约 4.3MB** 做 TS 包校验 —— 极米 H1S 这类慢存储上一次调用就是好几秒，
+     * 足以让主线程 ANR（用户感知即"按了切歌卡死"）。深度校验统一交给后台
+     * （`localSongInventory()` / `SongOkDownloadManager.isDownloaded()`）完成。
+     */
+    private fun hasPlayableLocalFile(song: Song?): Boolean {
+        val path = song?.path?.takeIf { it.isNotEmpty() } ?: return false
+        val file = File(path)
+        return file.isFile && file.length() >= SongFileValidator.MIN_VALID_FILE_SIZE
+    }
+
     private fun play(song: Song?) {
         if (player == null) player = videoBackground
         if (song == null) return
@@ -5033,7 +5073,7 @@ class MainActivity : AppCompatActivity() {
             // 远程日志: 点歌使用的源(本地文件 / 在线源)。
             MiliLog.info(
                 "PLAY id=${extractTid(song)} title=${song.title} src=" +
-                    (if (song.hasLocalFile()) "local" else "online"),
+                    (if (hasPlayableLocalFile(song)) "local" else "online"),
             )
             // 取消仍在后台扫描的“已点播完后随机本地歌曲”请求，避免抢占新点歌曲。
             randomLocalRequestSerial++
@@ -5054,7 +5094,7 @@ class MainActivity : AppCompatActivity() {
             updateBottomBar(song, true)
             scheduleAutoFullscreen()
 
-            if (song.hasLocalFile()) {
+            if (hasPlayableLocalFile(song)) {
                 playLocalFile(song)
             } else {
                 playbackPreparing = true
@@ -5182,6 +5222,7 @@ class MainActivity : AppCompatActivity() {
                 // 移到正式位置
                 tmpFile.renameTo(finalFile)
                 song.path = finalFile.getAbsolutePath()
+                randomCandidates[stableId(song)] = song
 
                 main.post(Runnable {
                     hideDownloadProgress()
@@ -5283,9 +5324,9 @@ class MainActivity : AppCompatActivity() {
             // 远程日志: 播放网络/解码错误实时上报。
             MiliLog.error(
                 "PLAY-ERR id=${song?.let(::extractTid)} title=${song?.title} what=$what extra=$extra" +
-                    (if (song?.hasLocalFile() == true) " local" else " stream"),
+                    (if (hasPlayableLocalFile(song)) " local" else " stream"),
             )
-            if (songRetryCount < 2 && song != null && song.hasLocalFile()) {
+            if (songRetryCount < 2 && song != null && hasPlayableLocalFile(song)) {
                 songRetryCount++
                 val retry = songRetryCount
                 main.postDelayed(Runnable {
@@ -5302,7 +5343,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun switchToLocalPlayback(song: Song?) {
         if (currentSong == null || !currentSong!!.equals(song)) return
-        if (!song!!.hasLocalFile()) return
+        if (song == null || !hasPlayableLocalFile(song)) return
         var pos = 0
         try {
             pos = player!!.currentPosition
@@ -5445,6 +5486,8 @@ class MainActivity : AppCompatActivity() {
                 main.post(Runnable {
                     downloads.removeAll { stableId(it.song) == stableId(song) }
                     song.path = localPath
+                    // 立刻进公放候选缓存：不必等下次预热扫描，新下载的歌马上能被随机到。
+                    randomCandidates[stableId(song)] = song
                     refreshSongAdapter()
                     val shouldAddToQueue = pendingQueueSongIds.remove(stableId(song))
                     Log.i(
@@ -5653,17 +5696,21 @@ class MainActivity : AppCompatActivity() {
         }
         persistRuntimeState()
 
-        io.execute {
-            val localSongs = localSongInventory()
-            library.scanLocal().forEach { song ->
-                val file = song.path?.let(::File) ?: return@forEach
-                if (SongFileValidator.inspect(
-                        file,
-                        SongFileValidator.requiresTransportStream(file),
-                    ).valid
-                ) {
-                    localSongs.getOrPut(stableId(song)) { song }
-                }
+        // ⚠️ 两条硬约束：
+        // 1) 必须用 randomPlayExecutor（专用线程），否则会被几十秒的下载任务挤在后面排队；
+        // 2) 必须优先读预热缓存，不能在切歌时现扫目录（老盒子上"逐文件校验 + 遍历 /storage/ 各挂载点"
+        //    会让切歌看起来卡死）。
+        randomPlayExecutor.execute {
+            val localSongs = LinkedHashMap<String, Song>()
+            randomCandidates.forEach { (id, song) -> localSongs[id] = song }
+            if (localSongs.isEmpty()) {
+                // 缓存还没预热好（例如刚开机就切歌）：做一次**安全的**库存查询兜底。
+                // 刻意不调用 library.scanLocal() —— 它会遍历 /storage/ 各挂载点，老 ROM 的失效挂载点
+                // 可能让 File.listFiles() 永久阻塞；外部目录交给带超时的预热流程去补。
+                runCatching {
+                    localSongInventory().forEach { (id, song) -> localSongs[id] = song }
+                }.onFailure { Log.w(TAG, "random candidates fallback failed", it) }
+                primeRandomCandidates()
             }
             val allLocalSongs = localSongs.values.toList()
             main.post {
@@ -8778,6 +8825,66 @@ class MainActivity : AppCompatActivity() {
 
     private fun countDownloadedFiles(): Int = localSongInventory().size
 
+    /**
+     * 预热公放候选缓存（启动时调用一次；下载完成后由回调增量补充）。
+     *
+     * 用**独立守护线程**而不是 [io] 池：里面的 `library.scanLocal()` 在老盒子上可能永久阻塞，
+     * 绝不能占住 io 线程；[scanWithTimeout] 保证即使它卡住，也只损失"导入目录/外置存储"那部分候选，
+     * 已下载曲库照样可用。
+     */
+    private fun primeRandomCandidates() {
+        if (randomCandidatesPriming || randomCandidatesPrimed) return
+        randomCandidatesPriming = true
+        Thread({
+            val startedAt = System.currentTimeMillis()
+            runCatching {
+                // 1) 已下载曲库：只读我们自己的目录 + 曲库 DB，安全。
+                localSongInventory().forEach { (id, song) -> randomCandidates.putIfAbsent(id, song) }
+                // 2) 导入目录 / 外置存储：遍历 /storage/ 各挂载点 有阻塞风险，必须带超时。
+                val scanned = scanWithTimeout(RANDOM_SCAN_TIMEOUT_MS) { library.scanLocal() }
+                if (scanned == null) {
+                    MiliLog.warn("RANDOM-CACHE 目录扫描超时(${RANDOM_SCAN_TIMEOUT_MS}ms)，仅使用已下载曲库")
+                } else {
+                    scanned.forEach { song ->
+                        val file = song.path?.let(::File) ?: return@forEach
+                        if (SongFileValidator.inspect(
+                                file,
+                                SongFileValidator.requiresTransportStream(file),
+                            ).valid
+                        ) {
+                            randomCandidates.putIfAbsent(stableId(song), song)
+                        }
+                    }
+                }
+            }.onFailure { Log.w(TAG, "prime random candidates failed", it) }
+            randomCandidatesPrimed = true
+            randomCandidatesPriming = false
+            MiliLog.info(
+                "RANDOM-CACHE 预热完成 size=${randomCandidates.size} " +
+                    "用时=${System.currentTimeMillis() - startedAt}ms",
+            )
+        }, "ktv-random-prime").apply { isDaemon = true }.start()
+    }
+
+    /**
+     * 在独立守护线程里执行"可能永久阻塞"的文件系统扫描，超时返回 null。
+     *
+     * 不能放进任何线程池：老盒子（极米 H1S，非标准 ROM）上 `/storage/ 各挂载点` 里的失效挂载点
+     * 会让 `File.listFiles()` 无限期阻塞，占住池线程会连带拖死后续所有任务。
+     */
+    private fun <T> scanWithTimeout(timeoutMs: Long, block: () -> T): T? {
+        val holder = java.util.concurrent.atomic.AtomicReference<T>()
+        val done = java.util.concurrent.CountDownLatch(1)
+        Thread({
+            runCatching { holder.set(block()) }
+            done.countDown()
+        }, "ktv-scan").apply { isDaemon = true }.start()
+        val finished = runCatching {
+            done.await(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
+        }.getOrDefault(false)
+        return if (finished) holder.get() else null
+    }
+
     private fun localSongInventory(): LinkedHashMap<String, Song> {
         val result = LinkedHashMap<String, Song>()
         library.muse.localPathSongs().forEach { song ->
@@ -9766,7 +9873,7 @@ class MainActivity : AppCompatActivity() {
         return SongRowState(
             current = currentSong?.equals(song) == true,
             queued = orderQueue!!.contains(song),
-            local = song.hasLocalFile(),
+            local = hasPlayableLocalFile(song),
             downloading = isDownloading(song),
             failed = taskState.startsWith("失败"),
             paused = taskState.contains("暂停") || taskState.contains("中断"),
@@ -10000,7 +10107,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun isSongReadyForQueue(song: Song): Boolean =
-        SongOkDownloadManager.isDownloaded(song) || song.hasLocalFile()
+        hasPlayableLocalFile(song) || SongOkDownloadManager.isDownloaded(song)
 
     private fun addReadySongToQueue(song: Song) {
         if (orderQueue!!.contains(song)) return
@@ -10598,6 +10705,8 @@ class MainActivity : AppCompatActivity() {
         private const val LEGACY_PACKAGE = "com.origjoy.local.ktv"
         private const val LEGACY_KTV_ID = "10006789"        // 门店/包厢 id
         private const val HEARTBEAT_INTERVAL_MS = 3600_000L
+        /** 公放候选预热时，外部目录扫描（可能遍历 /storage/ 各挂载点）的超时上限。 */
+        private const val RANDOM_SCAN_TIMEOUT_MS = 4_000L
 
         // ===== 主题色(对标原版麦动 配色) =====
         /** 主背景:极深蓝黑(原版 #080C12 系)  */
