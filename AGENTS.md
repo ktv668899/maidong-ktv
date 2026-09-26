@@ -160,7 +160,7 @@ $BT/apksigner verify 目标名.apk
 
 ### 版本号
 
-- `app/build.gradle`：`versionName "1.4.8"` / `versionCode 28`（18~21 被本机临时诊断包占用过）
+- `app/build.gradle`：`versionName "1.4.9"` / `versionCode 29`（18~21 被本机临时诊断包占用过）
 - App 内显示统一用纯版本号（不加 `(versionCode)` 括号）
 - ⚠️ **发布构建已开启 NewApi 闸门**（`lint { checkReleaseBuilds true; fatal += ['NewApi'] }`）：
   任何「调用了高于 `minSdk 21` 且未做版本守卫的 API」都会让 `assembleRelease` 直接失败。
@@ -321,6 +321,13 @@ $BT/apksigner verify 目标名.apk
   - 恢复 → `refreshNetworkState()`：重解析网卡 MAC + 日志上下文、**重建歌曲源会话**、
     复位 `Eac19WindowGuard`、重启本地点歌服务并刷新二维码、自动重试断网期间失败的下载（最多 8 首）。
   换网/换 IP 时 `remoteNetworkMonitor` 走同一个 `refreshNetworkState()`（静默，不弹提示）。
+  - ⚠️ **启动 ≠ 网络恢复**：`KtvNetworkMonitor.start()` 的回调带 **`initial`** 参数，
+    `initial=true` 表示"注册回调时系统回报的初始状态"。**绝不能**把它当成"断网后恢复"——
+    启动流程（`onCreate`）自己已经做过 `startRemoteServer()`/二维码/设备上下文，
+    再走一遍恢复逻辑会：白清刚建立的歌曲源会话、语义错误地 `noteUrlOk()`（掩盖真正的
+    窗口到期提示）、把状态栏错写成"网络已恢复"（启动瞬间就显示，用户可见）。
+    初始状态**只更新断网角标**，恢复动作只在真正的 offline→online 跃迁时执行
+    （2026-09-26 由现场日志 `NET-UP` 出现在 `BOOT` 之前而发现）。
   ⚠️ **「断网重连后再也下载不了、日志却显示歌曲源获取成功」的根因**：
   `SongApiClient.clearTokenCache()` 原本是**空实现**，JS 侧 `window.api.tokens` 与
   `_apiInitPromise` 会被一直复用；而歌曲源按「出口 IP + device」识别、试用窗口也记在出口 IP 上，

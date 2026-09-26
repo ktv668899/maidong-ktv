@@ -388,11 +388,28 @@ class KtvJsBridge(context: Context) {
 
     private fun wrapHtml(script: String): String {
         val escaped = script.replace("</script", "<\\/script", ignoreCase = true)
-        // console.log 桥接：ktv_api.js 的 _log()/_log 细节（Try source / Token FAIL / do.php code=
-        // 等）原本只进 WebView 控制台，远程日志里完全看不到，点歌失败无从定位。
-        // 这里把它转发到 android.log → MiliLog，并保留原始 console 行为。
+        // 诊断 + console 桥（必须在主脚本之前执行）：
+        // 1) 上报 WebView 内核版本与 ES2017(async/await) 支持情况 —— 老盒子（Android 5.x 的
+        //    WebView 可能是 Chrome 39~4x）不支持 async/await 会让**整个脚本语法报错**，
+        //    表现为 `window.KtvApi` 未导出、桥永远不就绪；这条日志可直接定死该原因。
+        //    （用 new Function 做特性探测，避免探测语句本身引起语法错误。）
+        // 2) window.onerror 捕获脚本解析/运行错误 —— 语法错误也会触发它，能拿到真实报错。
+        // 3) console.log 桥接：ktv_api.js 的 _log() 细节原本只进 WebView 控制台。
         val consoleBridge = """
             (function(){
+              try {
+                window.onerror = function(msg, src, line, col){
+                  try { android.log('JS-ERROR ' + msg + ' @' + line + ':' + col); } catch(e) {}
+                };
+              } catch(e) {}
+              try {
+                var es = 'unknown';
+                try { new Function('return (async function(){})'); es = 'yes'; } catch(e) { es = 'no'; }
+                try {
+                  android.log('WEBVIEW ua=' + navigator.userAgent +
+                    ' asyncFunction=' + es + ' promise=' + (typeof Promise));
+                } catch(e) {}
+              } catch(e) {}
               try {
                 var orig = console.log;
                 console.log = function(){

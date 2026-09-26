@@ -29,8 +29,8 @@ object SongApiClient {
         SongUrlResolver.install { url -> bridge?.rawCleanGet(url) }
         bridge?.init { ok ->
             ready = ok
+            // 失败原因由 KtvJsBridge.markUnavailable() 统一上报（只记一次），此处不再重复记日志。
             Log.i(TAG, "JS Bridge init: $ok")
-            if (!ok) MiliLog.error("JS-BRIDGE 初始化返回 false，取址将走原生兜底")
         }
     }
 

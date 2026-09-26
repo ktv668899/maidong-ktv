@@ -36,8 +36,15 @@ object KtvNetworkMonitor {
     private var manager: ConnectivityManager? = null
     private var callback: ConnectivityManager.NetworkCallback? = null
 
-    /** 开始监测；[onChange] 只在状态真正变化时回调（主线程）。 */
-    fun start(context: Context, onChange: (online: Boolean) -> Unit) {
+    /**
+     * 开始监测；[onChange] 在**状态变化**时回调（主线程）。
+     *
+     * ⚠️ 第二参数 [initial] 区分「启动时的初始状态」与「真正的断网→恢复」：
+     * 注册回调的当下系统就会回报一次初始状态，上层若把它当成"网络已恢复"，
+     * 就会在启动阶段做一遍**重复且有害**的恢复动作（重建歌曲源会话、复位窗口守卫、
+     * 把状态栏写成"网络已恢复"）。见 [MainActivity.onNetworkStateChanged]。
+     */
+    fun start(context: Context, onChange: (online: Boolean, initial: Boolean) -> Unit) {
         if (callback != null) return
         val cm = context.applicationContext
             .getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
@@ -76,7 +83,7 @@ object KtvNetworkMonitor {
             manager = null
         }
         Log.i(TAG, "monitor started, online=$initial registered=$registered")
-        onChange(initial)
+        onChange(initial, true)
     }
 
     fun stop() {
@@ -88,17 +95,17 @@ object KtvNetworkMonitor {
         Log.i(TAG, "monitor stopped")
     }
 
-    private fun publish(value: Boolean, onChange: (Boolean) -> Unit) {
+    private fun publish(value: Boolean, onChange: (Boolean, Boolean) -> Unit) {
         mainHandler.post {
             if (value == online) return@post
             online = value
             Log.i(TAG, "network state changed: online=$value")
-            onChange(value)
+            onChange(value, false)
         }
     }
 
     /** 主动复检一次（例如从后台回到前台），有变化才回调。 */
-    fun refresh(onChange: (online: Boolean) -> Unit) {
+    fun refresh(onChange: (online: Boolean, initial: Boolean) -> Unit) {
         publish(currentOnline(manager), onChange)
     }
 

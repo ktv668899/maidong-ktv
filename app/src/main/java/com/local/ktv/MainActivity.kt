@@ -531,7 +531,9 @@ class MainActivity : AppCompatActivity() {
         updateMobileQrOverlay()
         main.postDelayed(remoteNetworkMonitor, 5000)
         // 网络状态监测: 断网提示 + 恢复后重建歌曲源会话/重试下载。
-        KtvNetworkMonitor.start(applicationContext) { online -> onNetworkStateChanged(online) }
+        KtvNetworkMonitor.start(applicationContext) { online, initial ->
+            onNetworkStateChanged(online, initial)
+        }
         // 设备心跳:开机立即上报一次(boot=1),之后每 3600s 保活,维持歌曲源合法设备判定。
         sendDeviceHeartbeat(boot = true)
         main.postDelayed(ktvHeartbeatRunnable, HEARTBEAT_INTERVAL_MS)
@@ -3684,11 +3686,22 @@ class MainActivity : AppCompatActivity() {
      *   4. 拉起本地点歌服务并刷新二维码；
      *   5. 自动重试断网期间失败的下载。
      */
-    private fun onNetworkStateChanged(online: Boolean) {
+    private fun onNetworkStateChanged(online: Boolean, initial: Boolean = false) {
         fullScreenNetworkBadge?.visibility = if (online) View.GONE else View.VISIBLE
         if (!online) {
             status?.text = "网络未连接"
             MiliLog.warn("NET-DOWN 设备网络已断开")
+            return
+        }
+        // ⚠️ initial=true 表示「启动时的初始状态」，**不是**「断网后恢复」。
+        // 启动流程（onCreate）已经做过 startRemoteServer()/updateMobileQrOverlay()/
+        // refreshLogDeviceContext()/DeviceMac 解析，这里再走一遍恢复逻辑只会:
+        //   1) 白白清掉刚建立的歌曲源会话（resetSourceSession）；
+        //   2) 语义错误地 noteUrlOk()，可能掩盖真正的歌曲源窗口到期提示；
+        //   3) 把状态栏错写成"网络已恢复"（启动瞬间就显示，用户可见的错误文案）。
+        // 因此初始状态只更新断网角标，不做任何恢复动作。
+        if (initial) {
+            Log.i(TAG, "initial network state: online=true (skip recovery actions)")
             return
         }
         MiliLog.notice("NET-UP 设备网络已恢复, 重建歌曲源会话")
