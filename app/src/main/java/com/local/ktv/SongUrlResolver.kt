@@ -202,15 +202,16 @@ object SongUrlResolver {
         }
     }
 
-    /** 镜像 ktv_api.js 的 `isDemoUrl`：广告视频 / 纯 IP / R2 测试桶 / ts 编号与请求不一致。 */
+    /**
+     * 原生路径的可信校验：先过 `AdVideoFilter.isTrustedSongUrl`（广告域名/路径 + `.ts` 文件名
+     * 必须等于点歌编号），再补上 JS `isDemoUrl` 里那几条（wb66/demo、纯 IP、R2 测试桶）。
+     */
     private fun isValidSongUrl(url: String, musicno: String): Boolean {
-        if (AdVideoFilter.isAdVideo(url)) return false
+        if (!AdVideoFilter.isTrustedSongUrl(url, musicno)) return false
         val lower = url.lowercase()
         if (lower.contains("wb66") || lower.contains("demo")) return false
         if (IP_URL.containsMatchIn(url)) return false
         if (R2_DEMO.containsMatchIn(url)) return false
-        val matched = TS_NAME.find(url)?.groupValues?.getOrNull(1)
-        if (matched != null && matched != musicno) return false
         return true
     }
 

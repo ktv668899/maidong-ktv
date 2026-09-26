@@ -23,6 +23,9 @@ object SongOkDownloadManager {
     private const val MAX_RETRY_COUNT = 3
     private const val STALL_TIMEOUT_MS = 25_000L
 
+    /** 曲库视频目录下会被当作"已下载歌曲"的文件后缀（用于一次性清理历史广告缓存）。 */
+    private val MEDIA_EXTENSIONS = setOf("ts", "ls", "mp4", "mkv")
+
     interface DownloadCallback {
         fun onDownloadStart(song: Song)
         fun onDownloadProgress(song: Song, progress: Int)
@@ -71,6 +74,41 @@ object SongOkDownloadManager {
             song.path = file.absolutePath
         }
         return downloaded
+    }
+
+    /**
+     * 一次性清理历史遗留的歌曲缓存（广告漏放期间的产物）。
+     *
+     * 背景（2026-09-26 事故）：1.4.9 及以前，JS 取址返回的地址在 `buildDownloadUrl` 的成功分支里
+     * **完全没有过广告校验**，广告视频（如 `gz.ac16.vip`）会被当成歌曲下载并落盘；它又能通过
+     * [SongFileValidator] 的内容校验（≥6MB / ≥60s / TS 包完整），因此**靠内容无法识别**，
+     * 而且 [isDownloaded] 会直接复用该文件、连取址都不会再发生 —— 广告会一直播下去。
+     *
+     * 这类遗留文件只能在升级时清一次；此后由「取址即校验」（
+     * [AdVideoFilter.isTrustedSongUrl]）保证不再产生。清掉只是让歌曲重新下载，不影响任何用户数据。
+     *
+     * @return 删除的文件数（已清理过则返回 0）
+     */
+    @JvmStatic
+    fun purgeLegacySongCacheOnce(context: android.content.Context): Int {
+        val marker = File(context.filesDir, "song_cache_purged_v1")
+        if (marker.exists()) return 0
+        var removed = 0
+        runCatching {
+            val dir = File("${MuseDatabase.VIDEO_ROOT}/${MuseDatabase.CLOUD_SONG_DIR}")
+            dir.listFiles()?.forEach { file ->
+                if (file.isFile && file.extension.lowercase() in MEDIA_EXTENSIONS) {
+                    SongFileValidator.forget(file)
+                    if (file.delete()) removed++
+                }
+            }
+            marker.writeText("purged=${System.currentTimeMillis()} removed=$removed", Charsets.UTF_8)
+        }.onFailure { Log.w(TAG, "purge legacy song cache failed: ${it.message}") }
+        // 首次启动才会真正有动作，之后 marker 存在会直接返回 0，不产生噪声日志。
+        if (removed > 0 || !marker.exists()) {
+            MiliLog.warn("SONG-AD 一次性清理历史歌曲缓存 removed=$removed（旧版本可能把广告缓存成歌曲）")
+        }
+        return removed
     }
 
     @JvmStatic
@@ -173,31 +211,64 @@ object SongOkDownloadManager {
     }
 
     private fun buildDownloadUrl(song: Song, forceRefresh: Boolean = false): String {
+        val musicNo = song.filename?.removeSuffix(".ts")?.removeSuffix(".ls") ?: song.id
         if (!forceRefresh) {
             song.downloadUrl?.takeIf(String::isNotBlank)?.let { cached ->
-                if (!AdVideoFilter.isAdVideo(cached)) return cached
-                // 缓存的下载地址是广告视频,清掉并重新解析(广告会被桥接层屏蔽/替换)。
-                Log.w(TAG, "丢弃广告缓存地址: ${song.title}")
+                if (AdVideoFilter.isTrustedSongUrl(cached, musicNo)) return cached
+                // 缓存的地址不可信（广告 / 文件名与点歌编号不符）：除了清地址，还要**删掉已落盘的
+                // 同名文件** —— 广告视频能通过内容校验（≥6MB / ≥60s / TS 包完整），
+                // 一旦被缓存成歌曲，isDownloaded() 会直接复用、连取址都不会再发生。
+                Log.w(TAG, "丢弃不可信缓存地址: ${song.title} -> $cached")
+                MiliLog.warn("SONG-AD 丢弃不可信缓存地址 编号=$musicNo url=$cached")
                 song.downloadUrl = null
+                purgeCachedSongFile(song, "untrusted-cached-url")
             }
         }
-        val musicNo = song.filename?.removeSuffix(".ts")?.removeSuffix(".ls") ?: song.id
         return SongApiClient.getSongDownloadUrl(musicNo).orEmpty().also { url ->
             // 请求源 = 本次点歌实际命中的源(JS 上报); 取不到时留空。
             val srcHost = SongApiClient.lastSongSourceHost()
-            if (url.isNotEmpty()) {
+            // ⚠️ 广告漏放的**最终兜底防线**：不管地址来自 JS 取址、原生兜底还是 DB 回退，
+            // 都必须过 AdVideoFilter.isTrustedSongUrl（2026-09-26 事故：JS 路径返回
+            // gz.ac16.vip 的广告视频，因为这里的成功分支完全没做广告校验而被当成歌曲下载播放）。
+            if (url.isNotEmpty() && AdVideoFilter.isTrustedSongUrl(url, musicNo)) {
                 song.downloadUrl = url
                 val cdnHost = runCatching { java.net.URI(url).host }.getOrNull() ?: "unknown"
                 MiliLog.info(
                     "点歌编号=$musicNo 标题=${song.title} 请求源=$srcHost 状态=成功 urlHost=$cdnHost",
                 )
+            } else if (url.isNotEmpty()) {
+                Log.w(TAG, "Untrusted URL rejected for ${song.title}: $url")
+                MiliLog.error(
+                    "点歌编号=$musicNo 标题=${song.title} 请求源=$srcHost 状态=失败 " +
+                        "详情=地址不可信(广告或文件名不符) url=$url",
+                )
+                purgeCachedSongFile(song, "untrusted-resolved-url")
+                ""
             } else {
                 Log.w(TAG, "Unable to get download URL: ${song.title}")
                 MiliLog.error(
                     "点歌编号=$musicNo 标题=${song.title} 请求源=$srcHost 状态=失败 详情=无法生成下载地址",
                 )
+                ""
             }
         }
+    }
+
+    /** 删除某首歌已落盘的文件（发现地址不可信/命中广告时调用，让下次点歌重新取址下载）。 */
+    private fun purgeCachedSongFile(song: Song, reason: String) {
+        runCatching {
+            val file = getLocalFile(song)
+            if (file.exists()) {
+                val sizeMb = file.length() / 1024 / 1024
+                SongFileValidator.forget(file)
+                val deleted = file.delete()
+                MiliLog.warn(
+                    "SONG-AD 清除可疑歌曲缓存 编号=${song.id} 原因=$reason " +
+                        "大小=${sizeMb}MB 已删除=$deleted",
+                )
+            }
+            song.path = null
+        }.onFailure { Log.w(TAG, "purge cached file failed: ${it.message}") }
     }
 
     private fun startDownloadTask(song: Song, url: String, callback: DownloadCallback?, attempt: Int) {

@@ -335,7 +335,7 @@ class KtvJsBridge(context: Context) {
         runCatching {
             file.isFile && file.length() in 1_001..500_000 &&
                 file.readText(Charsets.UTF_8).let {
-                    it.contains("KtvApi") && it.contains("KTV_BRIDGE_API: 8")
+                    it.contains("KtvApi") && it.contains("KTV_BRIDGE_API: 9")
                 }
         }.getOrDefault(false)
 
@@ -361,7 +361,7 @@ class KtvJsBridge(context: Context) {
                     val script = String(bytes, StandardCharsets.UTF_8)
                     require(
                         script.length > 1000 && script.contains("KtvApi") &&
-                            script.contains("KTV_BRIDGE_API: 8"),
+                            script.contains("KTV_BRIDGE_API: 9"),
                     ) { "Invalid or incompatible JS file" }
                     tempFile.writeText(script, Charsets.UTF_8)
                     if (!tempFile.renameTo(cacheFile)) {

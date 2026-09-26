@@ -12,7 +12,7 @@
 (function(global) {
   'use strict';
 
-  // KTV_BRIDGE_API: 8 (Android 缓存校验标记，请勿删除)
+  // KTV_BRIDGE_API: 9 (Android 缓存校验标记，请勿删除)
 
   // ─── 配置 ──────────────────────────────────────────
   const CONFIG = {
@@ -138,13 +138,19 @@
   function isDemoUrl(url, musicno) {
     var s = String(url || '');
     if (/(?:wb66|demo)/i.test(s)) return true;
+    // 广告视频专用域名（含子域）。2026-09-26 事故：新设备（WebView 正常 → 走本 JS 取址）
+    // 点歌拿到了 gz.ac16.vip 的广告视频，而它通过了下述所有旧规则 → 被当成歌曲下载播放。
+    if (/^https?:\/\/(?:[^\/]+\.)?ac16\.vip(?::\d+)?\//i.test(s)) return true;
+    if (/\/ad_files\/|my_ad_video/i.test(s)) return true;
     if (/^https?:\/\/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?::\d+)?\//i.test(s)) return true;
     // R2 demo bucket: pub-*.r2.dev/ss/ 通用测试资源
     if (/pub-[a-z0-9]+\.r2\.dev\/ss\//i.test(s)) return true;
-    // ts 文件名是纯数字, 若与请求的 musicno 不一致则视为广告/测试资源。
-    // 原版真源 URL 的 ts 文件名总是等于 musicno (如 /7120742.ts)。
+    // ts 文件名必须等于 musicno。原版真源 URL 恒为 /<musicno>.ts（已实测两个 CDN 域
+    // txog.ktvsky.com / download.origjoy.com 的 6 首歌全部如此）。
+    // ⚠️ 旧规则只比对"纯数字文件名"（/\/(\d+)\.ts/），像 my_ad_video.ts 这种非数字名字
+    // 会直接漏过 —— 这正是广告漏放的直接原因之一。
     if (musicno) {
-      var m = s.match(/\/(\d+)\.ts(?:\?|$)/);
+      var m = s.match(/\/([^\/?]+)\.ts(?:\?|$)/i);
       if (m && m[1] !== String(musicno)) return true;
     }
     return false;
@@ -435,7 +441,7 @@
   // ─── 导出 ──────────────────────────────────────────
   global.KtvApi = KtvApi;
   global.KtvApiConfig = CONFIG;
-  global.KtvBridgeApiVersion = 8;
+  global.KtvBridgeApiVersion = 9;
 
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = {KtvApi: KtvApi, CONFIG: CONFIG};

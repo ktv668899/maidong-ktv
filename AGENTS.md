@@ -160,7 +160,7 @@ $BT/apksigner verify 目标名.apk
 
 ### 版本号
 
-- `app/build.gradle`：`versionName "1.4.9"` / `versionCode 29`（18~21 被本机临时诊断包占用过）
+- `app/build.gradle`：`versionName "1.4.10"` / `versionCode 30`（18~21 被本机临时诊断包占用过）
 - App 内显示统一用纯版本号（不加 `(versionCode)` 括号）
 - ⚠️ **发布构建已开启 NewApi 闸门**（`lint { checkReleaseBuilds true; fatal += ['NewApi'] }`）：
   任何「调用了高于 `minSdk 21` 且未做版本守卫的 API」都会让 `assembleRelease` 直接失败。
@@ -273,6 +273,24 @@ $BT/apksigner verify 目标名.apk
     `NATIVE-SONG 全部源失败 编号=... 详情=token-fail|no-url|demo-or-mismatch`；
     桥侧另有 `JS-BRIDGE ...`（ready / KtvApi 未导出 / WebView 初始化失败 / 15s 未就绪）。
 - **JS 热更新**：改动 `ktv_api.js` 必须同步提升 `KTV_BRIDGE_API: N` 标记（JS 与 `KtvJsBridge.kt` 两处校验），否则设备仍用缓存旧脚本
+- **⚠️ 广告/错号地址只有一道闸门：`AdVideoFilter.isTrustedSongUrl(url, musicno)`**
+  （2026-09-26 事故：新设备点歌 7303235 拿到 `gz.ac16.vip` 的**广告视频并被当成歌曲下载播放**）。
+  约定：
+  1. **任何来源**的播放地址都必须过这道闸门 —— JS 取址（`ktv_api.js` 的 `isDemoUrl`）、
+     原生兜底（`SongUrlResolver.isValidSongUrl`）、DB 回退（`SongApiClient.fetchFromDb`），
+     以及**最终兜底** `SongOkDownloadManager.buildDownloadUrl` 的成功分支。
+     只加在某一层必然漏：这次就是 JS 层的规则不认广告域名、且 Kotlin 的成功分支**完全没做校验**；
+  2. 判定三条：非 http(s)；命中广告特征（路径 `/ad_files/`、`my_ad_video`、**域名 `*.ac16.vip`**）；
+     **URL 里的 `.ts` 文件名必须等于点歌编号**（真源恒为 `/<musicno>.ts`，已实测
+     `txog.ktvsky.com` / `download.origjoy.com` 两个 CDN 域）。旧规则只比对"纯数字文件名"，
+     `my_ad_video.ts` 这类非数字名字直接漏过；
+  3. **内容校验挡不住广告**：广告视频能通过 `SongFileValidator`（≥6MB / ≥60s / TS 包完整），
+     所以"取址即校验"是唯一有效防线。一旦判定地址不可信，必须**同时删除已落盘的歌曲文件**
+     （`purgeCachedSongFile`），否则 `isDownloaded()` 会一直复用那个广告文件，广告反复播；
+  4. 历史遗留由 `SongOkDownloadManager.purgeLegacySongCacheOnce()` 在升级后清一次
+     （marker：`filesDir/song_cache_purged_v1`）。清掉只是让歌曲重新下载，不影响用户数据；
+  5. 回归测试 `app/src/test/java/com/local/ktv/AdVideoFilterTest.java` 用日志里的**真实 URL 形态**
+     锁住行为（含两个真源 CDN 域），改这块逻辑必须先让它通过。
 - **曲库**：只走官方 Muse 同步（`MuseDbSync`），不再依赖代码仓库数据库文件
 - **曲库同步时效**：默认 **30 天**（`DatabaseBootstrapper.SYNC_TTL_DAYS`）。未到期启动**不联网**、直接用本地曲库；到期后才查询服务器版本，有更新才下载。时效起点记录在 `db_sync_at.txt`，由 `DatabaseBootstrapper.markSynced()` 写入（下载成功或校验为最新时）。设置页「曲库 → 更新」为手动强制检查（绕过时效，仅在服务器版本更新时下载）
 - **麦克风**：`MicActivator` 常驻占用输入通道（TV/投影需占用后才有演唱声音输出），外接设备热插拔会自动重建

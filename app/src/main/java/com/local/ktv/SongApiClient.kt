@@ -112,8 +112,11 @@ object SongApiClient {
             if (db.open()) {
                 val url = db.getCloudUrl(musicno)
                 db.close()
-                // DB 中的 cloud_url 可能也是 demo 地址, 做 URL 基本校验
-                if (url != null && !isLikelyDemoUrl(url)) return url
+                // DB 中的 cloud_url 也可能就是广告/demo 地址，必须过同一道可信校验
+                // （2026-09-26 广告事故：这里原来只做 isLikelyDemoUrl，挡不住广告域名）。
+                if (url != null && !isLikelyDemoUrl(url) && AdVideoFilter.isTrustedSongUrl(url, musicno)) {
+                    return url
+                }
             }
         } catch (_: Exception) {}
         return null
