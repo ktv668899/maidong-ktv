@@ -23,6 +23,7 @@
     VER:     '4',
     // 歌曲源(均为同一后台的多个入口; 运行时按可用性自动排序, 解析失败的源沉底)。
     HOSTS:   [
+      'http://zk.ktv1.top:6677',
       'http://w.w345.my',
       'http://desktok.top',
       'http://mm.kk456.top',
