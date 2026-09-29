@@ -7045,7 +7045,7 @@ class MainActivity : AppCompatActivity() {
         textPosterPage?.text = "1/${homeBanners.size}"
         main.removeCallbacks(homeBannerRunnable)
         main.postDelayed(homeBannerRunnable, 5000L)
-        if (homePoster != null) homePoster.setOnClickListener(View.OnClickListener { v: View? -> loadHotSongs() })
+        if (homePoster != null) homePoster.setOnClickListener(View.OnClickListener { v: View? -> openHomeBannerTarget(homeBannerIndex) })
         // 原版始终保留同一个视频窗口，仅在首页、子页和全屏间调整边界。
         // 两个 XML View 只用于提供精确的布局锚点，避免页面操作重建解码 Surface。
         homeVideoPlaceholder?.visibility = View.GONE
@@ -8121,7 +8121,7 @@ class MainActivity : AppCompatActivity() {
     /**
      * 加载热门歌曲列表
      */
-    private fun loadHotSongs() {
+    private fun loadHotSongs(preferredRankName: String? = null) {
         searchScope = "none"
         activeSearchQuery = ""
         setSearchText("")
@@ -8153,8 +8153,14 @@ class MainActivity : AppCompatActivity() {
                     rankPlaylistIds.add(playlist[0].orEmpty())
                     currentCategories.add(playlist[1].orEmpty())
                 }
-                currentCategoryIndex = playlists.indexOfFirst {
-                    it[2] == "2" || it[1] == "热歌榜"
+                // 幻灯片入口可指定首选榜单名(如"新歌榜"); 未命中时沿用默认热歌榜逻辑。
+                val preferred = preferredRankName?.trim().orEmpty()
+                currentCategoryIndex = if (preferred.isNotEmpty()) {
+                    playlists.indexOfFirst { (it[1] ?: "").contains(preferred) }
+                        .takeIf { it >= 0 }
+                        ?: playlists.indexOfFirst { it[2] == "2" || it[1] == "热歌榜" }
+                } else {
+                    playlists.indexOfFirst { it[2] == "2" || it[1] == "热歌榜" }
                 }.takeIf { it >= 0 } ?: 0
                 browseParam = rankPlaylistIds.getOrNull(currentCategoryIndex).orEmpty()
                 listTitle!!.text = currentCategories.getOrNull(currentCategoryIndex) ?: "排行榜"
@@ -8236,6 +8242,40 @@ class MainActivity : AppCompatActivity() {
         browseParam = categoryParentQuery
         browsePage = categoryParentPage
         loadCategoryPlaylistPage(categoryParentQuery)
+    }
+
+    /**
+     * 幻灯片(分类入口图)点击: 按当前轮播页跳转到对应榜单/分类歌单。
+     * 图与目标对应: 0=新歌榜(榜单) 1=戏曲(戏曲片段) 2=广场舞(disco)
+     * 3=儿童歌(儿歌) 4=高清歌曲(高清歌曲)。
+     */
+    private fun openHomeBannerTarget(index: Int) {
+        when (index % homeBanners.size) {
+            0 -> loadHotSongs("新歌榜")
+            1 -> openCategoryPlaylistByKeyword("戏曲")
+            2 -> openCategoryPlaylistByKeyword("disco")
+            3 -> openCategoryPlaylistByKeyword("儿歌")
+            else -> openCategoryPlaylistByKeyword("高清")
+        }
+    }
+
+    /**
+     * 按关键词打开分类歌单: 命中即直接进入首个歌单的歌曲列表;
+     * 未命中(曲库未同步等)则回退到分类列表页, 保证永远有可用落点。
+     */
+    private fun openCategoryPlaylistByKeyword(keyword: String) {
+        if (!library.muse.isAvailable()) {
+            catalogRefreshPending = true
+            busy(true, "曲库加载中...")
+            return
+        }
+        io.execute {
+            val playlists = library.muse.categoryPlaylists(keyword, 0, 1)
+            main.post {
+                val first = playlists.firstOrNull()
+                if (first == null) loadCategoryPlaylists() else openCategoryPlaylist(first)
+            }
+        }
     }
 
     private fun loadCategoryPlaylistPage(query: String = activeSearchQuery) {
