@@ -16,6 +16,8 @@ import kotlin.math.ceil
 class PlaylistGridAdapter(
     private val context: Context,
     private val playlists: List<Array<String?>>,
+    /** 卡片默认封面: 关键词虚拟歌单(如"广场舞")可传入主题图替代默认图标。 */
+    private val coverImageRes: Int = R.drawable.ic_default_playlist_avatar,
     private val onPlaylistClick: (Array<String?>) -> Unit,
 ) : BaseAdapter() {
     private val density = context.resources.displayMetrics.density
@@ -54,8 +56,12 @@ class PlaylistGridAdapter(
 
         addView(ImageView(context).apply {
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-            setImageResource(R.drawable.ic_default_playlist_avatar)
-            scaleType = ImageView.ScaleType.CENTER_INSIDE
+            setImageResource(coverImageRes)
+            scaleType = if (coverImageRes == R.drawable.ic_default_playlist_avatar) {
+                ImageView.ScaleType.CENTER_INSIDE
+            } else {
+                ImageView.ScaleType.CENTER_CROP
+            }
             alpha = 0.9f
         }, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(82), Gravity.TOP))
 

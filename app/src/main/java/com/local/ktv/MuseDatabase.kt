@@ -392,6 +392,42 @@ class MuseDatabase @JvmOverloads constructor(initialSourceFile: File? = null) {
         )
     }
 
+    /** 读取 tag_groups 标签组(如"戏曲")的 tags 名称列表, 保持组内配置顺序。 */
+    private fun tagGroupPlaylistNames(groupName: String?): List<String> {
+        if (groupName.isNullOrBlank()) return emptyList()
+        val tagsJson = rows(
+            "SELECT tags FROM tag_groups WHERE deleted_at IS NULL AND name=? AND type=1 " +
+                "ORDER BY sort_no LIMIT 1",
+            arrayOf(groupName),
+        ) { it.getString(0) }.firstOrNull() ?: return emptyList()
+        return runCatching {
+            val arr = org.json.JSONArray(tagsJson)
+            (0 until arr.length()).mapNotNull { index ->
+                arr.optString(index).takeIf { it.isNotEmpty() }
+            }
+        }.getOrDefault(emptyList())
+    }
+
+    /**
+     * 标签组内歌单(如"戏曲"→黄梅戏/京剧/粤剧…type=3 剧种歌单), 按组内 tags 顺序返回分页。
+     * 用于幻灯片分类入口: 金调同款"组名→子歌单网格"行为。
+     */
+    fun tagGroupPlaylists(groupName: String?, offset: Int, limit: Int): MutableList<Array<String?>> {
+        val names = tagGroupPlaylistNames(groupName)
+        if (names.isEmpty()) return mutableListOf()
+        val placeholders = names.joinToString(",") { "?" }
+        val all = rows(
+            "SELECT id, name, song_count, image FROM playlists " +
+                "WHERE deleted_at IS NULL AND type=3 AND name IN ($placeholders)",
+            names.toTypedArray(),
+        ) { cursor ->
+            arrayOf(cursor.getString(0), cursor.getString(1), cursor.getInt(2).toString(), cursor.getString(3))
+        }.sortedBy { playlist -> names.indexOfFirst { it == playlist[1] } }
+        return all.drop(offset).take(limit).toMutableList()
+    }
+
+    fun tagGroupPlaylistCount(groupName: String?): Int = tagGroupPlaylistNames(groupName).size
+
     fun songsInPlaylist(playlistId: String, offset: Int, limit: Int): MutableList<Song> = songs(
         "$SONG_SELECT INNER JOIN playlist_songs ps ON s.id=ps.song_id " +
             "WHERE ps.playlist_id=? AND s.deleted_at IS NULL " +

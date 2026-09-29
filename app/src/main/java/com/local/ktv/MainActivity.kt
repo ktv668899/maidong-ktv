@@ -401,12 +401,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
     private var homeBannerIndex = 0
+    // 与金调 KTV 一致仅 3 张: 新歌榜 / 戏曲 / 广场舞。
     private val homeBanners = intArrayOf(
         R.drawable.home_banner_0,
         R.drawable.home_banner_1,
         R.drawable.home_banner_2,
-        R.drawable.home_banner_3,
-        R.drawable.home_banner_4,
     )
     private val homeBannerRunnable = object : Runnable {
         override fun run() {
@@ -8245,18 +8244,134 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * 幻灯片(分类入口图)点击: 按当前轮播页跳转到对应榜单/分类歌单。
-     * 图与目标对应: 0=新歌榜(榜单) 1=戏曲(戏曲片段) 2=广场舞(disco)
-     * 3=儿童歌(儿歌) 4=高清歌曲(高清歌曲)。
+     * 幻灯片(分类入口图)点击: 按当前轮播页跳转, 与金调 KTV 行为一致。
+     * 0=新歌榜(榜单页选中新歌榜) 1=戏曲(剧种歌单网格) 2=广场舞(聚合歌单卡片)。
      */
     private fun openHomeBannerTarget(index: Int) {
         when (index % homeBanners.size) {
             0 -> loadHotSongs("新歌榜")
-            1 -> openCategoryPlaylistByKeyword("戏曲")
-            2 -> openCategoryPlaylistByKeyword("disco")
-            3 -> openCategoryPlaylistByKeyword("儿歌")
-            else -> openCategoryPlaylistByKeyword("高清")
+            1 -> loadTagGroupPage("戏曲")
+            else -> showKeywordPlaylistPage("广场舞")
         }
+    }
+
+    /**
+     * 关键词虚拟歌单页(金调"广场舞"同款): 网格展示 1 个聚合歌单卡片,
+     * 点击卡片进入该关键词的歌曲聚合列表。
+     */
+    private fun showKeywordPlaylistPage(keyword: String) {
+        if (!library.muse.isAvailable()) {
+            catalogRefreshPending = true
+            busy(true, "曲库加载中...")
+            return
+        }
+        searchScope = "none"
+        activeSearchQuery = ""
+        setSearchText("")
+        currentTabIndex = 2
+        showSubPageShell("主页 / $keyword")
+        setupTabs()
+        currentCategories.clear()
+        currentCategoryIndex = -1
+        updateCategories()
+        keyboardArea?.visibility = View.GONE
+        rankCategoryGrid?.visibility = View.GONE
+        subCategoryScroll?.visibility = View.GONE
+        browseMode = "keyword_playlist"
+        browseParam = keyword
+        browsePage = 0
+        browseTotalPages = 1
+        browseTotalCount = 1
+        val virtualCard = arrayOf<String?>("keyword:$keyword", keyword, null, null)
+        visiblePlaylists.clear()
+        visiblePlaylists.add(virtualCard)
+        songList?.apply {
+            dividerHeight = 0
+            // 虚拟歌单卡片封面: 用对应幻灯片主题图(0=新歌榜 1=戏曲 2=广场舞), 与金调视觉一致。
+            val cover = when (keyword) {
+                "新歌榜" -> R.drawable.home_banner_0
+                "戏曲" -> R.drawable.home_banner_1
+                else -> R.drawable.home_banner_2
+            }
+            adapter = PlaylistGridAdapter(this@MainActivity, listOf(virtualCard), cover) { _ ->
+                loadKeywordSongs(keyword)
+            }
+        }
+        updatePageInfo()
+    }
+
+    /**
+     * 标签组歌单网格页(金调同款): 如"戏曲"组 → 黄梅戏/京剧/粤剧…剧种歌单。
+     * 组不存在或为空时回退到按关键词搜索分类歌单, 保证永远有可用落点。
+     */
+    private fun loadTagGroupPage(groupName: String) {
+        if (!library.muse.isAvailable()) {
+            catalogRefreshPending = true
+            busy(true, "曲库加载中...")
+            return
+        }
+        if (library.muse.tagGroupPlaylistCount(groupName) <= 0) {
+            openCategoryPlaylistByKeyword(groupName)
+            return
+        }
+        searchScope = "none"
+        activeSearchQuery = ""
+        setSearchText("")
+        currentTabIndex = 2
+        showSubPageShell("主页 / $groupName")
+        setupTabs()
+        currentCategories.clear()
+        currentCategoryIndex = -1
+        updateCategories()
+        keyboardArea?.visibility = View.GONE
+        rankCategoryGrid?.visibility = View.GONE
+        subCategoryScroll?.visibility = View.GONE
+        browseMode = "tag_group"
+        browseParam = groupName
+        val requestVersion = ++browseRequestVersion
+        val requestedPage = browsePage
+        val pageSize = 12
+        io.execute {
+            val playlists = library.muse.tagGroupPlaylists(groupName, requestedPage * pageSize, pageSize)
+            val total = library.muse.tagGroupPlaylistCount(groupName)
+            main.post {
+                if (requestVersion != browseRequestVersion || browseMode != "tag_group" || browsePage != requestedPage
+                ) return@post
+                browseTotalCount = total
+                browseTotalPages = (total + pageSize - 1) / pageSize
+                visiblePlaylists.clear()
+                visiblePlaylists.addAll(playlists)
+                songList?.apply {
+                    dividerHeight = 0
+                    adapter = PlaylistGridAdapter(this@MainActivity, playlists) { playlist ->
+                        openCategoryPlaylist(playlist)
+                    }
+                }
+                updatePageInfo()
+            }
+        }
+    }
+
+    /** 按歌名关键词搜索歌曲(金调"广场舞"同款行为): 聚合曲库内全部同名主题歌曲。 */
+    private fun loadKeywordSongs(keyword: String) {
+        searchScope = "none"
+        activeSearchQuery = ""
+        setSearchText("")
+        currentTabIndex = 9
+        showSubPageShell("主页 / $keyword")
+        setupTabs()
+        currentCategories.clear()
+        currentCategoryIndex = -1
+        updateCategories()
+        keyboardArea?.visibility = View.GONE
+        rankCategoryGrid?.visibility = View.GONE
+        subCategoryScroll?.visibility = View.GONE
+        browseMode = "search"
+        browseParam = keyword
+        browsePage = 0
+        searchLanguage = "全部"
+        listTitle?.text = keyword
+        loadBrowsePage()
     }
 
     /**
@@ -9795,6 +9910,8 @@ class MainActivity : AppCompatActivity() {
         when {
             browseMode == "singer_list" -> loadSingerList(browseParam)
             browseMode == "category_list" -> loadCategoryPlaylistPage(activeSearchQuery)
+            browseMode == "tag_group" -> loadTagGroupPage(browseParam.orEmpty())
+            browseMode == "keyword_playlist" -> showKeywordPlaylistPage(browseParam.orEmpty())
             browseMode == "quick" -> loadQuickSearchPage(activeSearchQuery)
             currentTabIndex == 3 -> loadWordCounts()
             currentTabIndex == 7 -> loadFavorites()
@@ -10027,6 +10144,8 @@ class MainActivity : AppCompatActivity() {
             "singer_list" -> loadSingerList(browseParam, activeSearchQuery)
             "local" -> loadLocalCatalogPage()
             "category_list" -> loadCategoryPlaylistPage(activeSearchQuery)
+            "tag_group" -> loadTagGroupPage(browseParam.orEmpty())
+            "keyword_playlist" -> showKeywordPlaylistPage(browseParam.orEmpty())
             "quick" -> loadQuickSearchPage(activeSearchQuery)
             else -> loadBrowsePage()
         }
