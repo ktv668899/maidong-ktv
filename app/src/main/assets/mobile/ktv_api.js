@@ -21,18 +21,10 @@
     SDK_KEY: '19042303a8374f67ae3fe1e25c97936f',
     VN:      '4.100.5.11121504',
     VER:     '4',
-    // 歌曲源(均为同一后台的多个入口; 运行时按可用性自动排序, 解析失败的源沉底)。
+    // 歌曲源(唯一; 运行时按可用性自动排序, 解析失败的源沉底)。
     HOSTS:   [
       'http://zk.ktv1.top:6677',
-      'http://w.w345.my',
-      'http://desktok.top',
-      'http://mm.kk456.top',
-      'http://w.w345.my:66',
-      'http://z.w345.my',
-      'http://b.sktv.top',
-      'http://w345.my',
     ],
-    HOST:    'http://w.w345.my',
     MWS:     'https://mws.cherryonline.cn',
     RSA_PUBKEY: 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAucL0oFErd7REM6TSNa3EZdN1YaOs4J1eCybLPyoQ9ru3q1HU67agC9FzhrCG/RvAQUya5iPmQ8Caed05vqcCVcyJChmkSOGQ7DVShe2rGuTMNlpoRV6UzfcraaVS++7m2K/+kSZJ8OAhhhVuqPruMjsFYpdtstAwvyZT28b+eENwzpp9UHqsooZc7FZ0H8kTbs6XMkw4nIWo+4HoPAhNLEY+xdHvwY6drF/3WDTvsaoMrs73TVQCEEHzZNIz2H/is9VLMnIyOfnfcJi9br78Fj2xHzxu3sAySBOTVLmUMxqYh/g1ox5OXGcW93HJkQLkBi42tFAEkWYlYyl93+jbbQIDAQAB'
   };
