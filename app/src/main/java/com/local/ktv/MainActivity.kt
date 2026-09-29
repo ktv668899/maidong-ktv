@@ -199,8 +199,11 @@ class MainActivity : AppCompatActivity() {
                 main.postDelayed(this, 5000)
                 return
             }
-            val publicHost = remotePublicHost().ifEmpty { null }
-            if (ip != remoteServer.address() || publicHost != remoteServer.publicHostOrNull()) {
+            val endpoint = publicEndpoint()
+            if (ip != remoteServer.address() ||
+                endpoint?.first != remoteServer.publicHostOrNull() ||
+                (endpoint?.second ?: -1) != remoteServer.publicPortValue()
+            ) {
                 remoteServer.stop()
                 startRemoteServer()
                 // 换网/换 IP 后出口 IP 可能变化, 歌曲源会话必须重建(见 refreshNetworkState)。
@@ -3255,11 +3258,11 @@ class MainActivity : AppCompatActivity() {
         box.setOrientation(LinearLayout.VERTICAL)
         box.setGravity(Gravity.CENTER_HORIZONTAL)
         box.setPadding(dp(20), dp(12), dp(20), dp(8))
-        val publicHost = remotePublicHost()
+        val endpoint = publicEndpoint()
         val lanAddress = remoteServer.address()
             ?.takeIf { remoteServer.port() > 0 }?.let { "${it}:${remoteServer.port()}" }.orEmpty()
         // 位图按最终显示尺寸生成，保证任何分辨率下二维码都清晰可扫。
-        if (publicHost.isNotEmpty() && lanAddress.isNotEmpty()) {
+        if (endpoint != null && lanAddress.isNotEmpty()) {
             // 双码布局: 左=公网地址(局域网/外网通用) 右=局域网直连(路由器不支持回流时的后备)。
             val side = min(qrSide, 190)
             val lanUrl = "http://$lanAddress/mobile"
@@ -3283,10 +3286,10 @@ class MainActivity : AppCompatActivity() {
                 row.addView(column)
             }
             box.addView(row)
-            val tip = label("手机扫码即可点歌（外网需路由器端口映射）", if (compact) 15 else 17, Color.WHITE)
+            val tip = label("手机扫码即可点歌（局域网/外网均可）", if (compact) 15 else 17, Color.WHITE)
             tip.gravity = Gravity.CENTER
             box.addView(tip, LinearLayout.LayoutParams(-1, dp(if (compact) 38 else 48)))
-            val publicLine = label("外网地址：$publicHost:${remoteServer.port()}", 15, GOLD)
+            val publicLine = label("外网地址：${endpoint.first}:${endpoint.second}", 15, GOLD)
             publicLine.gravity = Gravity.CENTER
             box.addView(publicLine, LinearLayout.LayoutParams(-1, dp(30)))
             val lanLine = label("局域网直连：$lanAddress", 14, Color.LTGRAY)
@@ -3425,7 +3428,7 @@ class MainActivity : AppCompatActivity() {
     /** 外网扫码点歌: 配置路由器 DDNS 域名(需路由器把 WAN 8765-8775 转发到本机)。 */
     private fun showPublicHostDialog() {
         val input = android.widget.EditText(this)
-        input.hint = "域名或公网 IP，如 ck.ac19.cn"
+        input.hint = "如 sm.ac19.cn:6699（可带端口）"
         input.setSingleLine(true)
         input.setText(prefs()?.getString(KEY_REMOTE_PUBLIC_HOST, null)?.trim() ?: remotePublicHost())
         val pad = android.widget.FrameLayout(this)
@@ -3434,9 +3437,9 @@ class MainActivity : AppCompatActivity() {
         AlertDialog.Builder(this)
             .setTitle("外网扫码点歌")
             .setMessage(
-                "默认已启用 ${remotePublicHost().ifEmpty { "(已禁用)" }}（本机部署的爱快 DDNS）。" +
-                    "\n使用前提：路由器已把 WAN 端口 8765-8775 转发到本机。" +
-                    "\n可填写其它域名或公网 IP；清空保存则禁用外网模式，二维码仅限局域网。"
+                "默认已启用 ${remotePublicHost().ifEmpty { "(已禁用)" }}（与 Gitea 同端口，由反向代理按域名分流到本机）。" +
+                    "\n前提：DNS 已将该域名解析到家里公网 IP，且 6699 端口的反代已按域名分流。" +
+                    "\n可填写其它域名（支持带端口，如 sm.ac19.cn:6699）；清空保存则禁用外网模式，二维码仅限局域网。"
             )
             .setView(pad)
             .setPositiveButton("保存") { _, _ -> savePublicHost(input.text.toString().trim()) }
@@ -3455,9 +3458,11 @@ class MainActivity : AppCompatActivity() {
 
     private fun startRemoteServer() {
         val address = localIp().takeIf { LocalRemoteServer.isPrivateIpv4(it) }
+        val endpoint = publicEndpoint()
         remoteServer.start(
             address,
-            remotePublicHost().ifEmpty { null },
+            endpoint?.first,
+            endpoint?.second ?: -1,
             remoteAccessToken().ifEmpty { null },
             object : LocalRemoteServer.Callback {
             override fun handle(
@@ -4178,12 +4183,12 @@ class MainActivity : AppCompatActivity() {
 
     private fun remoteUrl(): String {
         if (!remoteServer.isRunning() || remoteServer.port() <= 0) return ""
-        // 配置了公网域名(DDNS)时, 二维码直接给外网地址——局域网/外网手机扫码均可点歌。
-        val publicHost = remotePublicHost()
-        if (publicHost.isNotEmpty()) {
+        // 配置了公网端点时, 二维码直接给外网地址——局域网/外网手机扫码均可点歌。
+        val endpoint = publicEndpoint()
+        if (endpoint != null) {
             val token = remoteAccessToken()
             val suffix = if (token.isEmpty()) "" else "?t=$token"
-            return "http://$publicHost:${remoteServer.port()}/mobile$suffix"
+            return "http://${endpoint.first}:${endpoint.second}/mobile$suffix"
         }
         val overrideHost = Settings.Global.getString(contentResolver, "maidong_remote_host")
             ?.takeIf { LocalRemoteServer.isPrivateIpv4(it) }
@@ -4192,8 +4197,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * 外网扫码点歌的公网域名。优先级: 用户显式设置(含清空=禁用) > adb settings 写入的非私有地址
-     * > 默认 ck.ac19.cn(本机部署的爱快 DDNS)。默认启用, 使二维码开箱即支持外网点歌。
+     * 外网扫码点歌的公网端点。优先级: 用户显式设置(含清空=禁用) > adb settings 写入的非私有地址
+     * > 默认 sm.ac19.cn:6699(与 Gitea 同端口, 由反向代理按域名分流到本机点歌服务)。
+     * 支持 "域名" 或 "域名:端口" 两种写法。
      */
     private fun remotePublicHost(): String {
         val prefs = prefs()
@@ -4202,7 +4208,20 @@ class MainActivity : AppCompatActivity() {
         }
         val setting = Settings.Global.getString(contentResolver, "maidong_remote_host")?.trim().orEmpty()
         if (setting.isNotEmpty() && !LocalRemoteServer.isPrivateIpv4(setting)) return setting
-        return "ck.ac19.cn"
+        return "sm.ac19.cn:6699"
+    }
+
+    /** 解析公网端点为 (域名, 端口); 无端口时用本机服务端口。null=未启用外网模式。 */
+    private fun publicEndpoint(): Pair<String, Int>? {
+        val raw = remotePublicHost()
+        if (raw.isEmpty()) return null
+        val idx = raw.lastIndexOf(':')
+        val portPart = if (idx > 0) raw.substring(idx + 1) else ""
+        return if (portPart.isNotEmpty() && portPart.all { it.isDigit() }) {
+            raw.substring(0, idx) to portPart.toInt().coerceIn(1, 65535)
+        } else {
+            raw to (remoteServer.port().takeIf { it > 0 } ?: 8765)
+        }
     }
 
     /** 外网访问令牌: 首次生成后持久化, 保证二维码长期有效。 */

@@ -45,6 +45,8 @@ class LocalRemoteServer(private val context: Context) {
     @Volatile private var boundPort = -1
     /** 公网访问域名(如 DDNS 域名), 非空时二维码/Host/Origin 校验放行该域名。 */
     @Volatile private var publicHost: String? = null
+    /** 公网侧端口(反向代理复用端口场景下与 boundPort 不同); <=0 表示与 boundPort 一致。 */
+    @Volatile private var publicPort: Int = -1
     /** 外网客户端访问令牌(二维码 ?t= 携带); 局域网客户端免令牌。 */
     @Volatile private var accessKey: String? = null
     @Volatile private var lastError: String? = null
@@ -53,13 +55,15 @@ class LocalRemoteServer(private val context: Context) {
     private var callback: Callback? = null
 
     @Synchronized
-    fun start(address: String?, publicHost: String?, accessKey: String?, callback: Callback): Boolean {
+    fun start(address: String?, publicHost: String?, publicPort: Int, accessKey: String?, callback: Callback): Boolean {
         if (running && address == boundAddress &&
-            publicHost?.trim() == this.publicHost && accessKey?.trim() == this.accessKey
+            publicHost?.trim() == this.publicHost && publicPort == this.publicPort &&
+            accessKey?.trim() == this.accessKey
         ) return true
         stop()
         this.callback = callback
         this.publicHost = publicHost?.trim()?.takeIf { it.isNotEmpty() }
+        this.publicPort = publicPort
         this.accessKey = accessKey?.trim()?.takeIf { it.isNotEmpty() }
         if (!isPrivateIpv4(address)) {
             lastError = "请先连接 Wi-Fi 或有线局域网"
@@ -112,6 +116,7 @@ class LocalRemoteServer(private val context: Context) {
     fun port(): Int = boundPort
     fun address(): String? = boundAddress
     fun publicHostOrNull(): String? = publicHost
+    fun publicPortValue(): Int = publicPort
     fun error(): String? = lastError
 
     /** 是否在 [withinMs] 内有手机端请求(扫码点歌页面可见时每秒轮询 state)。 */
@@ -228,11 +233,14 @@ class LocalRemoteServer(private val context: Context) {
         if (origin.isNullOrBlank() || origin == "null") return true
         return runCatching {
             val uri = URI(origin)
-            if (uri.scheme != "http" || uri.port != boundPort) return@runCatching false
+            if (uri.scheme != "http") return@runCatching false
             val host = uri.host ?: return@runCatching false
-            if (isPrivateIpv4(host)) return@runCatching true
             val pub = publicHost
-            !pub.isNullOrEmpty() && host.equals(pub, ignoreCase = true)
+            if (!pub.isNullOrEmpty() && host.equals(pub, ignoreCase = true)) {
+                // 经反向代理复用公网端口时, 浏览器 Origin 端口是代理端口而非本机服务端口
+                return@runCatching uri.port == boundPort || (publicPort > 0 && uri.port == publicPort)
+            }
+            uri.port == boundPort && isPrivateIpv4(host)
         }.getOrDefault(false)
     }
 
