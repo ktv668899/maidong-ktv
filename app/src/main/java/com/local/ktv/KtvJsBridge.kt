@@ -299,12 +299,9 @@ class KtvJsBridge(context: Context) {
         }
     }
 
-    // JS isDemoUrl 已做第一层正则过滤; 这里再做域名白名单兜底, 防止 demo URL 绕过
-    private val trustedHostSuffixes = listOf(
-        "ktvsky.com", "origjoy.com", "cherryonline.cn", "ac16.vip",
-        "ktvdaren.com", "j-make.cn",
-    )
-    // 已知 demo 域名模式 (Cloudflare R2 测试桶、IP 地址等)
+    // JS isDemoUrl 已做第一层正则过滤; 这里仅保留 demo 域名兜底(IP 直连 / R2 测试桶)。
+    // 原域名白名单(trustedHostSuffixes)已按需求移除: 歌曲源可能返回任意 CDN 域,
+    // 白名单会误杀新源的合法下载地址; 防 demo 逻辑仍由 JS isDemoUrl + AdVideoFilter 承担。
     private val demoHostPatterns = listOf(
         Regex("^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$"),  // 纯 IP
         Regex("^pub-[a-z0-9]+\\.r2\\.dev$"),                      // R2 demo bucket
@@ -318,13 +315,11 @@ class KtvJsBridge(context: Context) {
             Log.w(TAG, "Rejected demo URL host: $host")
             return false
         }
-        val trusted = trustedHostSuffixes.any { host.endsWith(it) }
-        if (!trusted) Log.w(TAG, "Untrusted URL host: $host")
-        return trusted
+        return true
     }
 
     private fun complete(requestId: String, url: String?) {
-        // 先屏蔽/替换广告视频,再做域名白名单校验。
+        // 先屏蔽/替换广告视频,再做 demo 域名兜底校验(不再限制白名单域名)。
         callbacks.remove(requestId)?.invoke(AdVideoFilter.resolve(url)?.takeIf { isTrustedDownloadUrl(it) })
     }
 
