@@ -15,6 +15,7 @@ import java.net.URL
 object AppUpdateManager {
     private const val LATEST_RELEASE_API =
         "http://ck.ac19.cn:6699/api/v1/repos/admin/maidong-ktv/releases/latest"
+    private const val PUBLIC_GITEA_BASE = "http://ck.ac19.cn:6699"
 
     data class Release(
         val version: String,
@@ -37,7 +38,7 @@ object AppUpdateManager {
                     for (index in 0 until assets.length()) {
                         val asset = assets.optJSONObject(index) ?: continue
                         val name = asset.optString("name")
-                        val url = asset.optString("browser_download_url")
+                        val url = normalizeAssetUrl(asset.optString("browser_download_url"))
                         if (name.endsWith(".apk", ignoreCase = true) || url.contains(".apk", ignoreCase = true)) {
                             apkName = name.ifBlank { "maidong-ktv-$version.apk" }
                             apkUrl = url
@@ -138,6 +139,18 @@ object AppUpdateManager {
             if (compared != 0) return compared
         }
         return 0
+    }
+
+    /**
+     * Gitea 的 ROOT_URL 若配置为内网地址 (如 http://172.18.20.4:3000),
+     * 其 Release 附件的 browser_download_url 也是内网 IP, 外网设备不可达。
+     * 这里统一把私有网段地址重写到公网域名 (爱快端口映射 6699 -> 容器 3000),
+     * 使任意网络环境下的设备都能完成在线更新。
+     */
+    private fun normalizeAssetUrl(url: String): String {
+        if (url.isBlank()) return url
+        return Regex("http://(?:172\\.(?:1[6-9]|2[0-9]|3[01])|192\\.168|10)\\.\\d{1,3}\\.\\d{1,3}(?::\\d+)?")
+            .replace(url, PUBLIC_GITEA_BASE)
     }
 
     private fun getText(url: String): String {
