@@ -199,7 +199,8 @@ class MainActivity : AppCompatActivity() {
                 main.postDelayed(this, 5000)
                 return
             }
-            if (ip != remoteServer.address()) {
+            val publicHost = remotePublicHost().ifEmpty { null }
+            if (ip != remoteServer.address() || publicHost != remoteServer.publicHostOrNull()) {
                 remoteServer.stop()
                 startRemoteServer()
                 // 换网/换 IP 后出口 IP 可能变化, 歌曲源会话必须重建(见 refreshNetworkState)。
@@ -3254,21 +3255,56 @@ class MainActivity : AppCompatActivity() {
         box.setOrientation(LinearLayout.VERTICAL)
         box.setGravity(Gravity.CENTER_HORIZONTAL)
         box.setPadding(dp(20), dp(12), dp(20), dp(8))
-        val qr = ImageView(this)
-        qr.setBackgroundColor(Color.WHITE)
+        val publicHost = remotePublicHost()
+        val lanAddress = remoteServer.address()
+            ?.takeIf { remoteServer.port() > 0 }?.let { "${it}:${remoteServer.port()}" }.orEmpty()
         // 位图按最终显示尺寸生成，保证任何分辨率下二维码都清晰可扫。
-        qr.setImageBitmap(qrBitmap(url, dp(qrSide)))
-        box.addView(qr, LinearLayout.LayoutParams(dp(qrSide), dp(qrSide)))
-        val tip = label("手机连接同一局域网后扫码点歌", if (compact) 16 else 18, Color.WHITE)
-        tip.gravity = Gravity.CENTER
-        box.addView(tip, LinearLayout.LayoutParams(-1, dp(if (compact) 42 else 54)))
-        // 显示当前服务的 ip:端口 地址(去掉路径,便于对照路由器/局域网排查)。
-        val serverHost = remoteServer.address().orEmpty()
-        val serverPort = remoteServer.port()
-        if (serverHost.isNotEmpty() && serverPort > 0) {
-            val addressLine = label("$serverHost:$serverPort", 16, GOLD)
-            addressLine.gravity = Gravity.CENTER
-            box.addView(addressLine, LinearLayout.LayoutParams(-1, dp(32)))
+        if (publicHost.isNotEmpty() && lanAddress.isNotEmpty()) {
+            // 双码布局: 左=公网地址(局域网/外网通用) 右=局域网直连(路由器不支持回流时的后备)。
+            val side = min(qrSide, 190)
+            val lanUrl = "http://$lanAddress/mobile"
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER
+            }
+            listOf(url to "外网/局域网", lanUrl to "仅局域网").forEach { (target, caption) ->
+                val column = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    gravity = Gravity.CENTER_HORIZONTAL
+                    setPadding(dp(8), 0, dp(8), 0)
+                    addView(ImageView(this@MainActivity).apply {
+                        setBackgroundColor(Color.WHITE)
+                        setImageBitmap(qrBitmap(target, dp(side)))
+                    }, LinearLayout.LayoutParams(dp(side), dp(side)))
+                    addView(label(caption, 14, Color.LTGRAY).apply {
+                        gravity = Gravity.CENTER
+                    }, LinearLayout.LayoutParams(-1, dp(30)))
+                }
+                row.addView(column)
+            }
+            box.addView(row)
+            val tip = label("手机扫码即可点歌（外网需路由器端口映射）", if (compact) 15 else 17, Color.WHITE)
+            tip.gravity = Gravity.CENTER
+            box.addView(tip, LinearLayout.LayoutParams(-1, dp(if (compact) 38 else 48)))
+            val publicLine = label("外网地址：$publicHost:${remoteServer.port()}", 15, GOLD)
+            publicLine.gravity = Gravity.CENTER
+            box.addView(publicLine, LinearLayout.LayoutParams(-1, dp(30)))
+            val lanLine = label("局域网直连：$lanAddress", 14, Color.LTGRAY)
+            lanLine.gravity = Gravity.CENTER
+            box.addView(lanLine, LinearLayout.LayoutParams(-1, dp(28)))
+        } else {
+            val qr = ImageView(this)
+            qr.setBackgroundColor(Color.WHITE)
+            qr.setImageBitmap(qrBitmap(url, dp(qrSide)))
+            box.addView(qr, LinearLayout.LayoutParams(dp(qrSide), dp(qrSide)))
+            val tip = label("手机连接同一局域网后扫码点歌", if (compact) 16 else 18, Color.WHITE)
+            tip.gravity = Gravity.CENTER
+            box.addView(tip, LinearLayout.LayoutParams(-1, dp(if (compact) 42 else 54)))
+            if (lanAddress.isNotEmpty()) {
+                val addressLine = label(lanAddress, 16, GOLD)
+                addressLine.gravity = Gravity.CENTER
+                box.addView(addressLine, LinearLayout.LayoutParams(-1, dp(32)))
+            }
         }
         val scroll = android.widget.ScrollView(this).apply { addView(box) }
         val dialog = AlertDialog.Builder(this)
@@ -3380,14 +3416,50 @@ class MainActivity : AppCompatActivity() {
                 updateMobileQrOverlay()
                 dialog.dismiss()
             }
+            .setPositiveButton("外网访问") { _, _ -> showPublicHostDialog() }
             .setNeutralButton("查看二维码") { _, _ -> showMobileRemoteDialog() }
             .setNegativeButton("关闭", null)
             .create().showForTv()
     }
 
+    /** 外网扫码点歌: 配置路由器 DDNS 域名(需路由器把 WAN 8765-8775 转发到本机)。 */
+    private fun showPublicHostDialog() {
+        val input = android.widget.EditText(this)
+        input.hint = "域名或公网 IP，如 ck.ac19.cn"
+        input.setSingleLine(true)
+        input.setText(prefs()?.getString(KEY_REMOTE_PUBLIC_HOST, null)?.trim() ?: remotePublicHost())
+        val pad = android.widget.FrameLayout(this)
+        pad.setPadding(dp(24), dp(8), dp(24), 0)
+        pad.addView(input)
+        AlertDialog.Builder(this)
+            .setTitle("外网扫码点歌")
+            .setMessage(
+                "默认已启用 ${remotePublicHost().ifEmpty { "(已禁用)" }}（本机部署的爱快 DDNS）。" +
+                    "\n使用前提：路由器已把 WAN 端口 8765-8775 转发到本机。" +
+                    "\n可填写其它域名或公网 IP；清空保存则禁用外网模式，二维码仅限局域网。"
+            )
+            .setView(pad)
+            .setPositiveButton("保存") { _, _ -> savePublicHost(input.text.toString().trim()) }
+            .setNeutralButton("清除") { _, _ -> savePublicHost("") }
+            .setNegativeButton("取消", null)
+            .create().showForTv(DialogInterface.BUTTON_POSITIVE)
+    }
+
+    private fun savePublicHost(host: String) {
+        prefs()?.edit()?.putString(KEY_REMOTE_PUBLIC_HOST, host)?.apply()
+        remoteServer.stop()
+        startRemoteServer()
+        updateMobileQrOverlay()
+        updateFullScreenQrOverlay()
+    }
+
     private fun startRemoteServer() {
         val address = localIp().takeIf { LocalRemoteServer.isPrivateIpv4(it) }
-        remoteServer.start(address, object : LocalRemoteServer.Callback {
+        remoteServer.start(
+            address,
+            remotePublicHost().ifEmpty { null },
+            remoteAccessToken().ifEmpty { null },
+            object : LocalRemoteServer.Callback {
             override fun handle(
                 method: String,
                 path: String,
@@ -4106,10 +4178,42 @@ class MainActivity : AppCompatActivity() {
 
     private fun remoteUrl(): String {
         if (!remoteServer.isRunning() || remoteServer.port() <= 0) return ""
+        // 配置了公网域名(DDNS)时, 二维码直接给外网地址——局域网/外网手机扫码均可点歌。
+        val publicHost = remotePublicHost()
+        if (publicHost.isNotEmpty()) {
+            val token = remoteAccessToken()
+            val suffix = if (token.isEmpty()) "" else "?t=$token"
+            return "http://$publicHost:${remoteServer.port()}/mobile$suffix"
+        }
         val overrideHost = Settings.Global.getString(contentResolver, "maidong_remote_host")
             ?.takeIf { LocalRemoteServer.isPrivateIpv4(it) }
         val host = overrideHost ?: remoteServer.address() ?: return ""
         return "http://$host:${remoteServer.port()}/mobile"
+    }
+
+    /**
+     * 外网扫码点歌的公网域名。优先级: 用户显式设置(含清空=禁用) > adb settings 写入的非私有地址
+     * > 默认 ck.ac19.cn(本机部署的爱快 DDNS)。默认启用, 使二维码开箱即支持外网点歌。
+     */
+    private fun remotePublicHost(): String {
+        val prefs = prefs()
+        if (prefs != null && prefs.contains(KEY_REMOTE_PUBLIC_HOST)) {
+            return prefs.getString(KEY_REMOTE_PUBLIC_HOST, null)?.trim().orEmpty()
+        }
+        val setting = Settings.Global.getString(contentResolver, "maidong_remote_host")?.trim().orEmpty()
+        if (setting.isNotEmpty() && !LocalRemoteServer.isPrivateIpv4(setting)) return setting
+        return "ck.ac19.cn"
+    }
+
+    /** 外网访问令牌: 首次生成后持久化, 保证二维码长期有效。 */
+    private fun remoteAccessToken(): String {
+        val prefs = prefs() ?: return ""
+        var token = prefs.getString(KEY_REMOTE_TOKEN, null)
+        if (token.isNullOrBlank()) {
+            token = java.util.UUID.randomUUID().toString().replace("-", "").take(10)
+            prefs.edit().putString(KEY_REMOTE_TOKEN, token).apply()
+        }
+        return token
     }
 
     /**
@@ -10897,6 +11001,10 @@ class MainActivity : AppCompatActivity() {
         private const val PREFS = "ktv"
         private const val KEY_CATALOG_URL = "catalog_url"
         private const val KEY_SHOW_MOBILE_QR = "show_mobile_qr"
+        /** 外网扫码点歌: 用户配置的公网域名(空=仅局域网)。 */
+        private const val KEY_REMOTE_PUBLIC_HOST = "remote_public_host"
+        /** 外网访问令牌(二维码 ?t= 携带, 首次生成后持久化)。 */
+        private const val KEY_REMOTE_TOKEN = "remote_access_token"
         private const val REQUEST_MIC_PERMISSION = 12
 
         private const val TAG = "MainActivity"
