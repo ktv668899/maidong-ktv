@@ -3437,9 +3437,9 @@ class MainActivity : AppCompatActivity() {
         AlertDialog.Builder(this)
             .setTitle("外网扫码点歌")
             .setMessage(
-                "默认已启用 ${remotePublicHost().ifEmpty { "(已禁用)" }}（与 Gitea 同端口，由反向代理按域名分流到本机）。" +
-                    "\n前提：DNS 已将该域名解析到家里公网 IP，且 6699 端口的反代已按域名分流。" +
-                    "\n可填写其它域名（支持带端口，如 sm.ac19.cn:6699）；清空保存则禁用外网模式，二维码仅限局域网。"
+                "默认已启用 ${remotePublicHost().ifEmpty { "(已禁用)" }}（外网扫码点歌）。" +
+                    "\n前提：光猫和爱快都已把 WAN 端口 8765 转发到本机 8765。" +
+                    "\n可填写其它域名（支持带端口）；清空保存则禁用外网模式，二维码仅限局域网。"
             )
             .setView(pad)
             .setPositiveButton("保存") { _, _ -> savePublicHost(input.text.toString().trim()) }
@@ -4198,7 +4198,7 @@ class MainActivity : AppCompatActivity() {
 
     /**
      * 外网扫码点歌的公网端点。优先级: 用户显式设置(含清空=禁用) > adb settings 写入的非私有地址
-     * > 默认 sm.ac19.cn:6699(与 Gitea 同端口, 由反向代理按域名分流到本机点歌服务)。
+     * > 默认 ck.ac19.cn:8765(爱快 DDNS + WAN 8765 直映射到本机点歌服务端口)。
      * 支持 "域名" 或 "域名:端口" 两种写法。
      */
     private fun remotePublicHost(): String {
@@ -4208,7 +4208,7 @@ class MainActivity : AppCompatActivity() {
         }
         val setting = Settings.Global.getString(contentResolver, "maidong_remote_host")?.trim().orEmpty()
         if (setting.isNotEmpty() && !LocalRemoteServer.isPrivateIpv4(setting)) return setting
-        return "sm.ac19.cn:6699"
+        return "ck.ac19.cn:8765"
     }
 
     /** 解析公网端点为 (域名, 端口); 无端口时用本机服务端口。null=未启用外网模式。 */
