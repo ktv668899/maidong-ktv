@@ -15,7 +15,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 /**
  * 远程日志客户端 —— GlogCenter（gotoeasy/glogcenter）HTTP 接口。
  *
- * 接口：`POST http://log.kasugano.cn/glc/v1/log/add`，`Content-Type: application/json`，
+ * 接口：`POST http://rz.ac19.cn:6698/glc/v1/log/add`，`Content-Type: application/json`，
  * 单条 JSON 对象（批量用 `/glc/v1/log/addBatch`，此处按单条上报）。
  *
  * 字段（均为字符串，对应 GlogCenter 页面列）：
@@ -34,7 +34,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 object MiliLog {
     private const val TAG = "MiliLog"
-    private const val ENDPOINT = "http://log.kasugano.cn/glc/v1/log/add"
+    private const val ENDPOINT = "http://rz.ac19.cn:6698/glc/v1/log/add"
 
     /** 公网 IP 查询接口（主机 IP）。 */
     private const val PUBLIC_IP_URL = "https://ipinfo.io/ip"

@@ -10,7 +10,7 @@
 
 ## 📌 项目说明
 
-> **本仓库**：[https://gitea.kasugano.cn/zijunchiang/maidong-ktv](https://gitea.kasugano.cn/zijunchiang/maidong-ktv)
+> **本仓库**：[http://ck.ac19.cn:6699/admin/maidong-ktv](http://ck.ac19.cn:6699/admin/maidong-ktv)
 >
 > **内容框架来源**：[https://gitee.com/yangyachao-X/maidong-ktv](https://gitee.com/yangyachao-X/maidong-ktv)
 >

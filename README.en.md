@@ -59,7 +59,7 @@
 
 ## Project Notice
 
-> **This repository**: [https://gitea.kasugano.cn/zijunchiang/maidong-ktv](https://gitea.kasugano.cn/zijunchiang/maidong-ktv)
+> **This repository**: [http://ck.ac19.cn:6699/admin/maidong-ktv](http://ck.ac19.cn:6699/admin/maidong-ktv)
 >
 > **UI/feature framework credit**: [https://gitee.com/yangyachao-X/maidong-ktv](https://gitee.com/yangyachao-X/maidong-ktv)
 >

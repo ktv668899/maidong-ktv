@@ -14,7 +14,7 @@ import java.net.URL
 /** Gitea Release based in-app updater. */
 object AppUpdateManager {
     private const val LATEST_RELEASE_API =
-        "https://gitea.kasugano.cn/api/v1/repos/zijunchiang/maidong-ktv/releases/latest"
+        "http://ck.ac19.cn:6699/api/v1/repos/admin/maidong-ktv/releases/latest"
 
     data class Release(
         val version: String,

@@ -4,11 +4,11 @@
 
 ## 一、代码同步与发布策略（2026-09-14 更新）
 
-**代码主仓库：Gitea `https://gitea.kasugano.cn/zijunchiang/maidong-ktv`**
+**代码主仓库：Gitea `http://ck.ac19.cn:6699/admin/maidong-ktv`**
 
 | 远端 | 地址 | 用途 |
 |---|---|---|
-| `origin` | `https://gitea.kasugano.cn/zijunchiang/maidong-ktv.git` | ✅ 代码主仓库，**唯一的代码同步目标** |
+| `origin` | `http://ck.ac19.cn:6699/admin/maidong-ktv.git` | ✅ 代码主仓库，**唯一的代码同步目标** |
 | `gitee` | `https://gitee.com/zijunchiang/maidong-ktv.git` | 📦 **不推代码**，只用于发布 Release；仓库内只保留 README 文档 + Releases 附件 |
 
 ### 四条硬性规则
@@ -39,7 +39,7 @@
 - 凭据：
   - **Gitea**（代码主仓库）：访问令牌 `dsh-sync-20260926`（2026-09-26 数据迁移后重建；可在 Gitea
     「设置 → 应用 → 访问令牌」随时吊销），存放于 `~/.git-credentials-gitea`（权限 600），
-    由**按主机限定**的仓库级 `credential.https://gitea.kasugano.cn.helper` 引用；
+    由**按主机限定**的仓库级 `credential.http://ck.ac19.cn:6699.helper` 引用；
   - **Gitee**（仅发布 Release，按规则 2 不推代码）：访问令牌存放于 `~/.git-credentials-gitee`
     （权限 600），由全局 `credential.https://gitee.com.helper` 引用；**只用于 API 建 Release /
     传附件**，不得用于推送源码。
@@ -64,8 +64,8 @@ git push origin master              # origin = Gitea（唯一的代码同步目�
 
 App 内部两处端点已指向 Gitea（随本版 APK 生效）：
 
-- `AppUpdateManager.kt`：`gitea.kasugano.cn/api/v1/repos/zijunchiang/maidong-ktv/releases/latest`（App 内检查更新）
-- `KtvJsBridge.kt`：`gitea.kasugano.cn/zijunchiang/maidong-ktv/raw/branch/master/app/src/main/assets/mobile/ktv_api.js`（JS 热更新）
+- `AppUpdateManager.kt`：`ck.ac19.cn:6699/api/v1/repos/zijunchiang/maidong-ktv/releases/latest`（App 内检查更新）
+- `KtvJsBridge.kt`：`ck.ac19.cn:6699/admin/maidong-ktv/raw/branch/master/app/src/main/assets/mobile/ktv_api.js`（JS 热更新）
 
 > 注意：Gitea 的 raw 规范路径是 `/raw/branch/<分支>/<文件>`；`/raw/<分支>/<文件>` 会 303 跳转。
 > Gitea 的 raw 与 release 下载对**无 User-Agent** 的请求同样放行（App 裸 socket 可直连）。
@@ -73,17 +73,17 @@ App 内部两处端点已指向 Gitea（随本版 APK 生效）：
 ### 发布新版本（Gitea Release）
 
 ```bash
-TOKEN=$(sed -nE 's|https://[^:]+:([^@]+)@gitea\.kasugano\.cn.*|\1|p' ~/.git-credentials-gitea)
+TOKEN=$(sed -nE 's|https://[^:]+:([^@]+)@ck.ac19.cn:6699.*|\1|p' ~/.git-credentials-gitea)
 
 # 1) 创建 Release（tag 需高于当前 versionName 才会提示更新）
 curl -X POST -u "zijunchiang:$TOKEN" -H "Content-Type: application/json" \
   -d '{"tag_name":"v1.2.6","name":"麦动KTV V1.2.6","body":"更新说明","target_commitish":"master"}' \
-  https://gitea.kasugano.cn/api/v1/repos/zijunchiang/maidong-ktv/releases
+  http://ck.ac19.cn:6699/api/v1/repos/zijunchiang/maidong-ktv/releases
 
 # 2) 上传 APK 附件（用返回的 release id；附件名必须 ASCII）
 curl -X POST -u "zijunchiang:$TOKEN" \
   -F "attachment=@麦动KTV-V1.2.6-release.apk" \
-  "https://gitea.kasugano.cn/api/v1/repos/zijunchiang/maidong-ktv/releases/<id>/assets?name=maidong-ktv-V1.2.6-release.apk"
+  "http://ck.ac19.cn:6699/api/v1/repos/zijunchiang/maidong-ktv/releases/<id>/assets?name=maidong-ktv-V1.2.6-release.apk"
 ```
 
 > ⚠️ **附件文件名必须为 ASCII**：Gitea 1.27 的规范下载路径
@@ -212,7 +212,7 @@ $BT/apksigner verify 目标名.apk
   - 自查：`grep -rn "/storage/emulated\|/sdcard/MaidongKTV" app/src/main/java --include='*.kt'`
     除 `AppPaths` 的候选清单外不应再有硬编码。
 - **⚠️ 老系统（API < 24）的 TLS 根证书**：`*.cherryonline.cn`（曲库同步 `mconn` / 点歌登录 `mws`）
-  与 `gitea.kasugano.cn` 都用 **Let's Encrypt 新链**（`leaf ← YR2 ← Root YR ← ISRG Root X1`）。
+  （自建 Gitea `http://ck.ac19.cn:6699` 不走 TLS，不涉及此问题。）
   `res/xml/network_security_config.xml` 里的三个内置根证书**只在 Android 7.0(API 24)+ 生效**，
   Android 5.1.1 上被完全忽略、系统信任库又没有 ISRG 新根 →
   `SSLHandshakeException: Trust anchor for certification path not found` →

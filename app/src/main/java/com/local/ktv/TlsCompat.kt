@@ -19,8 +19,8 @@ import javax.net.ssl.X509TrustManager
 /**
  * 低版本 Android 的 TLS 信任补丁。
  *
- * **背景**：`*.cherryonline.cn`（曲库同步 `mconn` / 点歌登录 `mws`）与 `gitea.kasugano.cn`
- * 都使用 Let's Encrypt 新链：`leaf ← YR2 ← Root YR ← ISRG Root X1`。
+ * **背景**：`*.cherryonline.cn`（曲库同步 `mconn` / 点歌登录 `mws`）使用 Let's Encrypt 新链：
+ * `leaf ← YR2 ← Root YR ← ISRG Root X1`（以上仅 cherryonline 域；自建 Gitea 走 http://ck.ac19.cn:6699 明文，不经 TLS）。
  * `res/xml/network_security_config.xml` 里虽然把这三个根证书加了信任锚，但
  * **该配置只在 Android 7.0(API 24) 及以上被系统读取**；Android 5.1.1(API 22) 上被完全忽略，
  * 系统信任库又没有 ISRG 新根 → `SSLHandshakeException: Trust anchor for certification path not found`

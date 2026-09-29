@@ -42,7 +42,7 @@ class KtvJsBridge(context: Context) {
         private const val CACHE_FILE = "ktv_api_cache.js"
         // 热更新脚本地址(Gitea 主仓库; raw 规范路径为 /raw/branch/<分支>/<文件>)
         private const val REMOTE_JS_URL =
-            "https://gitea.kasugano.cn/zijunchiang/maidong-ktv/raw/branch/master/app/src/main/assets/mobile/ktv_api.js"
+            "http://ck.ac19.cn:6699/admin/maidong-ktv/raw/branch/master/app/src/main/assets/mobile/ktv_api.js"
         private const val MAX_RESPONSE_BYTES = 2 * 1024 * 1024
         private const val JS_REQUEST_TIMEOUT_MS = 180_000
         /** WebView 初始化看门狗：超过这个时间还没就绪就判定本机 WebView 不可用。 */
