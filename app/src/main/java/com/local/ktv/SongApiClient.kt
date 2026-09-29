@@ -109,30 +109,18 @@ object SongApiClient {
             .onFailure { Log.w(TAG, "native resolver failed", it) }
             .getOrNull()
 
-    /** DB cloud_url fallback — 必须通过 demo 检测才能使用 */
+    /** DB cloud_url fallback —— 广告过滤已移除, 直接返回库内地址。 */
     private fun fetchFromDb(musicno: String): String? {        try {
             val db = MuseDatabase()
             if (db.open()) {
                 val url = db.getCloudUrl(musicno)
                 db.close()
-                // DB 中的 cloud_url 也可能就是广告/demo 地址，必须过同一道可信校验
-                // （2026-09-26 广告事故：这里原来只做 isLikelyDemoUrl，挡不住广告域名）。
-                if (url != null && !isLikelyDemoUrl(url) && AdVideoFilter.isTrustedSongUrl(url, musicno)) {
+                if (url != null) {
                     return url
                 }
             }
         } catch (_: Exception) {}
         return null
-    }
-
-    /** 快速判断是否为 demo URL (不含 JS 的完整逻辑, 仅做硬特征兜底) */
-    private fun isLikelyDemoUrl(url: String): Boolean {
-        val host = runCatching { java.net.URI(url).host }.getOrNull() ?: return true
-        // 纯 IP 地址 → 高概率 demo
-        if (host.matches(Regex("^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$"))) return true
-        // Cloudflare R2 demo bucket (pub-*.r2.dev)
-        if (host.matches(Regex("^pub-[a-z0-9]+\\.r2\\.dev$"))) return true
-        return false
     }
 
     /**

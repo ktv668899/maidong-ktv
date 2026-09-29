@@ -18,7 +18,7 @@ import java.util.Collections
  * ## 做法
  * 用 Kotlin 复刻 `ktv_api.js` 的同一套协议：
  * `GET <host>/i.php`（取 token）→ `GET <host>/music/do.php`（取播放地址），
- * 并镜像 JS 的多源排序（失败源沉底）与广告/错号资源校验（`isDemoUrl`）。
+ * 并镜像 JS 的多源排序（失败源沉底）。
  *
  * ⚠️ 它**必须走与 JS 相同的 HTTP 通道**（[KtvJsBridge.rawCleanGet] 的裸 Socket，
  * 只发 Host + Accept），否则会被源站风控拒绝（带 UA/Connection 头会被判"异常行为"）。
@@ -122,7 +122,7 @@ object SongUrlResolver {
                     MiliLog.warn("NATIVE-SONG do.php 异常 源=$host ${it.javaClass.simpleName}: ${it.message}")
                     null
                 }
-            if (!url.isNullOrEmpty() && isValidSongUrl(url, musicno)) {
+            if (!url.isNullOrEmpty()) {
                 promote(host)
                 lastHost = host
                 val elapsed = System.currentTimeMillis() - startedAt
@@ -202,24 +202,9 @@ object SongUrlResolver {
         }
     }
 
-    /**
-     * 原生路径的可信校验：先过 `AdVideoFilter.isTrustedSongUrl`（广告域名/路径 + `.ts` 文件名
-     * 必须等于点歌编号），再补上 JS `isDemoUrl` 里那几条（wb66/demo、纯 IP、R2 测试桶）。
-     */
-    private fun isValidSongUrl(url: String, musicno: String): Boolean {
-        if (!AdVideoFilter.isTrustedSongUrl(url, musicno)) return false
-        val lower = url.lowercase()
-        if (lower.contains("wb66") || lower.contains("demo")) return false
-        if (IP_URL.containsMatchIn(url)) return false
-        if (R2_DEMO.containsMatchIn(url)) return false
-        return true
-    }
+    // 广告过滤已按需求全部移除: 原生取址结果(原 isTrustedSongUrl/wb66/IP/R2/文件名校验)不再拦截。
 
     private fun md5(text: String): String =
         MessageDigest.getInstance("MD5").digest(text.toByteArray(Charsets.UTF_8))
             .joinToString("") { "%02x".format(it) }
-
-    private val IP_URL = Regex("^https?://\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}(?::\\d+)?/", RegexOption.IGNORE_CASE)
-    private val R2_DEMO = Regex("pub-[a-z0-9]+\\.r2\\.dev/ss/", RegexOption.IGNORE_CASE)
-    private val TS_NAME = Regex("/(\\d+)\\.ts(?:\\?|$)")
 }

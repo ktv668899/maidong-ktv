@@ -552,10 +552,7 @@ class MainActivity : AppCompatActivity() {
         initializeDatabase()
         startRemoteServer()
         updateMobileQrOverlay()
-        // 一次性清理"同一段视频被当成多首不同歌曲"的注入广告副本。
-        // ⚠️ 只删可证明是广告的文件（多首歌内容完全相同）；**绝不能清空整个歌曲目录** ——
-        // 1.4.10 那样做过，等于删掉公放曲库，导致「切歌」选不出下一首（新设备回归）。
-        io.execute { SongOkDownloadManager.purgeInjectedAdDuplicatesOnce(applicationContext) }
+        // 广告过滤已按需求全部移除: 启动时不再清理任何"注入广告副本"本地文件。
         // 预热公放候选缓存（独立守护线程 + 内部超时），让之后的「切歌 → 公放」零 I/O。
         // 延后一点避开曲库加载/启动高峰，但不影响正确性：预热完成前切歌会走安全兜底路径。
         main.postDelayed({ primeRandomCandidates() }, 5_000L)

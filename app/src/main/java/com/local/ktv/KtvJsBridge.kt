@@ -299,28 +299,10 @@ class KtvJsBridge(context: Context) {
         }
     }
 
-    // JS isDemoUrl 已做第一层正则过滤; 这里仅保留 demo 域名兜底(IP 直连 / R2 测试桶)。
-    // 原域名白名单(trustedHostSuffixes)已按需求移除: 歌曲源可能返回任意 CDN 域,
-    // 白名单会误杀新源的合法下载地址; 防 demo 逻辑仍由 JS isDemoUrl + AdVideoFilter 承担。
-    private val demoHostPatterns = listOf(
-        Regex("^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$"),  // 纯 IP
-        Regex("^pub-[a-z0-9]+\\.r2\\.dev$"),                      // R2 demo bucket
-    )
-
-    private fun isTrustedDownloadUrl(url: String?): Boolean {
-        if (url == null) return false
-        if (!url.startsWith("http://") && !url.startsWith("https://")) return false
-        val host = runCatching { java.net.URI(url).host }.getOrNull() ?: return false
-        if (demoHostPatterns.any { it.matches(host) }) {
-            Log.w(TAG, "Rejected demo URL host: $host")
-            return false
-        }
-        return true
-    }
-
     private fun complete(requestId: String, url: String?) {
-        // 先屏蔽/替换广告视频,再做 demo 域名兜底校验(不再限制白名单域名)。
-        callbacks.remove(requestId)?.invoke(AdVideoFilter.resolve(url)?.takeIf { isTrustedDownloadUrl(it) })
+        // 广告过滤已按需求全部移除(域名白名单 / demo 兜底 / AdVideoFilter 均已删除):
+        // 取址结果原样返回, 由下载层直接使用。
+        callbacks.remove(requestId)?.invoke(url)
     }
 
     private fun readAssetScript(): String =

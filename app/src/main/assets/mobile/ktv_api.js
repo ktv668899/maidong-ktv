@@ -130,33 +130,6 @@
     return JSON.parse(body.slice(start));
   }
 
-  // 匹配 demo/广告/测试资源 URL 的多种模式:
-  //   1) wb66 / demo 关键字 (服务端注入广告示例: https://wb66.cn/f/d/mJMSQ/719.ts)
-  //   2) IPv4 地址 (如 http://154.222.26.244:656/722.ts)
-  //   3) Cloudflare R2 demo bucket (pub-*.r2.dev/ss/ 通用测试文件)
-  //   4) 任务4: ts 文件名编号与请求的 musicno 不一致 → 视为广告/错误资源
-  //      (例: 请求 7018878 却返回 /719.ts 或 /689.ts)
-  function isDemoUrl(url, musicno) {
-    var s = String(url || '');
-    if (/(?:wb66|demo)/i.test(s)) return true;
-    // 广告视频专用域名（含子域）。2026-09-26 事故：新设备（WebView 正常 → 走本 JS 取址）
-    // 点歌拿到了 gz.ac16.vip 的广告视频，而它通过了下述所有旧规则 → 被当成歌曲下载播放。
-    if (/^https?:\/\/(?:[^\/]+\.)?ac16\.vip(?::\d+)?\//i.test(s)) return true;
-    if (/\/ad_files\/|my_ad_video/i.test(s)) return true;
-    if (/^https?:\/\/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?::\d+)?\//i.test(s)) return true;
-    // R2 demo bucket: pub-*.r2.dev/ss/ 通用测试资源
-    if (/pub-[a-z0-9]+\.r2\.dev\/ss\//i.test(s)) return true;
-    // ts 文件名必须等于 musicno。原版真源 URL 恒为 /<musicno>.ts（已实测两个 CDN 域
-    // txog.ktvsky.com / download.origjoy.com 的 6 首歌全部如此）。
-    // ⚠️ 旧规则只比对"纯数字文件名"（/\/(\d+)\.ts/），像 my_ad_video.ts 这种非数字名字
-    // 会直接漏过 —— 这正是广告漏放的直接原因之一。
-    if (musicno) {
-      var m = s.match(/\/([^\/?]+)\.ts(?:\?|$)/i);
-      if (m && m[1] !== String(musicno)) return true;
-    }
-    return false;
-  }
-
   // 任务3: 点歌结果上报(成功/失败 + 实际命中的源) → Android 侧写入远程日志。
   function reportSongResult(ok, host, musicno, detail) {
     try {
@@ -347,7 +320,7 @@
 
     // 3. Get Song Download URL
     // 多源自动排序: 按 this.sourceOrder(当前优先级)依次尝试; 某源解析失败
-    // (token 失败 / do.php 非 200 / 广告错号 / 无有效 URL)时立即 demote 到队尾,
+    // (token 失败 / do.php 非 200 / 无有效 URL)时立即 demote 到队尾,
     // 下次点歌自动优先使用更可靠的源。全部源失败返回 null。
     getSongUrl: async function(musicno, resolution, h265, _preferredLs) {
       resolution = resolution || '720';
@@ -382,13 +355,8 @@
             try {
               var data = await self._fetchSongUrl(host, musicno, token, ls, resolution, h265);
               // token 恒定不变; do.php 403"检测到异常行为"是风控限流, 与 token 过期无关。
-              // 403/失败/广告命中时同 token 短退避重试一次, 不再清 token 重取 i.php。
-              // 广告/错号资源(如 wb66 719.ts)也算失败, 退避重试一次等真源。
+              // 失败时同 token 短退避重试一次, 不再清 token 重取 i.php。
               var needRetry = data.code !== 200;
-              if (!needRetry && data.code === 200 && isDemoUrl(data.data || '', musicno)) {
-                self._log('广告/错号资源 (ls=' + ls + '): ' + String(data.data).slice(0, 90));
-                needRetry = true;
-              }
               if (needRetry) {
                 hostDetail = 'do.php code=' + data.code + ' http=' + (data.httpStatus || 0);
                 self._log(hostDetail + ' for ' + musicno + ' ls=' + ls + '; retry once with same token');
@@ -398,18 +366,13 @@
 
               if (data.code === 200) {
                 var songUrl = data.data || '';
-                // 任务4: 返回的文件编号与请求不一致即视为广告/错误资源, 一律丢弃。
-                if (songUrl && !isDemoUrl(songUrl, musicno) && /^https?:\/\//i.test(songUrl)) {
+                if (songUrl && /^https?:\/\//i.test(songUrl)) {
                   self._log('URL OK: ' + musicno + ' ls=' + ls + ' via ' + host);
                   self.promoteSource(host);
                   hostOk = true;
                   // 任务3: 点歌成功上报命中的源(Android 侧写入远程日志)。
                   reportSongResult(true, host, musicno, 'ok');
                   return songUrl;
-                }
-                if (isDemoUrl(songUrl, musicno)) {
-                  hostDetail = '仍为广告/错号资源 (ls=' + ls + ')';
-                  self._log(hostDetail + ': ' + String(songUrl).slice(0, 90));
                 }
               }
             } catch(e) {

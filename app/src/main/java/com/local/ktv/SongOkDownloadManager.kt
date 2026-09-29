@@ -23,9 +23,6 @@ object SongOkDownloadManager {
     private const val MAX_RETRY_COUNT = 3
     private const val STALL_TIMEOUT_MS = 25_000L
 
-    /** 曲库视频目录下会被当作"已下载歌曲"的文件后缀（用于一次性清理历史广告缓存）。 */
-    private val MEDIA_EXTENSIONS = setOf("ts", "ls", "mp4", "mkv")
-
     interface DownloadCallback {
         fun onDownloadStart(song: Song)
         fun onDownloadProgress(song: Song, progress: Int)
@@ -77,74 +74,15 @@ object SongOkDownloadManager {
     }
 
     /**
-     * 一次性清理"同一段视频被当成多首不同歌曲"的注入广告。
+     * 历史上的"注入广告副本清理"入口（MainActivity 启动时调用）。
+     * 广告过滤已按需求全部移除: 现为 no-op, 不再扫描/删除任何本地文件。
      *
-     * 背景（2026-09-26 事故）：1.4.9 及以前，JS 取址返回的地址在 `buildDownloadUrl` 的成功分支里
-     * **完全没有过广告校验**，广告视频（如 `gz.ac16.vip/ad_files/my_ad_video.ts`）会被当成歌曲
-     * 下载并落盘；它又能通过 [SongFileValidator] 的内容校验（≥6MB / ≥60s / TS 包完整），
-     * 而且 [isDownloaded] 会直接复用该文件、连取址都不会再发生 —— 广告会一直播下去。
-     *
-     * ⚠️ **不能像 1.4.10 那样直接清空整个歌曲目录**：`MuseDatabase.songDirectories()` 只有
-     * `cloudSongsDir` 一个目录，那等于把**公放曲库整个删掉** —— 库里没歌，
-     * `playRandomLocalSong()` 选不出候选、`currentSong` 保持 null，
-     * 于是「切歌」落进空闲态分支、按了没反应（新设备上的回归）。
-     *
-     * 这里改为**只删真正能证明是注入广告的文件**：广告对每首歌都下发**同一个视频文件**，
-     * 所以它的特征是「多首不同歌曲的本地文件**内容完全相同**」。按「文件大小 + 头部指纹」
-     * 分组，只清理 ≥2 个文件完全相同的组 —— 正常歌曲各有各的内容，绝不会被误删。
-     *
-     * @return 删除的文件数（已清理过则返回 0）
+     * @return 恒为 0
      */
     @JvmStatic
     fun purgeInjectedAdDuplicatesOnce(context: android.content.Context): Int {
-        val marker = File(context.filesDir, "ad_dup_purge_v1")
-        if (marker.exists()) return 0
-        var removed = 0
-        var groups = 0
-        runCatching {
-            val files = AppPaths.cloudSongsDir.listFiles().orEmpty()
-                .filter { it.isFile && it.extension.lowercase() in MEDIA_EXTENSIONS && it.length() > 0 }
-            // 第一层：按大小分组（同尺寸才会有嫌疑）；第二层：比对头部指纹做双重确认。
-            files.groupBy { it.length() }
-                .filterValues { it.size >= 2 }
-                .forEach { (_, sameSize) ->
-                    sameSize.groupBy { headFingerprint(it) }
-                        .forEach { (fingerprint, duplicates) ->
-                            if (fingerprint != null && duplicates.size >= 2) {
-                                groups++
-                                duplicates.forEach { file ->
-                                    SongFileValidator.forget(file)
-                                    if (file.delete()) removed++
-                                }
-                            }
-                        }
-                }
-            marker.writeText("purged=${System.currentTimeMillis()} removed=$removed groups=$groups", Charsets.UTF_8)
-        }.onFailure { Log.w(TAG, "purge injected ad duplicates failed: ${it.message}") }
-        if (removed > 0) {
-            MiliLog.warn(
-                "SONG-AD 清理注入广告副本 removed=$removed groups=$groups（多首歌共用同一段视频）" +
-                    " 保留正常歌曲=${AppPaths.cloudSongsDir.listFiles()?.size ?: 0}",
-            )
-        }
-        return removed
+        return 0
     }
-
-    /** 文件头部 4MB 的 MD5，用于"同一段视频"的判定（读全文件太慢，广告同一文件必然头部也相同）。 */
-    private fun headFingerprint(file: File): String? = runCatching {
-        val digest = java.security.MessageDigest.getInstance("MD5")
-        file.inputStream().use { input ->
-            val buffer = ByteArray(1024 * 1024)
-            var total = 0
-            while (total < 4 * 1024 * 1024) {
-                val read = input.read(buffer)
-                if (read < 0) break
-                digest.update(buffer, 0, read)
-                total += read
-            }
-        }
-        digest.digest().joinToString("") { "%02x".format(it) }
-    }.getOrNull()
 
     @JvmStatic
     fun isDownloading(song: Song): Boolean {
@@ -246,44 +184,21 @@ object SongOkDownloadManager {
     }
 
     private fun buildDownloadUrl(song: Song, forceRefresh: Boolean = false): String {
-        // ⚠️ 只有「从文件名推出」的点歌编号才可信，才能参与 `.ts` 文件名比对。
-        // `song.id` 在曲库条目里可能是数据库主键（非点歌编号），拿它去比对会把**正常地址误杀**
-        // （表现：真源地址被判"文件名不符"→ 永远下不到歌）。此时传 null = 跳过文件名规则，
-        // 仅保留广告域名/路径特征那两条判定。
+        // 广告过滤已按需求全部移除: 缓存地址与取址结果原样使用, 不再校验域名/文件名。
         val musicNoFromFile = song.filename?.removeSuffix(".ts")?.removeSuffix(".ls")?.takeIf { it.isNotBlank() }
         val musicNo = musicNoFromFile ?: song.id
         if (!forceRefresh) {
-            song.downloadUrl?.takeIf(String::isNotBlank)?.let { cached ->
-                if (AdVideoFilter.isTrustedSongUrl(cached, musicNoFromFile)) return cached
-                // 缓存的地址不可信（广告 / 文件名与点歌编号不符）：除了清地址，还要**删掉已落盘的
-                // 同名文件** —— 广告视频能通过内容校验（≥6MB / ≥60s / TS 包完整），
-                // 一旦被缓存成歌曲，isDownloaded() 会直接复用、连取址都不会再发生。
-                Log.w(TAG, "丢弃不可信缓存地址: ${song.title} -> $cached")
-                MiliLog.warn("SONG-AD 丢弃不可信缓存地址 编号=$musicNo url=$cached")
-                song.downloadUrl = null
-                purgeCachedSongFile(song, "untrusted-cached-url")
-            }
+            song.downloadUrl?.takeIf(String::isNotBlank)?.let { cached -> return cached }
         }
         return SongApiClient.getSongDownloadUrl(musicNo).orEmpty().also { url ->
             // 请求源 = 本次点歌实际命中的源(JS 上报); 取不到时留空。
             val srcHost = SongApiClient.lastSongSourceHost()
-            // ⚠️ 广告漏放的**最终兜底防线**：不管地址来自 JS 取址、原生兜底还是 DB 回退，
-            // 都必须过 AdVideoFilter.isTrustedSongUrl（2026-09-26 事故：JS 路径返回
-            // gz.ac16.vip 的广告视频，因为这里的成功分支完全没做广告校验而被当成歌曲下载播放）。
-            if (url.isNotEmpty() && AdVideoFilter.isTrustedSongUrl(url, musicNoFromFile)) {
+            if (url.isNotEmpty()) {
                 song.downloadUrl = url
                 val cdnHost = runCatching { java.net.URI(url).host }.getOrNull() ?: "unknown"
                 MiliLog.info(
                     "点歌编号=$musicNo 标题=${song.title} 请求源=$srcHost 状态=成功 urlHost=$cdnHost",
                 )
-            } else if (url.isNotEmpty()) {
-                Log.w(TAG, "Untrusted URL rejected for ${song.title}: $url")
-                MiliLog.error(
-                    "点歌编号=$musicNo 标题=${song.title} 请求源=$srcHost 状态=失败 " +
-                        "详情=地址不可信(广告或文件名不符) url=$url",
-                )
-                purgeCachedSongFile(song, "untrusted-resolved-url")
-                ""
             } else {
                 Log.w(TAG, "Unable to get download URL: ${song.title}")
                 MiliLog.error(
@@ -292,23 +207,6 @@ object SongOkDownloadManager {
                 ""
             }
         }
-    }
-
-    /** 删除某首歌已落盘的文件（发现地址不可信/命中广告时调用，让下次点歌重新取址下载）。 */
-    private fun purgeCachedSongFile(song: Song, reason: String) {
-        runCatching {
-            val file = getLocalFile(song)
-            if (file.exists()) {
-                val sizeMb = file.length() / 1024 / 1024
-                SongFileValidator.forget(file)
-                val deleted = file.delete()
-                MiliLog.warn(
-                    "SONG-AD 清除可疑歌曲缓存 编号=${song.id} 原因=$reason " +
-                        "大小=${sizeMb}MB 已删除=$deleted",
-                )
-            }
-            song.path = null
-        }.onFailure { Log.w(TAG, "purge cached file failed: ${it.message}") }
     }
 
     private fun startDownloadTask(song: Song, url: String, callback: DownloadCallback?, attempt: Int) {
