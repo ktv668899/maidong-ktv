@@ -59,7 +59,9 @@
 
 ## Project Notice
 
-> **This repository**: [http://ck.ac19.cn:6699/admin/maidong-ktv](http://ck.ac19.cn:6699/admin/maidong-ktv)
+> **This repository (primary)**: [http://ck.ac19.cn:6699/admin/maidong-ktv](http://ck.ac19.cn:6699/admin/maidong-ktv)
+>
+> **Open-source mirror (Gitee)**: [https://gitee.com/weishilong/maidong-ktv](https://gitee.com/weishilong/maidong-ktv)
 >
 > **UI/feature framework credit**: [https://gitee.com/yangyachao-X/maidong-ktv](https://gitee.com/yangyachao-X/maidong-ktv)
 >

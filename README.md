@@ -10,7 +10,9 @@
 
 ## 📌 项目说明
 
-> **本仓库**：[http://ck.ac19.cn:6699/admin/maidong-ktv](http://ck.ac19.cn:6699/admin/maidong-ktv)
+> **本仓库（主）**：[http://ck.ac19.cn:6699/admin/maidong-ktv](http://ck.ac19.cn:6699/admin/maidong-ktv)
+>
+> **开源镜像（Gitee）**：[https://gitee.com/weishilong/maidong-ktv](https://gitee.com/weishilong/maidong-ktv)
 >
 > **内容框架来源**：[https://gitee.com/yangyachao-X/maidong-ktv](https://gitee.com/yangyachao-X/maidong-ktv)
 >

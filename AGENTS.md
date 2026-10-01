@@ -2,23 +2,25 @@
 
 > 本文件供后续开发（含 AI 助手会话）遵循，优先级高于默认习惯。
 
-## 一、代码同步与发布策略（2026-09-14 更新）
+## 一、代码同步与发布策略（2026-10-01 更新）
 
 **代码主仓库：Gitea `http://ck.ac19.cn:6699/admin/maidong-ktv`**
 
 | 远端 | 地址 | 用途 |
 |---|---|---|
-| `origin` | `http://ck.ac19.cn:6699/admin/maidong-ktv.git` | ✅ 代码主仓库，**唯一的代码同步目标** |
-| `gitee` | `https://gitee.com/zijunchiang/maidong-ktv.git` | 📦 **不推代码**，只用于发布 Release；仓库内只保留 README 文档 + Releases 附件 |
+| `origin` | `http://ck.ac19.cn:6699/admin/maidong-ktv.git` | ✅ 代码主仓库；**已配置双推送**，`git push origin master` 同时推 Gitea + Gitee |
+| `gitee` | `https://gitee.com/weishilong/maidong-ktv.git` | 🌐 **开源镜像（同步源码）**；自 2026-10-01 起与 Gitea 同步全部源码与 tag |
+| `upstream` | `https://gitea.kasugano.cn/zijunchiang/maidong-ktv.git` | 原始仓库（只读参考，不推送） |
 
 ### 四条硬性规则
 
-1. **推送失败只重试 3 次**：Gitea 不可用（网络不通／服务器故障／返回非 200）时，最多重试 **3 次**
-   （间隔约 60s）。3 次仍失败就**停止重试**，改动保留为本地 commit，**留到下次一起同步**
-   （不要无限重试、不要为了"推上去"而改推 Gitee）。恢复同步时直接 `git push origin master`
-   把积压的 commit 一并推上即可。
-2. **Gitee 不再同步代码，只发布版本**：Gitee 仓库保持「仅 README 文档 + Releases 附件」状态，
-   **禁止推送源码**（`pre-push` 钩子会拦截 `gitee.com`）。Gitee 上只做一件事：创建 Release 并上传 APK 附件。
+1. **推送失败只重试 3 次**：推送失败时最多重试 **3 次**（间隔约 60s）。3 次仍失败就**停止重试**，
+   改动保留为本地 commit，**留到下次一起同步**（不要无限重试）。恢复同步时直接 `git push origin master`
+   把积压的 commit 一并推上即可。注意：`origin` 配了两个 pushurl（Gitea 在前、Gitee 在后），
+   单侧失败会使整条命令返回非 0，需按输出区分是哪一侧失败（Gitea 失败重试；Gitee 失败检查令牌/网络）。
+2. **Gitee 是开源镜像，源码与 Gitea 保持一致**（2026-10-01 起）：Gitee 仓库
+   `weishilong/maidong-ktv` 为**公开**镜像，承载完整源码与 tag，作为对外开源入口。
+   历史策略「Gitee 只发 Release、禁止推源码」自本日起废止。Release 仍按规则 4 由人工指令触发。
 3. **版本号递增规则（2026-09-26 更新）**：`versionName` 形如 `<major>.<minor>.<patch>`，
    **patch 取值 0~10、minor 取值 1~10**，每次修改先用掉一个 patch：
    - 常规递增：`1.5.0` → `1.5.1` → … → `1.5.10`；
@@ -28,43 +30,42 @@
    不要在同一个版本号下反复改动交付。
 4. **发布是手动操作**：**未收到明确的「发布新版本」指令时，默认只在本地打包测试**——
    产物按内部测试约定命名 `maidong-ktv-<版本>-<改动说明>-双ABI-release.apk`，
-   **不创建 Release、不上传附件、不推送 tag、不在 Gitee 建 Release**。
+   **不创建 Release、不上传附件、不推送 tag、不在 Gitea/Gitee 建 Release**。
    只有收到发布指令后，才按「发布新版本」小节在 Gitea（以及需要的 Gitee）建 Release。
-   > ⚠️ **不要混淆"交付"与"发布"**：向 Gitea `git push origin master` 同步代码（规则 1）、
+   > ⚠️ **不要混淆"交付"与"发布"**：向 Gitea/Gitee `git push origin master` 同步代码（规则 1）、
    > 本地构建/签名出 `*-release.apk`（规则 4 前半段）**都不算发布**，不需要、也不得顺带
    > 建 Release / 打 tag / 传附件。发布动作只有三个：建 Release、打 tag、上传附件；
    > 三者的触发条件只有一个 —— **收到明确的人工发布指令**。若不确定是否已发布，
    > 用 `GET /repos/{owner}/{repo}/releases` 与 `/tags` 核对，不要凭"打过包"推断。
 
 - 凭据：
-  - **Gitea**（代码主仓库）：访问令牌 `dsh-sync-20260926`（2026-09-26 数据迁移后重建；可在 Gitea
-    「设置 → 应用 → 访问令牌」随时吊销），存放于 `~/.git-credentials-gitea`（权限 600），
-    由**按主机限定**的仓库级 `credential.http://ck.ac19.cn:6699.helper` 引用；
-  - **Gitee**（仅发布 Release，按规则 2 不推代码）：访问令牌存放于 `~/.git-credentials-gitee`
-    （权限 600），由全局 `credential.https://gitee.com.helper` 引用；**只用于 API 建 Release /
-    传附件**，不得用于推送源码。
-  - 账号密码不写入仓库配置。
-  - ⚠️ **两个 helper 都必须按主机限定作用域**（`credential.https://<host>.helper`，不要用无主机限定的
-    `credential.helper`）：git 认证成功后会调用**每个** helper 的 `store`，无主机限定会把 Gitee 凭据
-    追加写进 Gitea 的凭据文件（一个文件两行），此后「取第一行」式的令牌提取会拿到错误令牌、API 报 401。
-  - ⚠️ **提取令牌必须按主机过滤**：用 `sed -nE 's|https://[^:]+:([^@]+)@<host>.*|\1|p'`，
-    不要用不带主机锚点的 `sed -E 's|https://[^:]+:([^@]+)@.*|\1|'`（多行文件会输出多行、拼成错令牌）。
+  - **Gitea**（代码主仓库）：访问令牌亦写入仓库级远端 URL，直接推送。
+  - **Gitee**（开源镜像）：账号 `weishilong`，私人令牌（`projects` 权限）写在本机远端 URL
+    与 Gitee API 调用中，**不得写入仓库内任何被提交的文件**。
+  - ⚠️ **令牌只出现在 `.git/config` 的远端 URL 中，不进入任何提交**；
+    改动 remote 后请用 `git remote -v` 复核，避免把令牌带进文档或脚本。
+  - ⚠️ **Gitee 仓库必须是 public**：Gitee 的规则是"空仓库不能设为公开"，
+    首次推送源码后才能 `PATCH /api/v5/repos/{owner}/{repo}` 把 `private` 改 `false`。
+  - ⚠️ 本机（Windows）曾因 `http_proxy`/git-credential-manager 导致 git 网络操作挂起，
+    仓库级已配置 `credential.helper ""` 与 `http.proxy ""`（直连），**不要删掉这两项**。
 
 ### 推送方式
 
 ```bash
-cd /home/zijun/dsh_data/maidongktv/maidong-ktv
-git push origin master              # origin = Gitea（唯一的代码同步目标）
+cd <仓库根>
+git push origin master              # 同时推 Gitea + Gitee（origin 配了双 pushurl）
+git push origin --tags              # 标签同样双推
 ```
 
-> Gitee 不参与代码同步；确需回推文档时用 `git push --no-verify gitee master`，
-> 但按规则 2 正常情况下不应执行。
+> `origin` 已用 `git remote set-url --add --push` 配置两个推送目标（顺序：Gitea → Gitee）。
+> 单独操作某一个镜像时：`git push gitee master`（只推 Gitee）/ `git push origin master`（两边都推）。
+> 新增远端后可用 `git remote -v` 复核推送目标（push 行应有两行）。
 
 ### 运行时端点（已全部迁移到 Gitea）
 
 App 内部两处端点已指向 Gitea（随本版 APK 生效）：
 
-- `AppUpdateManager.kt`：`ck.ac19.cn:6699/api/v1/repos/zijunchiang/maidong-ktv/releases/latest`（App 内检查更新）
+- `AppUpdateManager.kt`：`ck.ac19.cn:6699/api/v1/repos/admin/maidong-ktv/releases/latest`（App 内检查更新）
 - `KtvJsBridge.kt`：`ck.ac19.cn:6699/admin/maidong-ktv/raw/branch/master/app/src/main/assets/mobile/ktv_api.js`（JS 热更新）
 
 > 注意：Gitea 的 raw 规范路径是 `/raw/branch/<分支>/<文件>`；`/raw/<分支>/<文件>` 会 303 跳转。
@@ -73,17 +74,18 @@ App 内部两处端点已指向 Gitea（随本版 APK 生效）：
 ### 发布新版本（Gitea Release）
 
 ```bash
-TOKEN=$(sed -nE 's|https://[^:]+:([^@]+)@ck.ac19.cn:6699.*|\1|p' ~/.git-credentials-gitea)
+# 令牌直接从远端 URL 提取（本机把凭证写在远端 URL 里，不用凭据文件）
+TOKEN=$(git remote get-url origin | sed -nE 's|https?://[^:]+:([^@]+)@ck\.ac19\.cn.*|\1|p')
 
 # 1) 创建 Release（tag 需高于当前 versionName 才会提示更新）
-curl -X POST -u "zijunchiang:$TOKEN" -H "Content-Type: application/json" \
-  -d '{"tag_name":"v1.2.6","name":"麦动KTV V1.2.6","body":"更新说明","target_commitish":"master"}' \
-  http://ck.ac19.cn:6699/api/v1/repos/zijunchiang/maidong-ktv/releases
+curl -X POST -u "admin:$TOKEN" -H "Content-Type: application/json" \
+  -d '{"tag_name":"v1.5.7","name":"麦动KTV V1.5.7","body":"更新说明","target_commitish":"master"}' \
+  http://ck.ac19.cn:6699/api/v1/repos/admin/maidong-ktv/releases
 
 # 2) 上传 APK 附件（用返回的 release id；附件名必须 ASCII）
-curl -X POST -u "zijunchiang:$TOKEN" \
-  -F "attachment=@麦动KTV-V1.2.6-release.apk" \
-  "http://ck.ac19.cn:6699/api/v1/repos/zijunchiang/maidong-ktv/releases/<id>/assets?name=maidong-ktv-V1.2.6-release.apk"
+curl -X POST -u "admin:$TOKEN" \
+  -F "attachment=@maidong-ktv-release.apk" \
+  "http://ck.ac19.cn:6699/api/v1/repos/admin/maidong-ktv/releases/<id>/assets?name=maidong-ktv-release.apk"
 ```
 
 > ⚠️ **附件文件名必须为 ASCII**：Gitea 1.27 的规范下载路径
@@ -97,17 +99,17 @@ curl -X POST -u "zijunchiang:$TOKEN" \
 ### 发布新版本（Gitee Release）
 
 ```bash
-GT=$(sed -nE 's|https://[^:]+:([^@]+)@gitee\.com.*|\1|p' ~/.git-credentials-gitee)
+GT=$(git remote get-url gitee | sed -nE 's|https://[^:]+:([^@]+)@gitee\.com.*|\1|p')
 
 # 1) 创建 Release（Gitee 会自动创建同名 tag）
 curl -X POST -H "Authorization: token $GT" -H "Content-Type: application/json" \
-  -d '{"tag_name":"v1.4.0","name":"麦动KTV V1.4.0","body":"更新说明","target_commitish":"master"}' \
-  https://gitee.com/api/v5/repos/zijunchiang/maidong-ktv/releases
+  -d '{"tag_name":"v1.5.7","name":"麦动KTV V1.5.7","body":"更新说明","target_commitish":"master"}' \
+  https://gitee.com/api/v5/repos/weishilong/maidong-ktv/releases
 
 # 2) 上传 APK 附件（表单字段名是 file，不是 attachment；用返回的 release id）
 curl -X POST -H "Authorization: token $GT" \
-  -F "file=@麦动KTV-V1.4.0-release.apk" \
-  "https://gitee.com/api/v5/repos/zijunchiang/maidong-ktv/releases/<id>/attach_files"
+  -F "file=@maidong-ktv-release.apk" \
+  "https://gitee.com/api/v5/repos/weishilong/maidong-ktv/releases/<id>/attach_files"
 ```
 
 > Gitee 附件名**可用中文**（ASCII 限制只针对 Gitea 1.27），上传 22MB 约 4s。
