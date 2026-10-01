@@ -115,6 +115,16 @@ curl -X POST -H "Authorization: token $GT" \
 > Gitee 附件名**可用中文**（ASCII 限制只针对 Gitea 1.27），上传 22MB 约 4s。
 > 发布后务必校验下载：`curl -sL <browser_download_url> | md5sum` 应与本地发布包一致
 > （Gitea 侧同样要校验 `/releases/download/<tag>/<文件>` 规范路径返回 200）。
+>
+> **发版时 Gitea 与 Gitee 都要建 Release**（2026-10-01 起）：Gitea 供 App 内更新检查，
+> Gitee 供开源页访客下载，两边保持同 tag、同附件名（`maidong-ktv-release.apk`）。
+>
+> ⚠️ **跨机镜像历史 Release 时附件地址必须换公网**：Gitea API 返回的
+> `browser_download_url` 指向内网 `172.18.20.4:3000`，不同网段的机器不可达
+> （会下到 94 字节的错误响应）。需替换为 `http://ck.ac19.cn:6699/...` 再下载。
+>
+> ⚠️ **Gitee 附件无法单独删除**（列表接口不返回 `attach_file_id`）：附件传错了只能
+> `DELETE /releases/{id}` 删掉整个 Release 再重建（实测删 Release **不会**删除 git tag）。
 
 ## 二、构建与产物
 
