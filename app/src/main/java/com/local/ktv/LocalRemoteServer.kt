@@ -13,16 +13,14 @@ import java.util.concurrent.Executors
 
 /**
  * Small, dependency-free HTTP server for the mobile song-request web app.
- * 局域网设备免令牌直连; 配置公网域名(路由器 DDNS + 端口映射)后, 外网设备须持
- * 二维码里的访问令牌(?t= / Cookie)才能打开页面与调用接口。
+ * 仅面向局域网: 手机连接同一 Wi-Fi/有线局域网后直接扫码使用。
  */
 class LocalRemoteServer(private val context: Context) {
     data class ApiResponse(
         val status: Int = 200,
         val body: String = "",
         val contentType: String = "application/json; charset=utf-8",
-        val bytes: ByteArray? = null,
-        val headers: Map<String, String> = emptyMap()
+        val bytes: ByteArray? = null
     )
 
     interface Callback {
@@ -43,28 +41,16 @@ class LocalRemoteServer(private val context: Context) {
     @Volatile private var running = false
     @Volatile private var boundAddress: String? = null
     @Volatile private var boundPort = -1
-    /** 公网访问域名(如 DDNS 域名), 非空时二维码/Host/Origin 校验放行该域名。 */
-    @Volatile private var publicHost: String? = null
-    /** 公网侧端口(反向代理复用端口场景下与 boundPort 不同); <=0 表示与 boundPort 一致。 */
-    @Volatile private var publicPort: Int = -1
-    /** 外网客户端访问令牌(二维码 ?t= 携带); 局域网客户端免令牌。 */
-    @Volatile private var accessKey: String? = null
     @Volatile private var lastError: String? = null
     @Volatile private var lastActivityAtMs = 0L
     private var server: ServerSocket? = null
     private var callback: Callback? = null
 
     @Synchronized
-    fun start(address: String?, publicHost: String?, publicPort: Int, accessKey: String?, callback: Callback): Boolean {
-        if (running && address == boundAddress &&
-            publicHost?.trim() == this.publicHost && publicPort == this.publicPort &&
-            accessKey?.trim() == this.accessKey
-        ) return true
+    fun start(address: String?, callback: Callback): Boolean {
+        if (running && address == boundAddress) return true
         stop()
         this.callback = callback
-        this.publicHost = publicHost?.trim()?.takeIf { it.isNotEmpty() }
-        this.publicPort = publicPort
-        this.accessKey = accessKey?.trim()?.takeIf { it.isNotEmpty() }
         if (!isPrivateIpv4(address)) {
             lastError = "请先连接 Wi-Fi 或有线局域网"
             return false
@@ -115,8 +101,6 @@ class LocalRemoteServer(private val context: Context) {
     fun isRunning(): Boolean = running
     fun port(): Int = boundPort
     fun address(): String? = boundAddress
-    fun publicHostOrNull(): String? = publicHost
-    fun publicPortValue(): Int = publicPort
     fun error(): String? = lastError
 
     /** 是否在 [withinMs] 内有手机端请求(扫码点歌页面可见时每秒轮询 state)。 */
@@ -133,7 +117,6 @@ class LocalRemoteServer(private val context: Context) {
         runCatching {
             socket.soTimeout = 5000
             socket.use { client ->
-                val remote = client.inetAddress
                 val input = BufferedInputStream(client.getInputStream())
                 val requestLine = readLine(input) ?: return
                 val parts = requestLine.split(' ')
@@ -152,22 +135,7 @@ class LocalRemoteServer(private val context: Context) {
                 }
                 val path = target.substringBefore('?')
                 val query = parseQuery(target.substringAfter('?', ""))
-                // 局域网设备免令牌直连; 外网设备必须持二维码里的访问令牌(?t= 或 Cookie),
-                // 否则只读静态资源可见, 页面与接口一律拒绝——公网端口映射后防止陌生人操控。
-                val lanClient = isPrivateAddress(remote)
-                val key = accessKey
-                val tokenOk = key.isNullOrEmpty() ||
-                    query["t"] == key ||
-                    cookieValue(headers["cookie"], "mtk") == key
                 val pageRequest = path == "/" || path == "/mobile" || path == "/mobile/"
-                if (!lanClient && !key.isNullOrEmpty() && !tokenOk) {
-                    if (pageRequest) {
-                        write(client, ApiResponse(403, qrExpiredHtml(), "text/html; charset=utf-8"))
-                    } else {
-                        write(client, ApiResponse(403, error("FORBIDDEN", "访问令牌无效，请在电视上重新扫码")))
-                    }
-                    return
-                }
                 if (!validHost(headers["host"]) || !validOrigin(headers["origin"])) {
                     write(client, ApiResponse(403, error("BAD_ORIGIN", "请求来源无效")))
                     return
@@ -183,7 +151,7 @@ class LocalRemoteServer(private val context: Context) {
                 val body = String(bodyBytes, 0, offset, Charsets.UTF_8)
                 // 手机端已成功建立会话并访问页面/接口 → 记录活跃(用于控制二维码显隐)。
                 lastActivityAtMs = System.currentTimeMillis()
-                var response = when {
+                val response = when {
                     pageRequest -> asset("mobile/index.html", "text/html; charset=utf-8")
                     path == "/mobile/app.css" -> asset("mobile/app.css", "text/css; charset=utf-8")
                     path == "/mobile/logo.css" -> asset("mobile/logo.css", "text/css; charset=utf-8")
@@ -192,14 +160,6 @@ class LocalRemoteServer(private val context: Context) {
                     path.startsWith("/api/v1/") -> callback?.handle(method, path, query, body)
                         ?: ApiResponse(503, error("NOT_READY", "服务尚未准备完成"))
                     else -> ApiResponse(404, error("NOT_FOUND", "接口不存在"))
-                }
-                // 外网客户端经 ?t= 首次打开页面时种下 Cookie, 后续接口请求免重复带令牌。
-                if (pageRequest && !key.isNullOrEmpty() && query["t"] == key &&
-                    cookieValue(headers["cookie"], "mtk") != key
-                ) {
-                    response = response.copy(
-                        headers = response.headers + ("Set-Cookie" to "mtk=$key; Path=/; Max-Age=31536000; HttpOnly")
-                    )
                 }
                 write(client, response)
             }
@@ -224,9 +184,7 @@ class LocalRemoteServer(private val context: Context) {
         if (host.isNullOrBlank()) return false
         val expected = boundAddress ?: return false
         val name = host.substringBefore(':')
-        if (name == expected || isPrivateIpv4(name)) return true
-        val pub = publicHost
-        return !pub.isNullOrEmpty() && name.equals(pub, ignoreCase = true)
+        return name == expected || isPrivateIpv4(name)
     }
 
     private fun validOrigin(origin: String?): Boolean {
@@ -235,32 +193,9 @@ class LocalRemoteServer(private val context: Context) {
             val uri = URI(origin)
             if (uri.scheme != "http") return@runCatching false
             val host = uri.host ?: return@runCatching false
-            val pub = publicHost
-            if (!pub.isNullOrEmpty() && host.equals(pub, ignoreCase = true)) {
-                // 经反向代理复用公网端口时, 浏览器 Origin 端口是代理端口而非本机服务端口
-                return@runCatching uri.port == boundPort || (publicPort > 0 && uri.port == publicPort)
-            }
             uri.port == boundPort && isPrivateIpv4(host)
         }.getOrDefault(false)
     }
-
-    private fun cookieValue(header: String?, name: String): String? {
-        if (header.isNullOrBlank()) return null
-        for (part in header.split(';')) {
-            val segment = part.trim()
-            val eq = segment.indexOf('=')
-            if (eq > 0 && segment.substring(0, eq).trim() == name) return segment.substring(eq + 1).trim()
-        }
-        return null
-    }
-
-    /** 外网客户端未带令牌访问页面时给出的可读提示(替代裸 JSON)。 */
-    private fun qrExpiredHtml(): String =
-        "<!DOCTYPE html><html><head><meta charset=\"utf-8\">" +
-            "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">" +
-            "<title>二维码已失效</title></head>" +
-            "<body style=\"font-family:sans-serif;text-align:center;padding-top:20vh;color:#333\">" +
-            "<h2>二维码已失效</h2><p>请在电视上重新打开「扫码点歌」后再次扫码</p></body></html>"
 
     private fun readLine(input: BufferedInputStream): String? {
         val bytes = ArrayList<Byte>()
@@ -288,14 +223,12 @@ class LocalRemoteServer(private val context: Context) {
             200 -> "OK"; 201 -> "Created"; 204 -> "No Content"; 400 -> "Bad Request"
             403 -> "Forbidden"; 404 -> "Not Found"; 409 -> "Conflict"; else -> "Error"
         }
-        val extraHeaders = response.headers.entries.joinToString("") { "${it.key}: ${it.value}\r\n" }
         val output = socket.getOutputStream()
         output.write(("HTTP/1.1 ${response.status} $reason\r\n" +
             "Content-Type: ${response.contentType}\r\n" +
             "Cache-Control: no-store\r\n" +
             "X-Content-Type-Options: nosniff\r\n" +
             "Content-Security-Policy: default-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'\r\n" +
-            extraHeaders +
             "Content-Length: ${bytes.size}\r\nConnection: close\r\n\r\n").toByteArray())
         output.write(bytes)
         output.flush()

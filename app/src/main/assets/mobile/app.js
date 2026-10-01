@@ -21,17 +21,8 @@ function setConnected(connected) {
     : "<span></span>正在连接麦动 KTV…";
 }
 
-// 外网扫码时二维码带有访问令牌(?t=xxx), 所有接口请求自动附带;
-// 局域网扫码无令牌, 服务器放行。
-const ACCESS_TOKEN = new URLSearchParams(window.location.search).get("t") || "";
-
-function withToken(path) {
-  if (!ACCESS_TOKEN) return path;
-  return path + (path.indexOf("?") >= 0 ? "&" : "?") + "t=" + encodeURIComponent(ACCESS_TOKEN);
-}
-
 async function api(path, options = {}) {
-  const response = await fetch(withToken(path), {
+  const response = await fetch(path, {
     cache: "no-store",
     headers: { "Content-Type": "application/json" },
     ...options
