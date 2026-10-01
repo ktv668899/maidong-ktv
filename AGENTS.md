@@ -125,6 +125,12 @@ curl -X POST -H "Authorization: token $GT" \
 >
 > ⚠️ **Gitee 附件无法单独删除**（列表接口不返回 `attach_file_id`）：附件传错了只能
 > `DELETE /releases/{id}` 删掉整个 Release 再重建（实测删 Release **不会**删除 git tag）。
+>
+> ⚠️ **Gitee 的「最新版」按创建时间判定，与 tag 号无关**：`/releases/latest` 和发行版
+> 页首条都取「最近创建」的 Release。因此**镜像历史版本时必须按版本从旧到新依次创建**
+> （v1.5.1 → v1.5.2 → … → v1.5.7），否则建得更晚的旧版本会被当成最新版（实测把
+> v1.5.1~v1.5.6 批量补建后，latest 错误指向了 v1.5.1）。已建错的只能删除全部 Release
+> 再按序重建。新建 Release 之间留 2~3 秒，保证 created_at 严格递增。
 
 ## 二、构建与产物
 
