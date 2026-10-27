@@ -94,6 +94,8 @@ private class KtvSurfaceView(context: Context) : SurfaceView(context) {
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val maxWidth = getDefaultSize(videoWidth, widthMeasureSpec).coerceAtLeast(1)
         val maxHeight = getDefaultSize(videoHeight, heightMeasureSpec).coerceAtLeast(1)
+        // 保持麦动原版 scale mode 1 的行为: 画面拉伸铺满 16:9 画布并居中。
+        // 不要按片源真实比例缩放 —— 3:2/4:3 片源会在 16:9 窗口里产生黑边、画面变小。
         var measuredWidth = maxWidth
         var measuredHeight = measuredWidth * 9 / 16
         if (measuredHeight > maxHeight) {

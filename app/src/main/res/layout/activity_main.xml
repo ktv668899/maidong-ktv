@@ -61,6 +61,7 @@
 
         <!-- 占位 spacer -->
         <View
+            android:id="@+id/top_bar_spacer"
             android:layout_width="0dp"
             android:layout_height="1dp"
             android:layout_weight="1" />
@@ -754,8 +755,9 @@
                 </FrameLayout>
 
                 <LinearLayout
+                    android:id="@+id/home_bottom_cards_row"
                     android:layout_width="match_parent"
-                    android:layout_height="86dp"
+                    android:layout_height="56dp"
                     android:orientation="horizontal">
 
                     <TextView
@@ -764,8 +766,8 @@
                         android:layout_height="match_parent"
                         android:layout_weight="1"
                         android:layout_marginEnd="6dp"
-                        android:background="@drawable/home_card_regular"
-                        android:gravity="top|start" android:padding="14dp" android:text="常唱" android:textColor="#FFFFFFFF" android:textSize="20sp" />
+                        android:background="@drawable/bg_home_card_green"
+                        android:gravity="center_vertical" android:paddingStart="14dp" android:paddingEnd="10dp" android:text="常唱" android:textColor="#FFFFFFFF" android:textSize="20sp" />
 
                     <TextView
                         android:id="@+id/home_card_favorite"
@@ -773,16 +775,16 @@
                         android:layout_height="match_parent"
                         android:layout_weight="1"
                         android:layout_marginEnd="6dp"
-                        android:background="@drawable/home_card_favorite"
-                        android:gravity="top|start" android:padding="14dp" android:text="收藏" android:textColor="#FFFFFFFF" android:textSize="20sp" />
+                        android:background="@drawable/bg_home_card_violet"
+                        android:gravity="center_vertical" android:paddingStart="14dp" android:paddingEnd="10dp" android:text="收藏" android:textColor="#FFFFFFFF" android:textSize="20sp" />
 
                     <TextView
                         android:id="@+id/home_card_category"
                         android:layout_width="0dp"
                         android:layout_height="match_parent"
                         android:layout_weight="1"
-                        android:background="@drawable/home_card_category"
-                        android:gravity="top|start" android:padding="14dp" android:text="分类" android:textColor="#FFFFFFFF" android:textSize="20sp" />
+                        android:background="@drawable/bg_home_card_sky"
+                        android:gravity="center_vertical" android:paddingStart="14dp" android:paddingEnd="10dp" android:text="分类" android:textColor="#FFFFFFFF" android:textSize="20sp" />
                 </LinearLayout>
             </LinearLayout>
 

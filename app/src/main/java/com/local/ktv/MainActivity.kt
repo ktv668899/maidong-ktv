@@ -45,6 +45,7 @@ import android.view.View
 import android.view.View.OnFocusChangeListener
 import android.view.View.OnTouchListener
 import android.view.ViewGroup
+import android.view.ViewTreeObserver
 import android.view.WindowManager
 import android.view.inputmethod.InputMethodManager
 import android.widget.AdapterView
@@ -62,10 +63,12 @@ import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.SeekBar
 import android.widget.SeekBar.OnSeekBarChangeListener
+import android.widget.Space
 import android.widget.TextView
 import android.widget.TextView.OnEditorActionListener
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.core.widget.ImageViewCompat
@@ -936,6 +939,117 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun chromeBarHeight(): Int = dp(if (compactUi) 52 else 64)
+
+    /**
+     * 首页视频窗锁定 16:9（全分辨率/屏幕尺寸自适应）。
+     *
+     * 背景: 首页左列宽度由 layout_weight、高度由剩余空间决定，XML 里没有任何比例约束，
+     * 不同分辨率/密度下窗体比例会漂移（实测窄屏设备 2.34:1、TV 1.21:1），而 MV 画面是
+     * 16:9 —— 画面填不满窗体，左右(或上下)出现大块黑边，与卡片行/中列宽度互相错位。
+     *
+     * 做法（纯运行时计算，不写死任何 dp）:
+     *   1. 可用高度 = 列高 - 卡片行高 - 列间距；
+     *   2. 目标宽度 = 可用高度 × 16/9，上限为行宽的 62%（避免挤占中列/海报列）；
+     *   3. 左列宽度改为固定目标宽（剩余宽度按权重还给中列/海报列）；
+     *   4. 容器高度 = 目标宽 × 9/16；若受上限约束导致高度有富余，用 spacer 吸收，
+     *      卡片行保持贴底，与中列/海报列底边对齐。
+     * 通过 GlobalLayout 监听挂载，布局变化（首次布局/切页返回/旋转）时自动重算，
+     * 目标值已满足时不做任何改动，不会引发布局抖动。
+     */
+    private var homeAspectSpacer: View? = null
+
+    private fun applyHomePlayerAspect() {
+        val host = findViewById<FrameLayout?>(R.id.home_player_container) ?: return
+        val column = host.parent as? LinearLayout ?: return
+        val row = column.parent as? LinearLayout ?: return
+        if (column.childCount < 2 || column.visibility != View.VISIBLE) return
+        if (column.width <= 0 || column.height <= 0 || row.width <= 0) return
+        val cards = column.getChildAt(column.childCount - 1)
+        val hostLp = host.layoutParams as? LinearLayout.LayoutParams ?: return
+        val colLp = column.layoutParams as? LinearLayout.LayoutParams ?: return
+        val gap = hostLp.bottomMargin.takeIf { it > 0 } ?: dp(8)
+        val cardsH = if (cards.visibility == View.GONE) 0 else cards.height
+        val availH = column.height - cardsH - gap
+        if (availH <= 0) return
+        val rowInner = row.width - row.paddingLeft - row.paddingRight
+        val capW = ((rowInner - colLp.leftMargin - colLp.rightMargin) * 0.62f).toInt()
+        val targetW = ((availH * 16f) / 9f).toInt().coerceIn(dp(120), capW.coerceAtLeast(dp(120)))
+        val targetH = ((targetW * 9f) / 16f).toInt()
+        val tolerance = dp(2)
+        if (colLp.weight != 0f || kotlin.math.abs(colLp.width - targetW) > tolerance) {
+            colLp.weight = 0f
+            colLp.width = targetW
+            column.layoutParams = colLp
+        }
+        if (hostLp.weight != 0f || kotlin.math.abs(hostLp.height - targetH) > tolerance) {
+            hostLp.weight = 0f
+            hostLp.height = targetH
+            host.layoutParams = hostLp
+        }
+        val spacerH = availH - targetH
+        val spacer = homeAspectSpacer
+        if (spacerH > tolerance) {
+            if (spacer == null) {
+                val created = Space(this)
+                column.addView(
+                    created,
+                    column.indexOfChild(cards),
+                    LinearLayout.LayoutParams(0, 0, 1f),
+                )
+                homeAspectSpacer = created
+            }
+        } else if (spacer != null) {
+            column.removeView(spacer)
+            homeAspectSpacer = null
+        }
+    }
+
+    /** 在首页列上挂布局监听，驱动 [applyHomePlayerAspect] 自适应。 */
+    private fun installHomePlayerAspectGuard() {
+        val host = findViewById<FrameLayout?>(R.id.home_player_container) ?: return
+        val column = host.parent as? View ?: return
+        column.viewTreeObserver.addOnGlobalLayoutListener(
+            object : ViewTreeObserver.OnGlobalLayoutListener {
+                override fun onGlobalLayout() {
+                    runCatching { applyHomePlayerAspect() }
+                        .onFailure { Log.w(TAG, "home player aspect failed", it) }
+                    runCatching { applyHomeBottomCardsScale() }
+                        .onFailure { Log.w(TAG, "home bottom cards scale failed", it) }
+                }
+            },
+        )
+    }
+
+    /**
+     * 首页底部三卡(常唱/收藏/分类)与右列卡片同高自适应：
+     * 行高直接取右列卡片(home_card_rank)的实际渲染高度，配图占满卡高、
+     * 字号按卡高等比缩放 —— 无论分辨率/密度如何，左右两侧视觉一致。
+     */
+    private fun applyHomeBottomCardsScale() {
+        val row = findViewById<LinearLayout?>(R.id.home_bottom_cards_row) ?: return
+        val ref = findViewById<View?>(R.id.home_card_rank) ?: return
+        if (row.visibility != View.VISIBLE || ref.height <= 0 || row.height <= 0) return
+        val target = ref.height
+        if (target > 0 && kotlin.math.abs(row.layoutParams.height - target) > dp(2)) {
+            row.layoutParams = row.layoutParams.apply { height = target }
+        }
+        val artSize = (target - dp(16)).coerceAtLeast(dp(26))
+        val labelSp = target / resources.displayMetrics.density * 0.24f
+        mapOf(
+            R.id.home_card_regular to R.drawable.home_art_regular,
+            R.id.home_card_favorite to R.drawable.home_art_favorite,
+            R.id.home_card_category to R.drawable.home_art_category,
+        ).forEach { (viewId, artRes) ->
+            findViewById<TextView?>(viewId)?.apply {
+                val art = AppCompatResources.getDrawable(context, artRes)?.mutate() ?: return@apply
+                art.setBounds(0, 0, artSize, artSize)
+                setCompoundDrawablesRelative(null, null, art, null)
+                compoundDrawablePadding = dp(8)
+                textSize = labelSp
+                setPadding(dp(14), dp(6), dp(10), dp(6))
+            }
+        }
+    }
 
     private fun buildShell() {
         val root = FrameLayout(this)
@@ -1867,7 +1981,7 @@ class MainActivity : AppCompatActivity() {
      * 固定 dp 尺寸在矮屏上会被屏幕裁掉。这里统一按当前屏幕可用区域收敛：
      * - 宽度取 `min(preferredWidthDp, 屏幕宽 * widthRatio)`；
      * - 高度不交给 `WRAP_CONTENT`，而是把内容所在的 [scroll] 高度限制为
-     *   `屏幕高 * heightRatio - 弹窗标题/按钮区(chromeDp)`，内容更高时在弹窗内滚动。
+     *   `屏幕高 * heightRatio - 24dp 边框余量`，内容更高时在弹窗内滚动。
      *
      * 这样内容放得下时窗口紧凑，放不下时滚动，任何分辨率下都不会被裁切。
      */
@@ -1878,7 +1992,6 @@ class MainActivity : AppCompatActivity() {
         preferredWidthDp: Int,
         widthRatio: Float = 0.94f,
         heightRatio: Float = 0.92f,
-        chromeDp: Int = 150,
     ) {
         val metrics = resources.displayMetrics
         val availableWidth = (metrics.widthPixels * widthRatio).toInt()
@@ -1894,7 +2007,8 @@ class MainActivity : AppCompatActivity() {
             View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.AT_MOST),
             View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
         )
-        val maxContentHeight = (availableHeight - dp(chromeDp)).coerceAtLeast(dp(120))
+        // 窗口高度 = 内容 + 24dp 边框余量(与下方显式窗口高度一致), 别再虚留 chrome 空间。
+        val maxContentHeight = (availableHeight - dp(24)).coerceAtLeast(dp(120))
         val contentHeight = content.measuredHeight.coerceAtMost(maxContentHeight)
         val params = scroll.layoutParams
         if (params != null) {
@@ -1907,7 +2021,16 @@ class MainActivity : AppCompatActivity() {
                 contentHeight,
             )
         }
-        dialog.window?.setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT)
+        // 显式设定窗口高度(内容+少量边框余量, 钳制在可用高度内):
+        // 部分系统在 show() 后修改子 View 高度不会触发 WRAP_CONTENT 窗口重排,
+        // 导致弹窗仍按原始内容高度摆位、底部被顶出屏幕 —— 显式高度可彻底规避。
+        dialog.window?.apply {
+            setGravity(Gravity.CENTER)
+            setLayout(
+                width,
+                (contentHeight + dp(24)).coerceAtMost(availableHeight),
+            )
+        }
     }
 
     private fun AlertDialog.restoreSourceFocusOnDismiss(): AlertDialog {
@@ -2372,9 +2495,25 @@ class MainActivity : AppCompatActivity() {
         controls.gravity = Gravity.CENTER
         controls.clipChildren = false
         controls.clipToPadding = false
-        controls.setPadding(dp(8), dp(4), dp(8), dp(4))
-        controls.setBackgroundColor(Color.TRANSPARENT)
+        controls.setPadding(dp(12), dp(5), dp(12), dp(5))
+        // 半透明深色圆角底衬: 保证图标/文字压在明亮 MV 画面上也清晰可读。
+        controls.background = GradientDrawable().apply {
+            cornerRadius = dp(14).toFloat()
+            setColor(Color.argb(135, 0, 0, 0))
+        }
         val controlItems = ArrayList<View>(7)
+
+        // 右上角扫码二维码浮层宽约 88/106dp 且高程更高, 会盖住控制行右端;
+        // 两侧对称预留相同宽度(保持整行视觉居中), 屏幕放不下时等比收窄每个按钮,
+        // 保证 7 个控制项完整可见、整行居中、永不与二维码重叠。
+        // 40dp = 行内边距 16 + 6 个按钮间 margin 24。
+        val qrReserve = dp(if (compactUi) 94 else 112)
+        val screenW = fullScreenContainer?.width?.takeIf { it > 0 }
+            ?: resources.displayMetrics.widthPixels
+        val controlItemW = minOf(
+            dp(78),
+            (screenW - qrReserve * 2 - dp(40)) / 7,
+        ).coerceAtLeast(dp(52))
 
         fun addControl(iconRes: Int, text: String, action: () -> Unit): Pair<TextView, ImageView> {
             val item = LinearLayout(this).apply {
@@ -2390,9 +2529,9 @@ class MainActivity : AppCompatActivity() {
             val icon = ImageView(this).apply {
                 setImageResource(iconRes)
                 scaleType = ImageView.ScaleType.CENTER_INSIDE
-                alpha = 0.76f
+                alpha = 0.95f
             }
-            val caption = label(text, 12, Color.rgb(184, 184, 184)).apply {
+            val caption = label(text, if (compactUi) 13 else 14, Color.WHITE).apply {
                 gravity = Gravity.CENTER
                 maxLines = 1
                 includeFontPadding = false
@@ -2406,7 +2545,7 @@ class MainActivity : AppCompatActivity() {
             }
             installPressFeedback(item)
             controlItems.add(item)
-            val params = LinearLayout.LayoutParams(dp(78), dp(68))
+            val params = LinearLayout.LayoutParams(controlItemW, dp(68))
             params.setMargins(dp(2), 0, dp(2), 0)
             controls.addView(item, params)
             return caption to icon
@@ -2673,40 +2812,46 @@ class MainActivity : AppCompatActivity() {
             FloatArray(caps.bandCount) { saved.getOrElse(it) { 0f } }
         }
         // 分辨率自适应：**文字行全部 wrap_content**（高度由文本决定，永不被压扁/裁字），
-        // 只有均衡器频段行是可伸缩的 —— 屏幕放不下时收缩的是频段行高，不是文字。
+        // 只有均衡器频段行是可伸缩的 —— 频段行高 = (可用高度 - 其余固定行) / 频段数，
+        // 全部内容一次放下，不需要滚动。
         val metrics = resources.displayMetrics
         val screenHeightDp = metrics.heightPixels / metrics.density
         val compact = screenHeightDp < 620f
-        val chromeDp = if (compact) 132 else 152
-        val contentBudgetDp = (screenHeightDp * 0.92f - chromeDp).coerceAtLeast(240f)
+        // 紧凑屏固定行合计(dp)：上下边距18 + 标题23 + 分隔线(4+2) + 音量标题18 + 音量杆30 +
+        // 开关(4+25) + 预设(4+25) ≈ 153；普通屏 ≈ 252。
+        val fixedRowsDp = if (compact) 153f else 252f
+        val dialogBudgetDp = screenHeightDp * (if (compact) 0.80f else 0.92f)
         val bandCount = caps.bandCount.coerceAtLeast(1)
-        // 非频段部分(内边距/标题/音量标题+杆/开关/预设)的保守占位，最终以实测量为准。
-        val otherRowsDp = 30f + 34f + 30f + 44f + 50f + 58f
         var bandRowHeight = dp(
-            ((contentBudgetDp - otherRowsDp) / bandCount).coerceIn(38f, 56f).toInt(),
+            ((dialogBudgetDp - fixedRowsDp) / bandCount).coerceIn(if (compact) 24f else 38f, 56f).toInt(),
         )
         Log.i(
             TAG,
             "tuning dialog adaptive: screen=${screenHeightDp}dp compact=$compact " +
-                "budget=${contentBudgetDp}dp bandRows=$bandCount row=${bandRowHeight}px",
+                "budget=${dialogBudgetDp}dp fixed=${fixedRowsDp}dp bandRows=$bandCount row=${bandRowHeight}px",
         )
 
         val panel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             background = ContextCompat.getDrawable(context, R.drawable.bg_tuning_dialog)
-            setPadding(dp(26), dp(14), dp(26), dp(16))
+            setPadding(
+                dp(if (compact) 16 else 26),
+                dp(if (compact) 8 else 14),
+                dp(if (compact) 16 else 26),
+                dp(if (compact) 10 else 16),
+            )
         }
         TvFocusStyler.suppressFill(panel)
 
         fun pill(text: String, action: () -> Unit): TextView = TextView(this).apply {
             this.text = text
-            textSize = 15f
+            textSize = if (compact) 13f else 15f
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
             background = ContextCompat.getDrawable(context, R.drawable.bg_btn_glass)
             isClickable = true
             isFocusable = true
-            setPadding(dp(10), dp(6), dp(10), dp(6))
+            setPadding(dp(10), dp(if (compact) 4 else 6), dp(10), dp(if (compact) 4 else 6))
             setOnClickListener { action() }
             TvFocusStyler.installAction(this)
         }
@@ -2714,9 +2859,10 @@ class MainActivity : AppCompatActivity() {
         // ── 标题 ──
         val titleRow = FrameLayout(this)
         titleRow.addView(
-            label("调音", 23, Color.WHITE).apply {
+            label("调音", if (compact) 17 else 23, Color.WHITE).apply {
                 gravity = Gravity.CENTER
                 includeFontPadding = false
+                typeface = Typeface.DEFAULT_BOLD
             },
             FrameLayout.LayoutParams(-1, -2),
         )
@@ -2724,6 +2870,8 @@ class MainActivity : AppCompatActivity() {
             gravity = Gravity.CENTER
             isClickable = true
             isFocusable = true
+            // 圆形底衬让关闭按钮更像可点目标, 而不是一行漂浮的字符。
+            background = ContextCompat.getDrawable(context, R.drawable.bg_close_circle)
             TvFocusStyler.installAction(this)
         }
         titleRow.addView(
@@ -2731,10 +2879,17 @@ class MainActivity : AppCompatActivity() {
             FrameLayout.LayoutParams(dp(44), dp(38), Gravity.END or Gravity.CENTER_VERTICAL),
         )
         panel.addView(titleRow, LinearLayout.LayoutParams(-1, -2))
+        // 标题下的金色渐变分隔线: 两端淡出, 提升弹窗精致感且几乎不占高度。
+        panel.addView(
+            View(this).apply { background = ContextCompat.getDrawable(context, R.drawable.bg_dialog_divider) },
+            LinearLayout.LayoutParams(-1, dp(2)).apply { topMargin = dp(if (compact) 4 else 6) },
+        )
 
         // ── 1. 音量：横向控制杆（即时生效）──
         // 交互：遥控器按「确认」进入调节态后才能左右调；触控必须按住滑块才能拖动。
-        val volumeTitle = label("音量  $musicVolume%", 16, Color.WHITE)
+        val volumeTitle = label("音量  $musicVolume%", if (compact) 13 else 16, Color.WHITE).apply {
+            typeface = Typeface.DEFAULT_BOLD
+        }
         panel.addView(volumeTitle, LinearLayout.LayoutParams(-1, -2))
         var lastVolumeAppliedAt = 0L
         val volumeBar = EqSlider(this).apply {
@@ -2757,7 +2912,7 @@ class MainActivity : AppCompatActivity() {
                 saveState()
             }
         }
-        panel.addView(volumeBar, LinearLayout.LayoutParams(-1, dp(44)))
+        panel.addView(volumeBar, LinearLayout.LayoutParams(-1, dp(if (compact) 30 else 44)))
 
         // ── 2. 均衡器开关（默认关闭）──
         lateinit var eqSwitch: TextView
@@ -2774,7 +2929,12 @@ class MainActivity : AppCompatActivity() {
             applyEqualizerSettings()
             toast(if (KtvEqualizer.enabled) "均衡器已开启" else "均衡器已关闭")
         }
-        panel.addView(eqSwitch, LinearLayout.LayoutParams(dp(200), -2).apply { topMargin = dp(8) })
+        panel.addView(
+            eqSwitch,
+            LinearLayout.LayoutParams(dp(if (compact) 170 else 200), -2).apply {
+                topMargin = dp(if (compact) 4 else 8)
+            },
+        )
 
         eqArea = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         panel.addView(eqArea, LinearLayout.LayoutParams(-1, -2))
@@ -2785,14 +2945,19 @@ class MainActivity : AppCompatActivity() {
             presetButtons.forEach { (name, view) ->
                 val active = name == KtvEqualizer.preset
                 view.setTextColor(if (active) Color.rgb(255, 204, 92) else Color.WHITE)
-                view.alpha = if (active) 1f else 0.82f
+                view.alpha = if (active) 1f else 0.85f
+                // 选中态换金色描边底, 未选中用紫色渐变底 —— 一眼可辨当前预设。
+                view.background = ContextCompat.getDrawable(
+                    this@MainActivity,
+                    if (active) R.drawable.bg_preset_active else R.drawable.bg_tuning_counter,
+                )
             }
         }
         val presetRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
         }
-        eqArea.addView(presetRow, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(10) })
+        eqArea.addView(presetRow, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(if (compact) 4 else 10) })
 
         // ── 4. EQ 频段：横向控制杆（每个频段一行：频率 | 滑杆 | 增益）──
         // 刻度文字用无内边距的 caption：高度由文本自身决定, 不会被固定 dp 裁掉。
@@ -2821,12 +2986,16 @@ class MainActivity : AppCompatActivity() {
                 gravity = Gravity.CENTER_VERTICAL
             }
             row.addView(
-                caption(bandLabels.getOrElse(index) { "${index + 1}" } + "Hz", 13, Color.WHITE),
+                caption(
+                    bandLabels.getOrElse(index) { "${index + 1}" } + "Hz",
+                    if (compact) 12 else 13,
+                    Color.rgb(206, 200, 238),
+                ),
                 LinearLayout.LayoutParams(dp(62), -1),
             )
             val value = caption(
                 eqLevelText(working.getOrElse(index) { 0f }),
-                13,
+                if (compact) 12 else 13,
                 Color.argb(170, 255, 255, 255),
             )
             valueViews.add(value)
@@ -2859,14 +3028,14 @@ class MainActivity : AppCompatActivity() {
         KtvEqualizer.appPresetNames().forEach { name ->
             val presetButton = TextView(this).apply {
                 text = name
-                textSize = 15f
+                textSize = if (compact) 13f else 15f
                 setTextColor(Color.WHITE)
                 gravity = Gravity.CENTER
                 isClickable = true
                 isFocusable = true
                 background = ContextCompat.getDrawable(context, R.drawable.bg_tuning_counter)
                 includeFontPadding = false
-                setPadding(dp(6), dp(11), dp(6), dp(11))
+                setPadding(dp(6), dp(if (compact) 4 else 7), dp(6), dp(if (compact) 4 else 7))
                 TvFocusStyler.installAction(this)
                 setOnClickListener {
                     if (name == KtvEqualizer.CUSTOM_PRESET) {
@@ -2905,7 +3074,7 @@ class MainActivity : AppCompatActivity() {
             // 两遍自适应：先按内容实测高度判断是否超出可用空间，超出就只压缩 EQ 频段区
             // （文字行 wrap_content 保持不变），最后再收敛窗口尺寸。
             val availableHeight = (metrics.heightPixels * 0.92f).toInt()
-            val maxContentHeight = (availableHeight - dp(chromeDp)).coerceAtLeast(dp(150))
+            val maxContentHeight = (availableHeight - dp(24)).coerceAtLeast(dp(150))
             val probeWidth = min(dp(760), (metrics.widthPixels * 0.94f).toInt())
             panel.measure(
                 View.MeasureSpec.makeMeasureSpec(probeWidth, View.MeasureSpec.AT_MOST),
@@ -2913,7 +3082,7 @@ class MainActivity : AppCompatActivity() {
             )
             val overflow = panel.measuredHeight - maxContentHeight
             if (overflow > 0 && bandRows.isNotEmpty()) {
-                val shrunk = (bandRowHeight - overflow / bandRows.size).coerceAtLeast(dp(34))
+                val shrunk = (bandRowHeight - overflow / bandRows.size).coerceAtLeast(dp(26))
                 Log.i(
                     TAG,
                     "tuning dialog shrink band rows: measured=${panel.measuredHeight}px " +
@@ -2927,12 +3096,13 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             // 最终兜底：宽度上限 + 内容区高度上限（仍放不下时弹窗内滚动，绝不裁切）。
+            // 紧凑屏宽度比收到 0.72 —— 弹窗明显小于屏幕、四周留白，视觉更协调。
             fitDialogToScreen(
                 dialog = dialog,
                 scroll = scroll,
                 content = panel,
                 preferredWidthDp = 760,
-                chromeDp = if (compact) 128 else 150,
+                widthRatio = if (compact) 0.72f else 0.94f,
             )
             volumeBar.requestFocus()
         })
@@ -3243,48 +3413,110 @@ class MainActivity : AppCompatActivity() {
                 .create().showForTv(DialogInterface.BUTTON_POSITIVE)
             return
         }
-        // 分辨率自适应：二维码与文案高度按当前屏幕收敛，矮屏压缩、大屏放大(夹在 160~280dp)。
+        // 分辨率自适应：横版布局 —— 二维码居左、文字/按钮居右，面板又宽又扁
+        // (~60% 屏宽、<45% 屏高)，屏幕居中，只占少量画面，不遮挡底下内容。
         val metrics = resources.displayMetrics
-        val screenWidthDp = metrics.widthPixels / metrics.density
         val screenHeightDp = metrics.heightPixels / metrics.density
         val compact = screenHeightDp < 620f
         val qrSide = min(
-            min((screenHeightDp * 0.42f).toInt(), (screenWidthDp * 0.62f).toInt()),
-            if (compact) 220 else 280,
-        ).coerceAtLeast(160)
-        val box = LinearLayout(this)
-        box.setOrientation(LinearLayout.VERTICAL)
-        box.setGravity(Gravity.CENTER_HORIZONTAL)
-        box.setPadding(dp(20), dp(12), dp(20), dp(8))
-        val lanAddress = remoteServer.address()
-            ?.takeIf { remoteServer.port() > 0 }?.let { "${it}:${remoteServer.port()}" }.orEmpty()
+            (screenHeightDp * 0.30f).toInt(),
+            if (compact) 118 else 158,
+        ).coerceAtLeast(96)
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            background = ContextCompat.getDrawable(context, R.drawable.bg_tuning_dialog)
+            setPadding(
+                dp(if (compact) 14 else 20),
+                dp(if (compact) 10 else 14),
+                dp(if (compact) 16 else 22),
+                dp(if (compact) 10 else 14),
+            )
+        }
+        // 左：白色圆角卡片承载二维码，对比度更好、更精致。
+        val qrCard = FrameLayout(this).apply {
+            background = ContextCompat.getDrawable(context, R.drawable.bg_qr_card)
+            setPadding(dp(8), dp(8), dp(8), dp(8))
+        }
         // 位图按最终显示尺寸生成，保证任何分辨率下二维码都清晰可扫。
         val qr = ImageView(this)
-        qr.setBackgroundColor(Color.WHITE)
         qr.setImageBitmap(qrBitmap(url, dp(qrSide)))
-        box.addView(qr, LinearLayout.LayoutParams(dp(qrSide), dp(qrSide)))
-        val tip = label("手机连接同一局域网后扫码点歌", if (compact) 16 else 18, Color.WHITE)
-        tip.gravity = Gravity.CENTER
-        box.addView(tip, LinearLayout.LayoutParams(-1, dp(if (compact) 42 else 54)))
-        if (lanAddress.isNotEmpty()) {
-            val addressLine = label(lanAddress, 16, GOLD)
-            addressLine.gravity = Gravity.CENTER
-            box.addView(addressLine, LinearLayout.LayoutParams(-1, dp(32)))
+        qrCard.addView(qr, FrameLayout.LayoutParams(dp(qrSide), dp(qrSide)))
+        panel.addView(qrCard, LinearLayout.LayoutParams(-2, -2))
+        // 右：标题 + 金色分隔线 + 说明 + 地址 + 确定按钮。
+        val lanAddress = remoteServer.address()
+            ?.takeIf { remoteServer.port() > 0 }?.let { "${it}:${remoteServer.port()}" }.orEmpty()
+        val info = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(dp(if (compact) 14 else 18), 0, 0, 0)
         }
-        val scroll = android.widget.ScrollView(this).apply { addView(box) }
+        // 右列固定宽度: 横版布局下避免被压缩导致地址/文案被截断。
+        val infoWidth = dp(if (compact) 196 else 240)
+        info.addView(
+            label("扫码点歌", if (compact) 16 else 20, Color.WHITE).apply {
+                gravity = Gravity.CENTER
+                includeFontPadding = false
+                setTypeface(typeface, Typeface.BOLD)
+            },
+            LinearLayout.LayoutParams(-1, -2),
+        )
+        info.addView(
+            View(this).apply {
+                background = ContextCompat.getDrawable(context, R.drawable.bg_dialog_divider)
+            },
+            LinearLayout.LayoutParams(-1, dp(2)).apply { topMargin = dp(5); bottomMargin = dp(6) },
+        )
+        val tip = label(
+            "手机连接同一局域网\n后扫码点歌",
+            if (compact) 12 else 14,
+            Color.argb(214, 255, 255, 255),
+        )
+        tip.gravity = Gravity.CENTER
+        info.addView(tip, LinearLayout.LayoutParams(-1, -2))
+        if (lanAddress.isNotEmpty()) {
+            val addressLine = label(lanAddress, if (compact) 12 else 14, GOLD).apply {
+                gravity = Gravity.CENTER
+                setTypeface(Typeface.MONOSPACE, Typeface.BOLD)
+                maxLines = 1
+            }
+            info.addView(
+                addressLine,
+                LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(3) },
+            )
+        }
+        val confirm = TextView(this).apply {
+            text = "确 定"
+            textSize = if (compact) 13f else 15f
+            setTextColor(Color.rgb(59, 18, 92))
+            gravity = Gravity.CENTER
+            isClickable = true
+            isFocusable = true
+            background = ContextCompat.getDrawable(context, R.drawable.bg_confirm_gold)
+            setPadding(dp(30), dp(if (compact) 6 else 8), dp(30), dp(if (compact) 6 else 8))
+        }
+        info.addView(
+            confirm,
+            LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(if (compact) 8 else 12) },
+        )
+        panel.addView(info, LinearLayout.LayoutParams(infoWidth, -2))
+        val scroll = android.widget.ScrollView(this).apply { addView(panel) }
+        var dialogRef: AlertDialog? = null
+        confirm.setOnClickListener { dialogRef?.dismiss() }
         val dialog = AlertDialog.Builder(this)
-            .setTitle("扫码点歌")
             .setView(scroll)
-            .setPositiveButton("确定", null)
             .create()
-        dialog.showForTv(DialogInterface.BUTTON_POSITIVE) {
+        dialogRef = dialog
+        dialog.showForTv {
             fitDialogToScreen(
                 dialog = dialog,
                 scroll = scroll,
-                content = box,
-                preferredWidthDp = 460,
-                chromeDp = if (compact) 128 else 150,
+                content = panel,
+                preferredWidthDp = if (compact) 420 else 520,
+                widthRatio = 0.9f,
             )
+            TvFocusStyler.installAction(confirm)
+            confirm.requestFocus()
         }
     }
 
@@ -6952,6 +7184,7 @@ class MainActivity : AppCompatActivity() {
         playerLayerRoot = findViewById(R.id.layout_root)
         homePlayerHost = findViewById(R.id.home_player_container)
         subPagePlayerHost = findViewById(R.id.player_container)
+        installHomePlayerAspectGuard()
         textDownloadSpeed = findViewById<TextView?>(R.id.text_download_speed)
         downloadProgressContainer = findViewById<LinearLayout?>(R.id.download_progress_container)
         textDownloadStatus = findViewById<TextView?>(R.id.text_download_status)
@@ -7018,6 +7251,23 @@ class MainActivity : AppCompatActivity() {
         homeCardRegular = findViewById<TextView?>(R.id.home_card_regular)
         homeCardFavorite = findViewById<TextView?>(R.id.home_card_favorite)
         homeCardCategory = findViewById<TextView?>(R.id.home_card_category)
+        // 首页底部三卡(常唱/收藏/分类): 渐变底 + 右侧独立配图，替代整张被
+        // 拉伸变形的 webp 背景；配图尺寸随屏幕密度/紧凑模式自适应。
+        run {
+            val artSize = dp(if (compactUi) 34 else 44)
+            mapOf(
+                R.id.home_card_regular to R.drawable.home_art_regular,
+                R.id.home_card_favorite to R.drawable.home_art_favorite,
+                R.id.home_card_category to R.drawable.home_art_category,
+            ).forEach { (viewId, artRes) ->
+                findViewById<TextView?>(viewId)?.apply {
+                    val art = AppCompatResources.getDrawable(context, artRes)?.mutate() ?: return@apply
+                    art.setBounds(0, 0, artSize, artSize)
+                    setCompoundDrawablesRelative(null, null, art, null)
+                    compoundDrawablePadding = dp(6)
+                }
+            }
+        }
         textPosterPage = findViewById<TextView?>(R.id.text_poster_page)
 
         // ===== 子页面外壳 =====
@@ -7267,6 +7517,9 @@ class MainActivity : AppCompatActivity() {
         textLogo?.visibility = View.VISIBLE
         topBrandName?.visibility = View.VISIBLE
         btnTopSearch?.visibility = View.VISIBLE
+        // 恢复首页顶栏: 弹性占位放回，控制按钮仍靠右。
+        findViewById<View?>(R.id.top_bar_spacer)?.visibility = View.VISIBLE
+        findViewById<View?>(R.id.sub_controls_spacer)?.visibility = View.VISIBLE
         bottomBar?.visibility = View.VISIBLE
         updateContentFrameMargins(chromeBarHeight(), chromeBarHeight())
         if (homeLayout != null) homeLayout!!.setVisibility(View.VISIBLE)
@@ -7296,16 +7549,25 @@ class MainActivity : AppCompatActivity() {
         clearHomeTopFocusNavigation()
         topBar?.apply {
             visibility = View.VISIBLE
-            // 紧凑横屏的内容区顶部内边距只有 10dp；继续下移 22dp 会让顶部
-            // 控制按钮压到面包屑/返回栏上。窄屏只做轻微下移，保留两栏间距。
-            translationY = dp(if (compactUi) 8 else 22).toFloat()
+            // 内容区已经让出整条顶栏的高度，顶栏不需要再下移；
+            // 之前靠 translationY 躲内容，反而让按钮与面包屑挤在一起。
+            translationY = 0f
             setBackgroundColor(Color.TRANSPARENT)
         }
-        textLogo?.visibility = View.GONE
-        topBrandName?.visibility = View.GONE
+        // logo/品牌名在子页面同样保留，作为顶栏最左侧的落点。
+        textLogo?.visibility = View.VISIBLE
+        topBrandName?.visibility = View.VISIBLE
         btnTopSearch?.visibility = View.GONE
+        // 控制按钮与首页一致靠右贴住 WiFi，弹性占位保留(左侧留给 logo/品牌名)。
+        findViewById<View?>(R.id.top_bar_spacer)?.visibility = View.VISIBLE
+        // 内容区已经让出顶栏高度，右列顶部那条 48dp 占位就多余了，
+        // 否则顶栏与面包屑之间会空出一整条(红框位置)。
+        findViewById<View?>(R.id.sub_controls_spacer)?.visibility = View.GONE
         bottomBar?.visibility = View.GONE
-        updateContentFrameMargins(0, 0)
+        // 共享播放窗是挂在 layout_root 上的浮层，位置完全跟随宿主 View 的
+        // 窗口坐标；内容区若顶到 y=0，视频窗就会压到顶栏左侧(logo/控制按钮)。
+        // 因此子页面同样要留出顶栏高度，只放开底部(子页面没有底栏)。
+        updateContentFrameMargins(chromeBarHeight(), 0)
         val shell = findViewById<View?>(R.id.main_layout)
         if (shell != null) shell.setVisibility(View.VISIBLE)
         if (breadcrumbCurrent != null) {
@@ -8188,13 +8450,41 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /** 按榜单名挑专属主题图, 未命中回退默认奖杯。 */
+    private fun rankIconRes(title: String): Int = when {
+        title.contains("劲歌") || title.contains("热舞") || title.contains("舞") -> R.drawable.img_rank_dance
+        title.contains("新歌") -> R.drawable.img_rank_new
+        title.contains("热歌") -> R.drawable.img_rank_hot
+        title.contains("飙升") -> R.drawable.img_rank_rise
+        title.contains("抖音") -> R.drawable.img_rank_douyin
+        title.contains("内地") || title.contains("大陆") -> R.drawable.img_rank_mainland
+        title.contains("香港") || title.contains("粤语") -> R.drawable.img_rank_hk
+        title.contains("台湾") || title.contains("闽南") -> R.drawable.img_rank_tw
+        title.contains("流行") || title.contains("指数") -> R.drawable.img_rank_trend
+        else -> R.drawable.ic_default_rank_avatar
+    }
+
     private fun updateRankCategoryGrid() {
         val grid = rankCategoryGrid ?: return
+        // 内容区让出顶栏高度后，榜单格子的行高会变紧；必须按真实行高缩放
+        // 图标/字号，否则"图标在上文字在下"的单元格会把文字整行裁掉。
+        if (grid.width <= 0 || grid.height <= 0) {
+            grid.post { if (rankCategoryGrid === grid) updateRankCategoryGrid() }
+            return
+        }
         grid.removeAllViews()
+        val rowH = (grid.height - dp(18)) / 3
+        val iconSize = when {
+            rowH >= dp(64) -> dp(42)
+            rowH >= dp(52) -> dp(30)
+            rowH > 0 -> dp(24)
+            else -> dp(if (compactUi) 30 else 42)
+        }
+        val labelSp = if (iconSize >= dp(42)) 14f else 12f
         currentCategories.take(9).forEachIndexed { index, title ->
             val tile = TextView(this).apply {
                 text = title
-                textSize = 14f
+                textSize = labelSp
                 setTextColor(Color.WHITE)
                 gravity = Gravity.CENTER
                 isClickable = true
@@ -8203,9 +8493,9 @@ class MainActivity : AppCompatActivity() {
                     if (index == currentCategoryIndex) R.drawable.ott_bg_rank_item_selected
                     else R.drawable.ott_bg_rank_item_not_selected
                 )
-                val trophy = ContextCompat.getDrawable(context, R.drawable.ic_default_rank_avatar)?.mutate()
-                trophy?.setBounds(0, 0, dp(42), dp(42))
-                setCompoundDrawables(null, trophy, null, null)
+                val icon = AppCompatResources.getDrawable(context, rankIconRes(title))?.mutate()
+                icon?.setBounds(0, 0, iconSize, iconSize)
+                setCompoundDrawables(null, icon, null, null)
                 compoundDrawablePadding = dp(1)
                 setOnClickListener {
                     if (index == currentCategoryIndex) return@setOnClickListener
