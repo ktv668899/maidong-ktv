@@ -2,6 +2,7 @@ package com.local.ktv
 
 import android.content.Context
 import android.graphics.Color
+import android.os.Build
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -70,7 +71,8 @@ class SettingsListAdapter(
                     }
                     nextFocusDownId = actionIds[(position + 1).coerceAtMost(entries.lastIndex)]
                     isChecked = entry.checked
-                    showText = false
+                    // showText 属性是 API 21 引入的, Android 4.4 的 Switch 本来就不显示按钮文字。
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) showText = false
                     setAccessibleFocus(
                         "focus:settings:${entry.title}",
                         "${entry.title}${entry.subtitle.takeIf(String::isNotEmpty)?.let { "，$it" }.orEmpty()}，${if (entry.checked) "已开启" else "已关闭"}",

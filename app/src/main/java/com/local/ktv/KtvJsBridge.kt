@@ -51,7 +51,7 @@ class KtvJsBridge(context: Context) {
         // mac 取本机「当前在用网卡」的硬件地址(读不到时回退历史抓包值, 见 DeviceMac);
         // sn 沿用抓包注册值, 保证 mac 变化后仍能对上原有账号体系。
         private val DEVICE_MAC: String get() = DeviceMac.effective()
-        internal const val DEVICE_SN = "2d7bb4a7d7f7"
+        internal const val DEVICE_SN = "2d7bb4a7d7f8"
 
         /**
          * 断网重连后重置歌曲源会话。

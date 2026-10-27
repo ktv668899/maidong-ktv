@@ -9,10 +9,10 @@ android {
 
     defaultConfig {
         applicationId "com.local.ktv"
-        minSdk 21
+        minSdk 19
         targetSdk 25
-        versionCode 39
-        versionName "1.5.7"
+        versionCode 41
+        versionName "1.5.9"
         ndk {
             // 双 ABI 打包:兼容 64 位(Exynos 1580 等 arm64-v8a)与 32 位设备(极米 Play 超越版
             // 的 Amlogic 950X2/S905X2 采用 32 位 Android 用户态,必须包含 armeabi-v7a,否则
@@ -22,6 +22,21 @@ android {
         }
         // 曲库已改为官方 Muse 同步(database_publish 不再发布到 Gitee),
         // 不再需要 GITEE_DATABASE_* 构建参数。
+
+        // ⚠️ Android 4.4 (API 19) 必需:交给 support library(androidx.vectordrawable)在低版本
+        // 运行时把 <vector> 物化成 VectorDrawableCompat,而不是由 AGP 在打包时把它们光栅化成
+        // 各密度的 PNG 位图。
+        //
+        // 若不开启(默认 false),release + minSdk<21 时 AGP 会把每个 vector 展开成
+        // drawable-mdpi/hdpi/xhdpi/... 的 PNG,并且原 XML 只保留在 drawable-anydpi-v21。
+        // 于是 API 19 上 R.drawable.abc_vector_test 会命中 hdpi 的 PNG,解析出 BitmapDrawable,
+        // 而 appcompat 的 ResourceManagerInternal.checkVectorDrawableSetup() 要求它必须是
+        // VectorDrawableCompat / android.graphics.drawable.VectorDrawable,校验失败即在
+        // Activity.onCreate 里抛 IllegalStateException:
+        //   "This app has been built with an incorrect configuration.
+        //    Please configure your build for VectorDrawableCompat."
+        // 表现为 App 一打开就闪退(i.y2.g -> androidx.activity... -> MainActivity.onCreate)。
+        vectorDrawables.useSupportLibrary = true
     }
 
     // 签名配置:使用已有的 ktv_keystore.jks

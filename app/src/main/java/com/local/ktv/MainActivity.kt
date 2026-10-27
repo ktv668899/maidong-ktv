@@ -66,7 +66,9 @@ import android.widget.TextView
 import android.widget.TextView.OnEditorActionListener
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.core.widget.ImageViewCompat
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
 import com.local.ktv.KtvStore.Companion.stableId
@@ -2691,7 +2693,7 @@ class MainActivity : AppCompatActivity() {
 
         val panel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            background = getDrawable(R.drawable.bg_tuning_dialog)
+            background = ContextCompat.getDrawable(context, R.drawable.bg_tuning_dialog)
             setPadding(dp(26), dp(14), dp(26), dp(16))
         }
         TvFocusStyler.suppressFill(panel)
@@ -2701,7 +2703,7 @@ class MainActivity : AppCompatActivity() {
             textSize = 15f
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
-            background = getDrawable(R.drawable.bg_btn_glass)
+            background = ContextCompat.getDrawable(context, R.drawable.bg_btn_glass)
             isClickable = true
             isFocusable = true
             setPadding(dp(10), dp(6), dp(10), dp(6))
@@ -2862,7 +2864,7 @@ class MainActivity : AppCompatActivity() {
                 gravity = Gravity.CENTER
                 isClickable = true
                 isFocusable = true
-                background = getDrawable(R.drawable.bg_tuning_counter)
+                background = ContextCompat.getDrawable(context, R.drawable.bg_tuning_counter)
                 includeFontPadding = false
                 setPadding(dp(6), dp(11), dp(6), dp(11))
                 TvFocusStyler.installAction(this)
@@ -3343,7 +3345,7 @@ class MainActivity : AppCompatActivity() {
             gravity = Gravity.CENTER
             setPadding(dp(4), dp(4), dp(4), dp(3))
             setBackgroundColor(Color.argb(218, 255, 255, 255))
-            elevation = dp(12).toFloat()
+            UiCompat.setElevation(this, dp(12).toFloat())
             addView(ImageView(this@MainActivity).apply {
                 setImageBitmap(qrBitmap(url, qrSize))
                 contentDescription = "扫码手机点歌"
@@ -3781,7 +3783,7 @@ class MainActivity : AppCompatActivity() {
                 sb.append(" device=").append(Build.DEVICE)
                 sb.append(" android=").append(Build.VERSION.RELEASE)
                     .append("(api").append(Build.VERSION.SDK_INT).append(')')
-                sb.append(" abi=").append(Build.SUPPORTED_ABIS?.joinToString(",").orEmpty())
+                sb.append(" abi=").append(compatAbis())
                 sb.append(" kernel=").append(System.getProperty("os.version").orEmpty())
                 sb.append(" screen=").append(screenResolutionText())
                 // 等主机 IP(公网出口 IP)就绪，避免启动这条日志的 serverip 为空。
@@ -3804,6 +3806,20 @@ class MainActivity : AppCompatActivity() {
     }
 
     /** 屏幕物理分辨率(宽x高); 取不到返回 unknown。 */
+    /**
+     * 设备 ABI 列表。
+     * `Build.SUPPORTED_ABIS` 是 API 21 引入的，Android 4.4 退回已废弃但仍可用的 CPU_ABI/CPU_ABI2。
+     */
+    @Suppress("DEPRECATION")
+    private fun compatAbis(): String =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            Build.SUPPORTED_ABIS?.joinToString(",").orEmpty()
+        } else {
+            listOfNotNull(Build.CPU_ABI, Build.CPU_ABI2)
+                .filter { it.isNotEmpty() }
+                .joinToString(",")
+        }
+
     private fun screenResolutionText(): String = try {
         val metrics = android.util.DisplayMetrics()
         @Suppress("DEPRECATION")
@@ -6234,7 +6250,8 @@ class MainActivity : AppCompatActivity() {
             setBackgroundResource(R.drawable.bg_song_action_focus)
             addView(ImageView(this@MainActivity).apply {
                 setImageResource(iconRes)
-                iconTint?.let { imageTintList = ColorStateList.valueOf(it) }
+                // imageTintList 属性是 API 21 引入的, 用 ImageViewCompat 兼容到 API 14。
+                iconTint?.let { ImageViewCompat.setImageTintList(this, ColorStateList.valueOf(it)) }
                 setPadding(dp(18), dp(18), dp(18), dp(18))
                 background = GradientDrawable().apply {
                     shape = GradientDrawable.OVAL
@@ -7067,7 +7084,7 @@ class MainActivity : AppCompatActivity() {
                 isClickable = false
                 isFocusable = false
                 visibility = View.GONE
-                elevation = dp(6).toFloat()
+                UiCompat.setElevation(this, dp(6).toFloat())
             }.also { root.addView(it, insertionIndex + 1, FrameLayout.LayoutParams(1, 1)) }
             playbackModeNotice = TextView(this).apply {
                 gravity = Gravity.CENTER
@@ -7075,7 +7092,7 @@ class MainActivity : AppCompatActivity() {
                 setTextColor(Color.WHITE)
                 visibility = View.GONE
                 alpha = 0f
-                elevation = dp(8).toFloat()
+                UiCompat.setElevation(this, dp(8).toFloat())
             }.also { root.addView(it, insertionIndex + 1, FrameLayout.LayoutParams(dp(104), dp(104))) }
             songIntroNotice = TextView(this).apply {
                 gravity = Gravity.CENTER_VERTICAL
@@ -7085,7 +7102,7 @@ class MainActivity : AppCompatActivity() {
                 maxLines = 2
                 visibility = View.GONE
                 alpha = 0f
-                elevation = dp(7).toFloat()
+                UiCompat.setElevation(this, dp(7).toFloat())
             }.also { root.addView(it, insertionIndex + 1, FrameLayout.LayoutParams(dp(330), dp(92))) }
             songIntroIcon = TextView(this).apply {
                 text = "♫"
@@ -7098,14 +7115,14 @@ class MainActivity : AppCompatActivity() {
                 ).apply { shape = GradientDrawable.OVAL; setStroke(dp(3), Color.argb(210, 255, 255, 255)) }
                 visibility = View.GONE
                 alpha = 0f
-                elevation = dp(9).toFloat()
+                UiCompat.setElevation(this, dp(9).toFloat())
             }.also { root.addView(it, insertionIndex + 2, FrameLayout.LayoutParams(dp(78), dp(78))) }
             playerTouchOverlay = View(this).apply {
                 setBackgroundColor(Color.TRANSPARENT)
                 isClickable = true
                 isFocusable = false
                 setOnClickListener { showFullScreenPlayer() }
-                elevation = dp(10).toFloat()
+                UiCompat.setElevation(this, dp(10).toFloat())
                 // 这层铺满播放画面且浮在最上层: 一旦被套上焦点/按下填充,
                 // 触摸就会把整块播放画面刷成纯色(遮罩层), 必须显式排除。
                 // 它只负责抓触摸, 保持 isFocusable=false, 不参与遥控器焦点。
@@ -7159,7 +7176,7 @@ class MainActivity : AppCompatActivity() {
         // 播放画面宿主/海报是「表面型」View: 不能套焦点/按下填充,
         // 否则触摸一次就会用纯色层盖住整个播放画面或海报(见 TvFocusStyler.suppressFill)。
         listOfNotNull(homePlayerHost, subPagePlayerHost, homePoster).forEach(TvFocusStyler::suppressFill)
-        (homePoster as? FrameLayout)?.foreground = getDrawable(R.drawable.bg_player_focus)
+        (homePoster as? FrameLayout)?.foreground = ContextCompat.getDrawable(this, R.drawable.bg_player_focus)
         configureTvFocusNavigation()
         prepareTvFocusableTree(window.decorView)
 
@@ -8186,7 +8203,7 @@ class MainActivity : AppCompatActivity() {
                     if (index == currentCategoryIndex) R.drawable.ott_bg_rank_item_selected
                     else R.drawable.ott_bg_rank_item_not_selected
                 )
-                val trophy = getDrawable(R.drawable.ic_default_rank_avatar)?.mutate()
+                val trophy = ContextCompat.getDrawable(context, R.drawable.ic_default_rank_avatar)?.mutate()
                 trophy?.setBounds(0, 0, dp(42), dp(42))
                 setCompoundDrawables(null, trophy, null, null)
                 compoundDrawablePadding = dp(1)
@@ -8202,13 +8219,23 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             installPressFeedback(tile)
-            grid.addView(tile, GridLayout.LayoutParams().apply {
-                rowSpec = GridLayout.spec(index / 3, 1f)
-                columnSpec = GridLayout.spec(index % 3, 1f)
-                width = 0
-                height = 0
+            val gridParams = GridLayout.LayoutParams().apply {
                 setMargins(dp(3), dp(3), dp(3), dp(3))
-            })
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                gridParams.rowSpec = GridLayout.spec(index / 3, 1f)
+                gridParams.columnSpec = GridLayout.spec(index % 3, 1f)
+                gridParams.width = 0
+                gridParams.height = 0
+            } else {
+                // Android 4.4 的 GridLayout 没有带 weight 的 spec(API 21 引入),
+                // 改为按容器尺寸三等分算出每格固定宽高(减掉 3 列各自的左右 margin)。
+                gridParams.rowSpec = GridLayout.spec(index / 3)
+                gridParams.columnSpec = GridLayout.spec(index % 3)
+                gridParams.width = if (grid.width > 0) (grid.width - dp(18)) / 3 else dp(96)
+                gridParams.height = if (grid.height > 0) (grid.height - dp(18)) / 3 else dp(96)
+            }
+            grid.addView(tile, gridParams)
         }
     }
 
@@ -9178,7 +9205,7 @@ class MainActivity : AppCompatActivity() {
                 setBackgroundColor(Color.rgb(24, 17, 45))
                 isClickable = true
                 isFocusable = true
-                elevation = dp(30).toFloat()
+                UiCompat.setElevation(this, dp(30).toFloat())
             }
             // 启动加载遮罩铺满整屏: 不允许被焦点/按下填充覆盖, 否则点击启动界面会整屏变纯色。
             TvFocusStyler.suppressFill(overlay)
@@ -9189,9 +9216,18 @@ class MainActivity : AppCompatActivity() {
                     setImageResource(R.drawable.ktv_logo)
                     scaleType = ImageView.ScaleType.CENTER_INSIDE
                 }, LinearLayout.LayoutParams(dp(112), dp(112)))
-                addView(ProgressBar(this@MainActivity, null, 0, R.style.LoadingProgressBar), LinearLayout.LayoutParams(dp(54), dp(54)).apply {
-                    topMargin = dp(22)
-                })
+                addView(
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                        ProgressBar(this@MainActivity, null, 0, R.style.LoadingProgressBar)
+                    } else {
+                        // Android 4.4 没有带 defStyleRes 的 4 参构造器(API 21 引入),
+                        // 手动套用 LoadingProgressBar 里同样的 indeterminate drawable。
+                        ProgressBar(this@MainActivity).apply {
+                            indeterminateDrawable = ContextCompat.getDrawable(this@MainActivity, R.anim.loading_anim)
+                        }
+                    },
+                    LinearLayout.LayoutParams(dp(54), dp(54)).apply { topMargin = dp(22) },
+                )
                 databaseLoadingText = TextView(this@MainActivity).apply {
                     textSize = 20f
                     gravity = Gravity.CENTER
@@ -9201,7 +9237,7 @@ class MainActivity : AppCompatActivity() {
                 addView(databaseLoadingText, LinearLayout.LayoutParams(dp(620), -2))
                 databaseLoadingProgress = ProgressBar(this@MainActivity, null, android.R.attr.progressBarStyleHorizontal).apply {
                     max = 100
-                    progressDrawable = getDrawable(R.drawable.bg_download_progress)
+                    progressDrawable = ContextCompat.getDrawable(context, R.drawable.bg_download_progress)
                 }
                 addView(databaseLoadingProgress, LinearLayout.LayoutParams(dp(620), dp(10)))
                 databaseRetryButton = TextView(this@MainActivity).apply {

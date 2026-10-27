@@ -1,14 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ripple android:color="@color/androidx_core_ripple_material_light"
-  xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:id="@android:id/mask">
-        <inset android:insetLeft="@dimen/compat_button_inset_horizontal_material" android:insetRight="@dimen/compat_button_inset_horizontal_material" android:insetTop="@dimen/compat_button_inset_vertical_material" android:insetBottom="@dimen/compat_button_inset_vertical_material"
-          xmlns:android="http://schemas.android.com/apk/res/android">
-            <shape android:shape="rectangle">
-                <corners android:radius="@dimen/compat_control_corner_material" />
-                <solid android:color="@android:color/white" />
-                <padding android:left="@dimen/compat_button_padding_horizontal_material" android:top="@dimen/compat_button_padding_vertical_material" android:right="@dimen/compat_button_padding_horizontal_material" android:bottom="@dimen/compat_button_padding_vertical_material" />
-            </shape>
-        </inset>
-    </item>
-</ripple>
+<!--
+  Android 4.4(API 19) 版本：系统不支持 <ripple>（API 21 引入），
+  用 selector 模拟「按下时高亮」的等效效果。
+  真正的 <ripple> 版本在 res/drawable-v21/ 中，API 21+ 设备仍走原实现。
+-->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true" android:drawable="@color/androidx_core_ripple_material_light" />
+    <item android:drawable="@android:color/transparent" />
+</selector>

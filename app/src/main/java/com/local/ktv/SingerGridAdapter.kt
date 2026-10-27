@@ -2,12 +2,10 @@ package com.local.ktv
 
 import android.content.Context
 import android.graphics.Color
-import android.graphics.Outline
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
-import android.view.ViewOutlineProvider
 import android.widget.BaseAdapter
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -57,12 +55,8 @@ class SingerGridAdapter(
                 importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
                 scaleType = ImageView.ScaleType.CENTER_CROP
                 SingerAvatarLoader.load(this, singer.getOrNull(5), R.drawable.ic_singer_placeholder)
-                outlineProvider = object : ViewOutlineProvider() {
-                    override fun getOutline(view: View, outline: Outline) {
-                        outline.setOval(0, 0, view.width, view.height)
-                    }
-                }
-                clipToOutline = true
+                // Android 4.4 不支持 outline 圆形裁剪, UiCompat 内部按版本跳过(退化为方形头像)。
+                UiCompat.applyCircleOutline(this)
             }
             addView(avatar, LinearLayout.LayoutParams(dp(88), dp(88)).apply { topMargin = dp(21) })
 

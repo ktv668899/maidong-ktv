@@ -3,9 +3,13 @@
  * ====================================
  * 从 Gitea 热更新, App 无需发版即可修复 API 变更
  *
+ * ⚠️ 必须保持 ES5 语法(无 async/await、无 const/let、无箭头函数、无模板字符串):
+ *    本脚本由 App 内 WebView 直接执行, 而低版本设备(Android 4.4 = Chromium 33)
+ *    不认识 ES6+ 语法, 一旦出现语法错误整个脚本解析失败 → 点歌全挂。
+ *
  * 用法:
- *   const api = new KtvApi({proxy: 'http://127.0.0.1:7897'})
- *   const url = await api.getSongUrl('7678785')
+ *   var api = new KtvApi({proxy: 'http://127.0.0.1:7897'})
+ *   api.getSongUrl('7678785').then(function(url) { ... })
  *   // → http://download.origjoy.com/E/ts/.../7678785.ts?sign=...
  */
 
@@ -15,7 +19,7 @@
   // KTV_BRIDGE_API: 9 (Android 缓存校验标记，请勿删除)
 
   // ─── 配置 ──────────────────────────────────────────
-  const CONFIG = {
+  var CONFIG = {
     APP_ID:  'd4eeacc6cec3434fbc8c41608a3056a0',
     APP_KEY: '024210cba40d4385a93e6c2d3249bfb5',
     SDK_KEY: '19042303a8374f67ae3fe1e25c97936f',
@@ -94,13 +98,17 @@
   }
 
   // ─── RSA Encrypt ───────────────────────────────────
-  async function rsaEncrypt(plaintext) {
-    if (global.android && typeof global.android.rsaEncryptPkcs1 === 'function') {
-      var encrypted = global.android.rsaEncryptPkcs1(CONFIG.RSA_PUBKEY, plaintext);
-      if (!encrypted) throw new Error('native RSA encryption failed');
-      return encrypted;
-    }
-    throw new Error('RSA/PKCS1 bridge is unavailable');
+  // 同步 native 调用包装成 Promise(原 async 实现, 改为 ES5 兼容)。
+  function rsaEncrypt(plaintext) {
+    return new Promise(function(resolve, reject) {
+      if (global.android && typeof global.android.rsaEncryptPkcs1 === 'function') {
+        var encrypted = global.android.rsaEncryptPkcs1(CONFIG.RSA_PUBKEY, plaintext);
+        if (!encrypted) { reject(new Error('native RSA encryption failed')); return; }
+        resolve(encrypted);
+        return;
+      }
+      reject(new Error('RSA/PKCS1 bridge is unavailable'));
+    });
   }
 
   // ─── HTTP ──────────────────────────────────────────
@@ -131,12 +139,18 @@
     } catch(e) { /* 日志失败不影响点歌 */ }
   }
 
-  async function httpGet(url, timeout) {
+  function httpGet(url, timeout) {
     timeout = timeout || 8000;
     // 原 APK 的 native GET 抓包只带 Accept: */*，不伪造来源 IP。
     var headers = {'Accept': '*/*'};
     if (global.android && typeof global.android.httpGet === 'function') {
-      return nativeResponse(global.android.httpGet(url, JSON.stringify(headers), timeout));
+      return new Promise(function(resolve, reject) {
+        try {
+          resolve(nativeResponse(global.android.httpGet(url, JSON.stringify(headers), timeout)));
+        } catch (e) {
+          reject(e);
+        }
+      });
     }
     return new Promise(function(resolve, reject) {
       var xhr = new XMLHttpRequest();
@@ -149,11 +163,17 @@
     });
   }
 
-  async function httpPost(url, body, timeout) {
+  function httpPost(url, body, timeout) {
     timeout = timeout || 8000;
     var headers = {'Content-Type':'application/json', 'Accept':'*/*', 'User-Agent':'Dalvik/2.1.0'};
     if (global.android && typeof global.android.httpPost === 'function') {
-      return nativeResponse(global.android.httpPost(url, body, JSON.stringify(headers), timeout));
+      return new Promise(function(resolve, reject) {
+        try {
+          resolve(nativeResponse(global.android.httpPost(url, body, JSON.stringify(headers), timeout)));
+        } catch (e) {
+          reject(e);
+        }
+      });
     }
     return new Promise(function(resolve, reject) {
       var xhr = new XMLHttpRequest();
@@ -178,7 +198,8 @@
     // 某源解析失败时把它挪到队尾, 下次点歌优先尝试更可靠的源。
     this.sourceOrder = (options.hosts && options.hosts.length ? options.hosts : CONFIG.HOSTS).slice();
     // 与 test_ktv_unified.py 一致：首次设备加最多 3 次换设备重试。
-    this.maxDeviceRetries = Number.isFinite(Number(options.maxDeviceRetries))
+    // 用全局 isFinite 而非 Number.isFinite(后者是 ES6, Chromium 33 上没有)。
+    this.maxDeviceRetries = isFinite(Number(options.maxDeviceRetries))
       ? Math.max(0, Number(options.maxDeviceRetries) | 0) : 3;
     // 兼容旧远程脚本/调试代码读取单 token 的行为。
     this.token = '';
@@ -217,17 +238,17 @@
     },
 
     // 1. MWS Login
-    mwsLogin: async function() {
+    mwsLogin: function() {
       var self = this;
       var plaintext = JSON.stringify({device_id: self.mac});
       self._log('MWS login...');
-      try {
-        var encrypted = await rsaEncrypt(plaintext);
+      return rsaEncrypt(plaintext).then(function(encrypted) {
         var body = JSON.stringify({
           encrypted_data: encrypted, ip: '172.16.32.15', dns: '', router: '',
           subnet_mask: '255.255.255.0', channel: 'common', mode: 'ott'
         });
-        var resp = await httpPost(CONFIG.MWS + '/mls-api/v1/login', body);
+        return httpPost(CONFIG.MWS + '/mls-api/v1/login', body);
+      }).then(function(resp) {
         if (resp.status === 200) {
           var data = parseJsonBody(resp.body);
           if (data.authorized) {
@@ -241,19 +262,19 @@
         }
         self._log('MWS login FAIL: ' + resp.status);
         return false;
-      } catch(e) {
+      }).catch(function(e) {
         self._log('MWS login error: ' + e.message);
         return false;
-      }
+      });
     },
 
     // 2. Get Auth Token
-    getToken: async function(host, forceRefresh) {
+    getToken: function(host, forceRefresh) {
       var self = this;
       host = host || CONFIG.HOSTS[0];
       if (!forceRefresh && self.tokens[host]) {
         self.token = self.tokens[host];
-        return self.token;
+        return Promise.resolve(self.token);
       }
       var ts = Math.floor(Date.now() / 1000);
       var params = 'appid=' + CONFIG.APP_ID +
@@ -264,8 +285,7 @@
       var sign = md5(params + CONFIG.APP_KEY);
       var url = host + '/i.php?' + params + '&sign=' + sign;
       self._log('Getting token: ' + host);
-      try {
-        var resp = await httpGet(url);
+      return httpGet(url).then(function(resp) {
         if (resp.status === 200) {
           var data = parseJsonBody(resp.body);
           if (data.code === 200) {
@@ -278,11 +298,11 @@
         delete self.tokens[host];
         self._log('Token FAIL: ' + host + ', HTTP ' + resp.status);
         return null;
-      } catch(e) {
+      }).catch(function(e) {
         delete self.tokens[host];
         self._log('Token error: ' + host + ', ' + e.message);
         return null;
-      }
+      });
     },
 
     clearToken: function(host) {
@@ -290,7 +310,7 @@
       this.token = '';
     },
 
-    _fetchSongUrl: async function(host, musicno, token, ls, resolution, h265) {
+    _fetchSongUrl: function(host, musicno, token, ls, resolution, h265) {
       var ts = Math.floor(Date.now() / 1000);
       // 参数顺序、原始 token 中的 "=" 以及签名拼接必须与原 APK 保持一致。
       var params = 'appid=' + CONFIG.APP_ID +
@@ -303,94 +323,116 @@
         '&time=' + ts +
         '&token=' + token;
       var sign = md5(params + CONFIG.SDK_KEY);
-      var resp = await httpGet(host + '/music/do.php?' + params + '&sign=' + sign);
-      if (resp.status !== 200) {
-        return {code: null, data: '', httpStatus: resp.status};
-      }
-      return parseJsonBody(resp.body);
+      return httpGet(host + '/music/do.php?' + params + '&sign=' + sign).then(function(resp) {
+        if (resp.status !== 200) {
+          return {code: null, data: '', httpStatus: resp.status};
+        }
+        return parseJsonBody(resp.body);
+      });
     },
 
     // 3. Get Song Download URL
     // 多源自动排序: 按 this.sourceOrder(当前优先级)依次尝试; 某源解析失败
     // (token 失败 / do.php 非 200 / 无有效 URL)时立即 demote 到队尾,
     // 下次点歌自动优先使用更可靠的源。全部源失败返回 null。
-    getSongUrl: async function(musicno, resolution, h265, _preferredLs) {
+    getSongUrl: function(musicno, resolution, h265, _preferredLs) {
       resolution = resolution || '720';
       h265 = !!h265;
       var self = this;
       var lastDetail = '';
       var lastAttemptHost = '';
-      for (var deviceRound = 0; deviceRound <= self.maxDeviceRetries; deviceRound++) {
-        if (deviceRound > 0) self.regenerateDevice();
-        // 每一轮使用当时的优先级快照; demote 动态修改 sourceOrder。
-        var order = self.sourceOrder.slice();
-        for (var hostIndex = 0; hostIndex < order.length; hostIndex++) {
-          var host = order[hostIndex];
-          lastAttemptHost = host;
-          self._log('Try source (' + (hostIndex + 1) + '/' + order.length + '): ' + host);
+      // 各源同后台, 只试 ls=1(其余 ls 值会被其风控直接拒绝, 反复试会放大请求量)。
+      var lsValues = ['1'];
 
-          var token = await self.getToken(host, false);
+      // 原实现是 async/await 的三重循环, 此处改写为等价的串行 Promise 链
+      // (Android 4.4 的 WebView 不支持 async/await):
+      //   attemptDevices(换设备重试轮次) → attemptHosts(依次尝试各源) → attemptLs(单个源内各 ls)
+      // 命中 URL 后沿 Promise 链逐层向上返回; 全部失败返回 null。
+
+      function attemptLs(host, token, lsi, state) {
+        if (lsi >= lsValues.length || state.hostOk) return Promise.resolve(null);
+        var ls = lsValues[lsi];
+        return self._fetchSongUrl(host, musicno, token, ls, resolution, h265).then(function(data) {
+          // token 恒定不变; do.php 403"检测到异常行为"是风控限流, 与 token 过期无关。
+          // 失败时同 token 短退避重试一次, 不再清 token 重取 i.php。
+          if (data.code !== 200) {
+            state.hostDetail = 'do.php code=' + data.code + ' http=' + (data.httpStatus || 0);
+            self._log(state.hostDetail + ' for ' + musicno + ' ls=' + ls + '; retry once with same token');
+            return sleep(3000).then(function() {
+              return self._fetchSongUrl(host, musicno, token, ls, resolution, h265);
+            });
+          }
+          return data;
+        }).then(function(data) {
+          if (data && data.code === 200) {
+            var songUrl = data.data || '';
+            if (songUrl && /^https?:\/\//i.test(songUrl)) {
+              self._log('URL OK: ' + musicno + ' ls=' + ls + ' via ' + host);
+              self.promoteSource(host);
+              state.hostOk = true;
+              // 任务3: 点歌成功上报命中的源(Android 侧写入远程日志)。
+              reportSongResult(true, host, musicno, 'ok');
+              return songUrl;
+            }
+          }
+          return attemptLs(host, token, lsi + 1, state);
+        }).catch(function(e) {
+          state.hostDetail = e.message;
+          self._log('Failed ls=' + ls + ': ' + host + ', ' + e.message);
+          return attemptLs(host, token, lsi + 1, state);
+        });
+      }
+
+      function attemptHosts(order, hostIndex) {
+        if (hostIndex >= order.length) return Promise.resolve(null);
+        var host = order[hostIndex];
+        lastAttemptHost = host;
+        self._log('Try source (' + (hostIndex + 1) + '/' + order.length + '): ' + host);
+        return self.getToken(host, false).then(function(token) {
           if (!token) {
             lastDetail = 'token-fail';
             self._log('token-fail: ' + host + ' → demote');
             self.demoteSource(host);
-            continue;
+            return attemptHosts(order, hostIndex + 1);
           }
-
-          // 各源同后台, 只试 ls=1(其余 ls 值会被其风控直接拒绝, 反复试会放大请求量)。
-          var lsValues = ['1'];
-          var hostOk = false;
-          var hostDetail = '';
-
-          for (var lsi = 0; lsi < lsValues.length && !hostOk; lsi++) {
-            var ls = lsValues[lsi];
-            try {
-              var data = await self._fetchSongUrl(host, musicno, token, ls, resolution, h265);
-              // token 恒定不变; do.php 403"检测到异常行为"是风控限流, 与 token 过期无关。
-              // 失败时同 token 短退避重试一次, 不再清 token 重取 i.php。
-              var needRetry = data.code !== 200;
-              if (needRetry) {
-                hostDetail = 'do.php code=' + data.code + ' http=' + (data.httpStatus || 0);
-                self._log(hostDetail + ' for ' + musicno + ' ls=' + ls + '; retry once with same token');
-                await sleep(3000);
-                data = await self._fetchSongUrl(host, musicno, token, ls, resolution, h265);
-              }
-
-              if (data.code === 200) {
-                var songUrl = data.data || '';
-                if (songUrl && /^https?:\/\//i.test(songUrl)) {
-                  self._log('URL OK: ' + musicno + ' ls=' + ls + ' via ' + host);
-                  self.promoteSource(host);
-                  hostOk = true;
-                  // 任务3: 点歌成功上报命中的源(Android 侧写入远程日志)。
-                  reportSongResult(true, host, musicno, 'ok');
-                  return songUrl;
-                }
-              }
-            } catch(e) {
-              hostDetail = e.message;
-              self._log('Failed ls=' + ls + ': ' + host + ', ' + e.message);
+          var state = {hostOk: false, hostDetail: ''};
+          return attemptLs(host, token, 0, state).then(function(result) {
+            if (result) return result;
+            // 该源所有 ls 都未取到有效 URL → 判定解析失败, 排到最后。
+            if (!state.hostOk) {
+              lastDetail = state.hostDetail || 'no-url';
+              self._log('Source failed (' + (state.hostDetail || 'no-url') + ') → demote: ' + host);
+              self.demoteSource(host);
             }
-          }
-
-          // 该源所有 ls 都未取到有效 URL → 判定解析失败, 排到最后。
-          if (!hostOk) {
-            lastDetail = hostDetail || 'no-url';
-            self._log('Source failed (' + (hostDetail || 'no-url') + ') → demote: ' + host);
-            self.demoteSource(host);
-          }
-        }
+            return attemptHosts(order, hostIndex + 1);
+          });
+        });
       }
-      self._log('All sources exhausted for ' + musicno + ' (' + lastDetail + ')');
-      // 任务3: 全部源失败 → 上报最后尝试的源与原因。
-      reportSongResult(false, lastAttemptHost, musicno, lastDetail || 'all-sources-failed');
-      return null;
+
+      function attemptDevices(deviceRound) {
+        if (deviceRound > self.maxDeviceRetries) return Promise.resolve(null);
+        if (deviceRound > 0) self.regenerateDevice();
+        // 每一轮使用当时的优先级快照; demote 动态修改 sourceOrder。
+        var order = self.sourceOrder.slice();
+        return attemptHosts(order, 0).then(function(result) {
+          if (result) return result;
+          return attemptDevices(deviceRound + 1);
+        });
+      }
+
+      return attemptDevices(0).then(function(result) {
+        if (result) return result;
+        self._log('All sources exhausted for ' + musicno + ' (' + lastDetail + ')');
+        // 任务3: 全部源失败 → 上报最后尝试的源与原因。
+        reportSongResult(false, lastAttemptHost, musicno, lastDetail || 'all-sources-failed');
+        return null;
+      });
     },
 
     // 4. Full init sequence
-    init: async function() {
+    init: function() {
       // token 获取属于每个主/备节点请求的一部分；这里不提前绑定单一节点。
-      return true;
+      return Promise.resolve(true);
     }
   };
 

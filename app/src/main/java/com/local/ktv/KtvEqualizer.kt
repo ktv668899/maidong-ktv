@@ -3,6 +3,7 @@ package com.local.ktv
 import android.content.Context
 import android.media.AudioManager
 import android.media.audiofx.Equalizer
+import android.os.Build
 import android.util.Log
 import kotlin.math.min
 import kotlin.math.round
@@ -102,10 +103,15 @@ object KtvEqualizer {
         cachedCaps?.let { return it }
         synchronized(this) {
             cachedCaps?.let { return it }
-            val probeSession = runCatching {
-                (context.getSystemService(Context.AUDIO_SERVICE) as AudioManager)
-                    .generateAudioSessionId()
-            }.getOrDefault(GLOBAL_SESSION)
+            // generateAudioSessionId 是 API 21 引入的; Android 4.4 没有, 直接用全局会话探测。
+            val probeSession = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                runCatching {
+                    (context.getSystemService(Context.AUDIO_SERVICE) as AudioManager)
+                        .generateAudioSessionId()
+                }.getOrDefault(GLOBAL_SESSION)
+            } else {
+                GLOBAL_SESSION
+            }
             val caps = probe(probeSession) ?: probe(GLOBAL_SESSION)
                 ?: Capabilities(FALLBACK_FREQUENCIES, -15f, 15f)
             cachedCaps = caps

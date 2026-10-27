@@ -11,6 +11,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import kotlin.math.ceil
 
 data class SongRowState(
@@ -204,7 +205,7 @@ class SongListAdapter(
                 addView(ProgressBar(context, null, android.R.attr.progressBarStyleHorizontal).apply {
                     max = 100
                     progress = state.progress
-                    progressDrawable = context.getDrawable(R.drawable.bg_download_progress)
+                    progressDrawable = ContextCompat.getDrawable(context, R.drawable.bg_download_progress)
                 }, LinearLayout.LayoutParams(dp(90), dp(8)).apply { marginEnd = dp(6) })
             }
             when {

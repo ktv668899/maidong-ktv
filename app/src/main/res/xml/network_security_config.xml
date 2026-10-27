@@ -11,6 +11,12 @@
             <certificates src="@raw/isrg_root_x1" />
             <certificates src="@raw/isrg_root_yr" />
             <certificates src="@raw/letsencrypt_yr1" />
+            <!-- 沃通/Sectigo 链 (曲库文件所在的阿里云 OSS ali.pri.mcdn.cherryonline.cn)：
+                 leaf ← WoTrus RSA DV SSL CA 2 ← Sectigo Root R46 ← USERTrust RSA。
+                 老系统信任库没有这些根，曲库下载这一步握手失败。 -->
+            <certificates src="@raw/wotrus_rsa_dv_ssl_ca_2" />
+            <certificates src="@raw/sectigo_root_r46" />
+            <certificates src="@raw/usertrust_rsa_ca" />
         </trust-anchors>
     </base-config>
 </network-security-config>
