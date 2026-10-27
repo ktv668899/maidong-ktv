@@ -31,7 +31,7 @@
 4. **发布是手动操作**：**未收到明确的「发布新版本」指令时，默认只在本地打包测试**——
    产物按内部测试约定命名 `maidong-ktv-<版本>-<改动说明>-双ABI-release.apk`，
    **不创建 Release、不上传附件、不推送 tag、不在 Gitea/Gitee 建 Release**。
-   只有收到发布指令后，才按「发布新版本」小节在 Gitea（以及需要的 Gitee）建 Release。
+   只有收到发布指令后，才按「发布新版本」小节在 Gitea、Gitee、GitHub 三处建 Release。
    > ⚠️ **不要混淆"交付"与"发布"**：向 Gitea/Gitee `git push origin master` 同步代码（规则 1）、
    > 本地构建/签名出 `*-release.apk`（规则 4 前半段）**都不算发布**，不需要、也不得顺带
    > 建 Release / 打 tag / 传附件。发布动作只有三个：建 Release、打 tag、上传附件；
@@ -116,8 +116,35 @@ curl -X POST -H "Authorization: token $GT" \
 > 发布后务必校验下载：`curl -sL <browser_download_url> | md5sum` 应与本地发布包一致
 > （Gitea 侧同样要校验 `/releases/download/<tag>/<文件>` 规范路径返回 200）。
 >
-> **发版时 Gitea 与 Gitee 都要建 Release**（2026-10-01 起）：Gitea 供 App 内更新检查，
-> Gitee 供开源页访客下载，两边保持同 tag、同附件名（`maidong-ktv-release.apk`）。
+> **发版时 Gitea、Gitee、GitHub 三处都要建 Release**（Gitee 2026-10-01 起，GitHub 2026-10-27 起）：
+> Gitea 供 App 内更新检查，Gitee / GitHub 供开源页访客下载，三边保持同 tag、同附件名
+> （`maidong-ktv-release.apk`，Gitee 也必须用 ASCII 名以便与另两端一致）。
+
+### 发布新版本（GitHub Release）
+
+> ⚠️ 本机沙箱代理封了 `github.com:443`（CONNECT 502），但 `api.github.com` 与
+> `uploads.github.com` 可用，**建 Release / 传附件走 API 没问题**；只有浏览器式大文件下载
+> 会被代理截断（校验附件用 API 返回的 `digest`（sha256）与 `size`，不要用 curl 下载比对）。
+
+```bash
+# 前置：先把源码与 tag 镜像过去（Gitee → GitHub，含 GitHub 专属徽章版 README）
+bash /e/work/backups/sync-gitee-to-github.sh
+
+# 1) 建 Release（tag 已由上一步推送，target_commitish 用 master）
+curl -X POST -H "Authorization: token $GH" -H "Content-Type: application/json" \
+  -d '{"tag_name":"v1.5.10","name":"麦动KTV V1.5.10","body":"更新说明","target_commitish":"master"}' \
+  https://api.github.com/repos/ktv668899/maidong-ktv/releases
+
+# 2) 上传附件（body 走二进制，Content-Type 用 android 包；用返回的 release id）
+curl -X POST -H "Authorization: token $GH" \
+  -H "Content-Type: application/vnd.android.package-archive" \
+  --data-binary "@maidong-ktv-release.apk" \
+  "https://uploads.github.com/repos/ktv668899/maidong-ktv/releases/<id>/assets?name=maidong-ktv-release.apk"
+```
+
+> 校验：`GET /releases/assets/{asset_id}` 返回的 `digest`（`sha256:...`）应与本地
+> `sha256sum maidong-ktv-release.apk` 完全一致，`state` 为 `uploaded`。
+> 令牌只存在于本机命令行，**不得写入仓库内任何文件**。
 >
 > ⚠️ **跨机镜像历史 Release 时附件地址必须换公网**：Gitea API 返回的
 > `browser_download_url` 指向内网 `172.18.20.4:3000`，不同网段的机器不可达
